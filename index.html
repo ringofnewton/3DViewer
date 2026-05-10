@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lymph Node 3D Viewer</title>
+
+  <!-- Google <model-viewer>: GLB/GLTF 3D model viewer -->
+  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #08090d;
+      --panel: rgba(255, 255, 255, 0.08);
+      --panel-border: rgba(255, 255, 255, 0.18);
+      --text: #f5f7fb;
+      --muted: #a8afc2;
+      --accent: #8ab4ff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 20% 10%, rgba(255, 0, 80, 0.20), transparent 30%),
+        radial-gradient(circle at 80% 20%, rgba(0, 70, 255, 0.22), transparent 32%),
+        radial-gradient(circle at 50% 90%, rgba(255, 255, 255, 0.09), transparent 28%),
+        var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    .page {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    header {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 22px;
+      backdrop-filter: blur(18px);
+      background: rgba(0, 0, 0, 0.22);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+    }
+
+    .title-block h1 {
+      margin: 0;
+      font-size: clamp(18px, 2vw, 28px);
+      font-weight: 750;
+      letter-spacing: -0.03em;
+    }
+
+    .title-block p {
+      margin: 4px 0 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 10px;
+      border: 1px solid var(--panel-border);
+      border-radius: 999px;
+      background: var(--panel);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      box-shadow: 0 0 18px currentColor;
+    }
+
+    .red { color: #ff315f; background: #ff315f; }
+    .blue { color: #3d7bff; background: #3d7bff; }
+    .white { color: #ffffff; background: #ffffff; }
+
+    .viewer-wrap {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    model-viewer {
+      width: 100%;
+      height: 100%;
+      background-color: transparent;
+      --poster-color: transparent;
+    }
+
+    .help {
+      position: absolute;
+      left: 18px;
+      bottom: 18px;
+      z-index: 20;
+      max-width: min(430px, calc(100vw - 36px));
+      padding: 14px 16px;
+      border: 1px solid var(--panel-border);
+      border-radius: 22px;
+      background: rgba(0, 0, 0, 0.42);
+      backdrop-filter: blur(18px);
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .help strong {
+      color: var(--text);
+    }
+
+    @media (max-width: 700px) {
+      header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .legend {
+        justify-content: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <div class="title-block">
+        <h1>Lymph Node 3D Viewer</h1>
+        <p>Light-sheet microscopy surface rendering · GLB interactive viewer</p>
+      </div>
+
+      <div class="legend" aria-label="Channel legend">
+        <span class="chip"><span class="dot red"></span>T cells</span>
+        <span class="chip"><span class="dot blue"></span>B cell follicle</span>
+        <span class="chip"><span class="dot white"></span>Collagen</span>
+      </div>
+    </header>
+
+    <section class="viewer-wrap">
+      <!-- Replace lymph_node.glb with your exported GLB file name. -->
+      <model-viewer
+        src="lymph_node.glb"
+        alt="3D rendering of a lymph node showing T cells, B cell follicle, and collagen"
+        camera-controls
+        touch-action="pan-y"
+        interaction-prompt="auto"
+        auto-rotate
+        auto-rotate-delay="2500"
+        rotation-per-second="18deg"
+        exposure="1.15"
+        shadow-intensity="0"
+        environment-image="neutral"
+        camera-orbit="45deg 65deg auto"
+        min-camera-orbit="auto auto 0.05m"
+        max-camera-orbit="auto auto 100m"
+        field-of-view="28deg">
+      </model-viewer>
+
+      <div class="help">
+        <strong>Galaxy Tab controls:</strong><br />
+        one-finger drag / S Pen drag = rotate · pinch = zoom · two-finger drag = pan.<br />
+        Put this file and <strong>lymph_node.glb</strong> in the same folder before uploading.
+      </div>
+    </section>
+  </main>
+</body>
+</html>
