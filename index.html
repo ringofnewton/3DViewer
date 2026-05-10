@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Lymph Node 3D Viewer</title>
+  <title>3DViewer</title>
 
   <!-- Google <model-viewer>: GLB/GLTF 3D model viewer -->
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
@@ -12,6 +12,7 @@
     :root {
       --bg: #08090d;
       --panel: rgba(255, 255, 255, 0.08);
+      --panel-strong: rgba(255, 255, 255, 0.14);
       --panel-border: rgba(255, 255, 255, 0.18);
       --text: #f5f7fb;
       --muted: #a8afc2;
@@ -45,27 +46,79 @@
     header {
       position: relative;
       z-index: 10;
-      display: flex;
+      display: grid;
+      grid-template-columns: 1fr auto;
       align-items: center;
-      justify-content: space-between;
-      gap: 16px;
+      gap: 18px;
       padding: 18px 22px;
       backdrop-filter: blur(18px);
-      background: rgba(0, 0, 0, 0.22);
+      background: rgba(0, 0, 0, 0.24);
       border-bottom: 1px solid rgba(255, 255, 255, 0.10);
     }
 
     .title-block h1 {
       margin: 0;
-      font-size: clamp(18px, 2vw, 28px);
-      font-weight: 750;
-      letter-spacing: -0.03em;
+      font-size: clamp(22px, 2.4vw, 34px);
+      font-weight: 800;
+      letter-spacing: -0.045em;
     }
 
     .title-block p {
       margin: 4px 0 0;
       font-size: 13px;
       color: var(--muted);
+    }
+
+    .right-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 10px;
+    }
+
+    .upload-box {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      border: 1px solid var(--panel-border);
+      border-radius: 18px;
+      background: var(--panel);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
+    }
+
+    .upload-label {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      padding: 0 15px;
+      border-radius: 13px;
+      background: rgba(255, 255, 255, 0.92);
+      color: #11131a;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      user-select: none;
+      transition: transform 120ms ease, background 120ms ease;
+    }
+
+    .upload-label:hover {
+      transform: translateY(-1px);
+      background: #ffffff;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .file-name {
+      max-width: 280px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--muted);
+      font-size: 13px;
     }
 
     .legend {
@@ -81,11 +134,11 @@
       display: inline-flex;
       align-items: center;
       gap: 7px;
-      padding: 8px 10px;
+      padding: 7px 10px;
       border: 1px solid var(--panel-border);
       border-radius: 999px;
       background: var(--panel);
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
     }
 
     .dot {
@@ -112,12 +165,45 @@
       --poster-color: transparent;
     }
 
+    .empty-state {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      display: grid;
+      place-items: center;
+      pointer-events: none;
+    }
+
+    .empty-card {
+      width: min(520px, calc(100vw - 36px));
+      padding: 26px;
+      border: 1px solid var(--panel-border);
+      border-radius: 28px;
+      background: rgba(0, 0, 0, 0.42);
+      backdrop-filter: blur(18px);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
+      text-align: center;
+    }
+
+    .empty-card h2 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      letter-spacing: -0.03em;
+    }
+
+    .empty-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
     .help {
       position: absolute;
       left: 18px;
       bottom: 18px;
       z-index: 20;
-      max-width: min(430px, calc(100vw - 36px));
+      max-width: min(460px, calc(100vw - 36px));
       padding: 14px 16px;
       border: 1px solid var(--panel-border);
       border-radius: 22px;
@@ -133,10 +219,23 @@
       color: var(--text);
     }
 
-    @media (max-width: 700px) {
+    .hidden {
+      display: none;
+    }
+
+    @media (max-width: 820px) {
       header {
+        grid-template-columns: 1fr;
         align-items: flex-start;
-        flex-direction: column;
+      }
+
+      .right-panel {
+        width: 100%;
+        align-items: stretch;
+      }
+
+      .upload-box {
+        justify-content: space-between;
       }
 
       .legend {
@@ -149,22 +248,29 @@
   <main class="page">
     <header>
       <div class="title-block">
-        <h1>Lymph Node 3D Viewer</h1>
-        <p>Light-sheet microscopy surface rendering · GLB interactive viewer</p>
+        <h1>3DViewer</h1>
+        <p>Upload a GLB/GLTF file and inspect your light-sheet 3D rendering interactively.</p>
       </div>
 
-      <div class="legend" aria-label="Channel legend">
-        <span class="chip"><span class="dot red"></span>T cells</span>
-        <span class="chip"><span class="dot blue"></span>B cell follicle</span>
-        <span class="chip"><span class="dot white"></span>Collagen</span>
+      <div class="right-panel">
+        <div class="upload-box">
+          <label class="upload-label" for="modelUpload">Upload GLB</label>
+          <input id="modelUpload" type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" />
+          <span id="fileName" class="file-name">No file selected</span>
+        </div>
+
+        <div class="legend" aria-label="Channel legend">
+          <span class="chip"><span class="dot red"></span>T cells</span>
+          <span class="chip"><span class="dot blue"></span>B cell follicle</span>
+          <span class="chip"><span class="dot white"></span>Collagen</span>
+        </div>
       </div>
     </header>
 
     <section class="viewer-wrap">
-      <!-- Replace lymph_node.glb with your exported GLB file name. -->
       <model-viewer
-        src="lymph_node.glb"
-        alt="3D rendering of a lymph node showing T cells, B cell follicle, and collagen"
+        id="viewer"
+        alt="3D rendering viewer"
         camera-controls
         touch-action="pan-y"
         interaction-prompt="auto"
@@ -180,12 +286,54 @@
         field-of-view="28deg">
       </model-viewer>
 
+      <div id="emptyState" class="empty-state">
+        <div class="empty-card">
+          <h2>Upload your 3D model</h2>
+          <p>
+            Export your Imaris/Blender rendering as <strong>.glb</strong>, then select it above.<br />
+            The file opens locally in this browser and is not permanently stored on the website.
+          </p>
+        </div>
+      </div>
+
       <div class="help">
         <strong>Galaxy Tab controls:</strong><br />
         one-finger drag / S Pen drag = rotate · pinch = zoom · two-finger drag = pan.<br />
-        Put this file and <strong>lymph_node.glb</strong> in the same folder before uploading.
+        Recommended format: <strong>GLB</strong> with material colors preserved.
       </div>
     </section>
   </main>
+
+  <script>
+    const input = document.getElementById("modelUpload");
+    const viewer = document.getElementById("viewer");
+    const fileName = document.getElementById("fileName");
+    const emptyState = document.getElementById("emptyState");
+
+    let currentObjectUrl = null;
+
+    input.addEventListener("change", () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+
+      const lowerName = file.name.toLowerCase();
+      const isValid = lowerName.endsWith(".glb") || lowerName.endsWith(".gltf");
+
+      if (!isValid) {
+        alert("Please upload a .glb or .gltf file.");
+        input.value = "";
+        return;
+      }
+
+      if (currentObjectUrl) {
+        URL.revokeObjectURL(currentObjectUrl);
+      }
+
+      currentObjectUrl = URL.createObjectURL(file);
+      viewer.src = currentObjectUrl;
+      fileName.textContent = file.name;
+      emptyState.classList.add("hidden");
+    });
+  </script>
 </body>
 </html>
