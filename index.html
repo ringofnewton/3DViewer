@@ -174,6 +174,42 @@
       line-height: 1.55;
     }
 
+    .share-panel {
+      position: absolute;
+      left: 18px;
+      bottom: max(18px, env(safe-area-inset-bottom));
+      z-index: 24;
+      width: min(620px, calc(100vw - 36px));
+      padding: 12px 14px;
+      border: 1px solid var(--panel-border);
+      border-radius: 18px;
+      background: rgba(0, 0, 0, 0.52);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    .share-title {
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .share-input {
+      width: 100%;
+      min-height: 36px;
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 0 10px;
+      background: rgba(255, 255, 255, 0.10);
+      color: var(--text);
+      font-size: 12px;
+      outline: none;
+    }
+
     .status {
       position: absolute;
       right: 18px;
@@ -254,6 +290,10 @@
         </div>
       </div>
 
+      <div id="sharePanel" class="share-panel hidden">
+        <div class="share-title">Share URL</div>
+        <input id="shareUrlInput" class="share-input" readonly />
+      </div>
       <div id="status" class="status hidden"></div>
     </section>
   </main>
@@ -271,6 +311,8 @@
     const shareButton = document.getElementById("shareButton");
     const testButton = document.getElementById("testButton");
     const statusBox = document.getElementById("status");
+    const sharePanel = document.getElementById("sharePanel");
+    const shareUrlInput = document.getElementById("shareUrlInput");
 
     let currentObjectUrl = null;
     let selectedFile = null;
@@ -329,13 +371,24 @@
       emptyState.classList.add("hidden");
     }
 
-    function getSharedModelFromUrl() {
+    function getSharedModelFromUrl(showIfMissing = false) {
       const params = new URLSearchParams(window.location.search);
       const modelUrl = params.get("model");
       const name = params.get("name") || "Shared GLB model";
       if (modelUrl) {
+        setStatus(`Shared model URL detected. Loading: ${decodeURIComponent(name)}`);
         loadModel(modelUrl, name);
+        return true;
       }
+      if (showIfMissing) {
+        setStatus("No shared model URL found. The page URL must include ?model=...", "error");
+      }
+      return false;
+    }
+
+    function showShareUrl(url) {
+      shareUrlInput.value = url;
+      sharePanel.classList.remove("hidden");
     }
 
     viewer.addEventListener("load", () => {
@@ -432,19 +485,29 @@
           throw new Error("Could not create public URL.");
         }
 
-        const shareUrl = new URL(window.location.href);
+        const shareUrl = new URL(window.location.origin + window.location.pathname);
         shareUrl.searchParams.set("model", data.publicUrl);
         shareUrl.searchParams.set("name", selectedFile.name);
+        const shareUrlText = shareUrl.toString();
 
-        // Important: update the page URL first so refresh works even if clipboard copy fails.
-        window.history.replaceState({}, "", shareUrl.toString());
+        // Update the visible browser URL before clipboard copy.
+        // This makes refresh persistent even if clipboard access is blocked.
+        window.history.replaceState({}, "", shareUrlText);
+        showShareUrl(shareUrlText);
+        localStorage.setItem("last3DViewerShareUrl", shareUrlText);
 
-        // Do NOT reload the model from Supabase immediately after upload.
-        // Keep the already-working local preview active; the public URL is used on refresh/shared visits.
         let copied = false;
         try {
-          await navigator.clipboard.writeText(shareUrl.toString());
+          await navigator.clipboard.writeText(shareUrlText);
           copied = true;
+        } catch (clipboardError) {
+          console.warn("Clipboard copy failed", clipboardError);
+        }
+
+        if (copied) {
+          setStatus("Share URL created, copied, and placed in the address bar. Refresh should keep the model.", "ok");
+        } else {
+          setStatus("Share URL created and placed in the address bar. Copy it manually from the box.", "ok");
         } catch (clipboardError) {
           console.warn("Clipboard copy failed", clipboardError);
         }
@@ -463,7 +526,7 @@
     });
 
     customElements.whenDefined("model-viewer").then(() => {
-      getSharedModelFromUrl();
+      getSharedModelFromUrl(false);
     });
   </script>
 </body>
