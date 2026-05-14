@@ -134,6 +134,7 @@
       color: var(--muted);
       font-size: 13px;
     }
+
     .viewer-wrap {
       position: relative;
       width: 100%;
@@ -235,8 +236,6 @@
         flex-wrap: wrap;
         justify-content: flex-start;
       }
-
-      .legend { justify-content: flex-start; }
     }
   </style>
 </head>
@@ -265,9 +264,6 @@
         camera-controls
         touch-action="pan-y"
         interaction-prompt="auto"
-        auto-rotate
-        auto-rotate-delay="2500"
-        rotation-per-second="18deg"
         exposure="1.15"
         shadow-intensity="0"
         environment-image="neutral"
@@ -285,13 +281,6 @@
           </p>
         </div>
       </div>
-
-      <div class="help">
-        <strong>Galaxy Tab controls:</strong><br />
-        one-finger drag / S Pen drag = rotate · pinch = zoom · two-finger drag = pan.<br />
-        Share mode stores the GLB in your Supabase Storage bucket and opens it by URL.
-      </div>
-
       <div id="status" class="status hidden"></div>
     </section>
   </main>
@@ -302,14 +291,14 @@
       1. Create a Supabase project.
       2. Create a public Storage bucket named "models".
       3. Allow INSERT/SELECT for the bucket through Storage policies.
-      4. Paste your Supabase project URL and anon public key below.
+      4. Paste your Supabase project URL and publishable key below.
 
       Do NOT use this as a fully public production uploader without auth, rate limits,
       file-size limits, and abuse protection.
     */
 
-    const SUPABASE_URL = "https://jtwfakuwkmfigcnbqqhy.supabase.co";
-    const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_51li1lZxtUxKB1cDCxjtZw_TEKVrFON";
+    const SUPABASE_URL = "PASTE_YOUR_SUPABASE_PROJECT_URL_HERE";
+    const SUPABASE_PUBLISHABLE_KEY = "PASTE_YOUR_SUPABASE_PUBLISHABLE_KEY_HERE";
     const BUCKET_NAME = "models";
 
     const input = document.getElementById("modelUpload");
@@ -372,6 +361,17 @@
 
       const lowerName = file.name.toLowerCase();
       const isValid = lowerName.endsWith(".glb");
+      const fileSizeMB = file.size / 1024 / 1024;
+
+      if (fileSizeMB > 300) {
+        const proceed = confirm(
+          `This GLB is ${fileSizeMB.toFixed(1)} MB. Large models may freeze mobile browsers. Continue anyway?`
+        );
+        if (!proceed) {
+          input.value = "";
+          return;
+        }
+      }
 
       if (!isValid) {
         alert("Please upload a single-file .glb model. Use GLB instead of GLTF for sharing.");
@@ -400,7 +400,7 @@
 
       try {
         shareButton.disabled = true;
-        setStatus("Uploading GLB to cloud storage...");
+        setStatus("Uploading GLB to cloud storage. Large files may take time and can freeze weaker mobile browsers during preview.");
 
         const safeName = sanitizeFileName(selectedFile.name);
         const uniquePath = `models/${Date.now()}-${crypto.randomUUID()}-${safeName}`;
