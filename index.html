@@ -134,38 +134,6 @@
       color: var(--muted);
       font-size: 13px;
     }
-
-    .legend {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-      gap: 10px;
-      font-size: 13px;
-      color: var(--text);
-    }
-
-    .chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-      padding: 7px 10px;
-      border: 1px solid var(--panel-border);
-      border-radius: 999px;
-      background: var(--panel);
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
-    }
-
-    .dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      box-shadow: 0 0 18px currentColor;
-    }
-
-    .red { color: #ff315f; background: #ff315f; }
-    .blue { color: #3d7bff; background: #3d7bff; }
-    .white { color: #ffffff; background: #ffffff; }
-
     .viewer-wrap {
       position: relative;
       width: 100%;
@@ -277,7 +245,7 @@
     <header>
       <div class="title-block">
         <h1>3DViewer</h1>
-        <p>Upload a GLB file, create a shareable link, and inspect light-sheet 3D renderings interactively.</p>
+        <p>Upload a GLB file, create a shareable link, and inspect 3D models interactively.</p>
       </div>
 
       <div class="right-panel">
@@ -286,12 +254,6 @@
           <input id="modelUpload" type="file" accept=".glb,model/gltf-binary" />
           <span id="fileName" class="file-name">No file selected</span>
           <button id="shareButton" class="secondary" disabled>Upload & Copy Link</button>
-        </div>
-
-        <div class="legend" aria-label="Channel legend">
-          <span class="chip"><span class="dot red"></span>T cells</span>
-          <span class="chip"><span class="dot blue"></span>B cell follicle</span>
-          <span class="chip"><span class="dot white"></span>Collagen</span>
         </div>
       </div>
     </header>
@@ -347,7 +309,7 @@
     */
 
     const SUPABASE_URL = "PASTE_YOUR_SUPABASE_PROJECT_URL_HERE";
-    const SUPABASE_ANON_KEY = "PASTE_YOUR_SUPABASE_ANON_PUBLIC_KEY_HERE";
+    const SUPABASE_PUBLISHABLE_KEY = "PASTE_YOUR_SUPABASE_PUBLISHABLE_KEY_HERE";
     const BUCKET_NAME = "models";
 
     const input = document.getElementById("modelUpload");
@@ -362,12 +324,12 @@
 
     const supabaseReady =
       SUPABASE_URL.startsWith("http") &&
-      SUPABASE_ANON_KEY.length > 20 &&
+      SUPABASE_PUBLISHABLE_KEY.length > 20 &&
       !SUPABASE_URL.includes("PASTE_") &&
-      !SUPABASE_ANON_KEY.includes("PASTE_");
+      !SUPABASE_PUBLISHABLE_KEY.includes("PASTE_");
 
     const sb = supabaseReady
-      ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+      ? window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY)
       : null;
 
     function setStatus(message, type = "") {
@@ -432,7 +394,7 @@
       if (!selectedFile) return;
 
       if (!supabaseReady || !sb) {
-        setStatus("Supabase is not configured yet. Paste SUPABASE_URL and SUPABASE_ANON_KEY in the code first.", "error");
+        setStatus("Supabase is not configured yet. Paste SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in the code first.", "error");
         return;
       }
 
