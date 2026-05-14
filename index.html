@@ -26,6 +26,7 @@
       height: 100%;
       margin: 0;
       overflow: hidden;
+      overscroll-behavior: none;
       background: var(--bg);
       color: var(--text);
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -136,6 +137,10 @@
       height: 100%;
       background: transparent;
       --poster-color: transparent;
+      touch-action: none;
+      overscroll-behavior: none;
+      -webkit-user-select: none;
+      user-select: none;
     }
 
     .empty-state {
@@ -274,7 +279,7 @@
         id="viewer"
         alt="3D model viewer"
         camera-controls
-        touch-action="pan-y"
+        touch-action="none"
         interaction-prompt="none"
         loading="eager"
         reveal="auto"
@@ -463,6 +468,24 @@
 
         if (!data || !data.publicUrl) {
           throw new Error("Could not create public URL.");
+        }
+
+        // Verify that the public URL is actually readable before making a share link.
+        // getPublicUrl() only constructs a URL; it does not verify that the bucket/file is public.
+        try {
+          const publicCheck = await fetch(data.publicUrl, {
+            method: "GET",
+            headers: { Range: "bytes=0-0" },
+            cache: "no-store"
+          });
+
+          if (!(publicCheck.ok || publicCheck.status === 206)) {
+            throw new Error(`HTTP ${publicCheck.status}`);
+          }
+        } catch (publicUrlError) {
+          throw new Error(
+            `Uploaded, but the public file URL is not readable. Make the Supabase bucket '${BUCKET_NAME}' public and check Storage policies. Details: ${publicUrlError.message || publicUrlError}`
+          );
         }
 
         const shareUrl = new URL(window.location.origin + window.location.pathname);
