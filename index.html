@@ -447,7 +447,9 @@
       }
     });
 
-    getSharedModelFromUrl();
+    customElements.whenDefined("model-viewer").then(() => {
+      getSharedModelFromUrl();
+    });
   </script>
 </body>
 </html>
