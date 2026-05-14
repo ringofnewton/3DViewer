@@ -324,7 +324,7 @@
 
     function loadModel(src, name = "Shared GLB model") {
       setStatus("Loading model...");
-      viewer.src = src;
+      viewer.setAttribute("src", src);
       fileName.textContent = name;
       emptyState.classList.add("hidden");
     }
