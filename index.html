@@ -2,48 +2,48 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>3DViewer</title>
 
-  <!-- Google <model-viewer>: GLB/GLTF 3D model viewer -->
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-
-  <!-- Supabase client for persistent cloud storage -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
     :root {
       --bg: #08090d;
       --panel: rgba(255, 255, 255, 0.08);
-      --panel-strong: rgba(255, 255, 255, 0.14);
       --panel-border: rgba(255, 255, 255, 0.18);
       --text: #f5f7fb;
       --muted: #a8afc2;
-      --accent: #8ab4ff;
-      --danger: #ff5a7a;
       --ok: #75f0b5;
+      --danger: #ff5a7a;
     }
 
     * { box-sizing: border-box; }
 
-    body {
+    html, body {
+      width: 100%;
+      height: 100%;
       margin: 0;
-      min-height: 100vh;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background:
-        radial-gradient(circle at 20% 10%, rgba(255, 0, 80, 0.20), transparent 30%),
-        radial-gradient(circle at 80% 20%, rgba(0, 70, 255, 0.22), transparent 32%),
-        radial-gradient(circle at 50% 90%, rgba(255, 255, 255, 0.09), transparent 28%),
-        var(--bg);
-      color: var(--text);
       overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      background:
+        radial-gradient(circle at 20% 10%, rgba(255, 0, 80, 0.18), transparent 30%),
+        radial-gradient(circle at 80% 20%, rgba(0, 70, 255, 0.20), transparent 32%),
+        radial-gradient(circle at 50% 90%, rgba(255, 255, 255, 0.08), transparent 28%),
+        var(--bg);
     }
 
     .page {
       display: grid;
       grid-template-rows: auto 1fr;
       width: 100vw;
-      height: 100vh;
+      height: 100dvh;
     }
 
     header {
@@ -53,8 +53,10 @@
       grid-template-columns: 1fr auto;
       align-items: center;
       gap: 18px;
-      padding: 18px 22px;
+      padding: 14px 18px;
+      padding-top: max(14px, env(safe-area-inset-top));
       backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
       background: rgba(0, 0, 0, 0.24);
       border-bottom: 1px solid rgba(255, 255, 255, 0.10);
     }
@@ -70,13 +72,6 @@
       margin: 4px 0 0;
       font-size: 13px;
       color: var(--muted);
-    }
-
-    .right-panel {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 10px;
     }
 
     .upload-box {
@@ -104,12 +99,7 @@
       font-weight: 750;
       cursor: pointer;
       user-select: none;
-      transition: transform 120ms ease, background 120ms ease, opacity 120ms ease;
-    }
-
-    .upload-label:hover, button:hover {
-      transform: translateY(-1px);
-      background: #ffffff;
+      -webkit-user-select: none;
     }
 
     button.secondary {
@@ -121,7 +111,6 @@
     button:disabled {
       cursor: not-allowed;
       opacity: 0.45;
-      transform: none;
     }
 
     input[type="file"] { display: none; }
@@ -139,9 +128,11 @@
       position: relative;
       width: 100%;
       height: 100%;
+      min-height: 0;
     }
 
     model-viewer {
+      display: block;
       width: 100%;
       height: 100%;
       background-color: transparent;
@@ -155,6 +146,7 @@
       display: grid;
       place-items: center;
       pointer-events: none;
+      padding: 18px;
     }
 
     .empty-card {
@@ -164,6 +156,7 @@
       border-radius: 28px;
       background: rgba(0, 0, 0, 0.42);
       backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
       box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
       text-align: center;
     }
@@ -181,29 +174,10 @@
       line-height: 1.55;
     }
 
-    .help {
-      position: absolute;
-      left: 18px;
-      bottom: 18px;
-      z-index: 20;
-      max-width: min(560px, calc(100vw - 36px));
-      padding: 14px 16px;
-      border: 1px solid var(--panel-border);
-      border-radius: 22px;
-      background: rgba(0, 0, 0, 0.42);
-      backdrop-filter: blur(18px);
-      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.5;
-    }
-
-    .help strong { color: var(--text); }
-
     .status {
       position: absolute;
       right: 18px;
-      bottom: 18px;
+      bottom: max(18px, env(safe-area-inset-bottom));
       z-index: 25;
       max-width: min(520px, calc(100vw - 36px));
       padding: 12px 14px;
@@ -211,6 +185,7 @@
       border-radius: 18px;
       background: rgba(0, 0, 0, 0.52);
       backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
       box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
       color: var(--muted);
       font-size: 13px;
@@ -227,14 +202,13 @@
         align-items: flex-start;
       }
 
-      .right-panel {
-        width: 100%;
-        align-items: stretch;
-      }
-
       .upload-box {
         flex-wrap: wrap;
         justify-content: flex-start;
+      }
+
+      .file-name {
+        max-width: calc(100vw - 42px);
       }
     }
   </style>
@@ -247,26 +221,26 @@
         <p>Upload a GLB file, create a shareable link, and inspect 3D models interactively.</p>
       </div>
 
-      <div class="right-panel">
-        <div class="upload-box">
-          <label class="upload-label" for="modelUpload">Choose GLB</label>
-          <input id="modelUpload" type="file" accept=".glb,model/gltf-binary" />
-          <span id="fileName" class="file-name">No file selected</span>
-          <button id="shareButton" class="secondary" disabled>Upload & Copy Link</button>
-        </div>
+      <div class="upload-box">
+        <label class="upload-label" for="modelUpload">Choose GLB</label>
+        <input id="modelUpload" type="file" accept=".glb,model/gltf-binary" />
+        <span id="fileName" class="file-name">No file selected</span>
+        <button id="shareButton" class="secondary" disabled>Upload & Copy Link</button>
+        <button id="testButton" class="secondary">Test Model</button>
       </div>
     </header>
 
     <section class="viewer-wrap">
       <model-viewer
         id="viewer"
-        alt="3D rendering viewer"
+        alt="3D model viewer"
         camera-controls
         touch-action="pan-y"
-        interaction-prompt="auto"
-        exposure="1.15"
+        interaction-prompt="none"
+        loading="eager"
+        reveal="auto"
+        exposure="1.0"
         shadow-intensity="0"
-        environment-image="neutral"
         camera-orbit="45deg 65deg auto"
         min-camera-orbit="auto auto 0.05m"
         max-camera-orbit="auto auto 100m"
@@ -276,36 +250,26 @@
       <div id="emptyState" class="empty-state">
         <div class="empty-card">
           <h2>Upload your 3D model</h2>
-          <p>
-            Select a <strong>.glb</strong> file for local preview, then click <strong>Upload & Copy Link</strong> to create a URL that other people can open.
-          </p>
+          <p>Select a <strong>.glb</strong> file for preview, then click <strong>Upload & Copy Link</strong> to create a shareable URL.</p>
         </div>
       </div>
+
       <div id="status" class="status hidden"></div>
     </section>
   </main>
 
   <script>
-    /*
-      REQUIRED SETUP
-      1. Create a Supabase project.
-      2. Create a public Storage bucket named "models".
-      3. Allow INSERT/SELECT for the bucket through Storage policies.
-      4. Paste your Supabase project URL and publishable key below.
-
-      Do NOT use this as a fully public production uploader without auth, rate limits,
-      file-size limits, and abuse protection.
-    */
-
     const SUPABASE_URL = "https://jtwfakuwkmfigcnbqqhy.supabase.co";
     const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_51li1lZxtUxKB1cDCxjtZw_TEKVrFON";
     const BUCKET_NAME = "models";
+    const TEST_MODEL_URL = "https://modelviewer.dev/shared-assets/models/Astronaut.glb";
 
     const input = document.getElementById("modelUpload");
     const viewer = document.getElementById("viewer");
     const fileName = document.getElementById("fileName");
     const emptyState = document.getElementById("emptyState");
     const shareButton = document.getElementById("shareButton");
+    const testButton = document.getElementById("testButton");
     const statusBox = document.getElementById("status");
 
     let currentObjectUrl = null;
@@ -331,6 +295,26 @@
       statusBox.classList.add("hidden");
     }
 
+    function supportsWebGL() {
+      try {
+        const canvas = document.createElement("canvas");
+        return !!(window.WebGLRenderingContext && (canvas.getContext("webgl") || canvas.getContext("experimental-webgl")));
+      } catch (e) {
+        return false;
+      }
+    }
+
+    window.addEventListener("load", () => {
+      if (!supportsWebGL()) {
+        setStatus("WebGL is not available on this browser/device.", "error");
+        return;
+      }
+
+      if (!customElements.get("model-viewer")) {
+        setStatus("model-viewer library failed to load. Check CDN/script blocking or network settings.", "error");
+      }
+    });
+
     function sanitizeFileName(name) {
       return name
         .replace(/[^a-zA-Z0-9._-]/g, "_")
@@ -339,6 +323,7 @@
     }
 
     function loadModel(src, name = "Shared GLB model") {
+      setStatus("Loading model...");
       viewer.src = src;
       fileName.textContent = name;
       emptyState.classList.add("hidden");
@@ -350,9 +335,32 @@
       const name = params.get("name") || "Shared GLB model";
       if (modelUrl) {
         loadModel(modelUrl, name);
-        setStatus("Loaded shared model from URL.", "ok");
       }
     }
+
+    viewer.addEventListener("load", () => {
+      setStatus("Model loaded successfully.", "ok");
+    });
+
+    viewer.addEventListener("error", (event) => {
+      console.error("model-viewer error", event);
+      const detail = event.detail && event.detail.sourceEvent
+        ? event.detail.sourceEvent.message || event.detail.sourceEvent.type
+        : "Unknown model loading error";
+      setStatus(`Model loading failed: ${detail}`, "error");
+    });
+
+    viewer.addEventListener("progress", (event) => {
+      if (!event.detail || typeof event.detail.totalProgress !== "number") return;
+      const pct = Math.round(event.detail.totalProgress * 100);
+      setStatus(`Loading model... ${pct}%`);
+    });
+
+    testButton.addEventListener("click", () => {
+      selectedFile = null;
+      shareButton.disabled = true;
+      loadModel(TEST_MODEL_URL, "Test model: Astronaut.glb");
+    });
 
     input.addEventListener("change", () => {
       hideStatus();
@@ -363,6 +371,12 @@
       const isValid = lowerName.endsWith(".glb");
       const fileSizeMB = file.size / 1024 / 1024;
 
+      if (!isValid) {
+        alert("Please upload a single-file .glb model. Use GLB instead of GLTF for sharing.");
+        input.value = "";
+        return;
+      }
+
       if (fileSizeMB > 300) {
         const proceed = confirm(
           `This GLB is ${fileSizeMB.toFixed(1)} MB. Large models may freeze mobile browsers. Continue anyway?`
@@ -371,12 +385,6 @@
           input.value = "";
           return;
         }
-      }
-
-      if (!isValid) {
-        alert("Please upload a single-file .glb model. Use GLB instead of GLTF for sharing.");
-        input.value = "";
-        return;
       }
 
       selectedFile = file;
@@ -400,7 +408,7 @@
 
       try {
         shareButton.disabled = true;
-        setStatus("Uploading GLB to cloud storage. Large files may take time and can freeze weaker mobile browsers during preview.");
+        setStatus("Uploading GLB to cloud storage...");
 
         const safeName = sanitizeFileName(selectedFile.name);
         const uniquePath = `models/${Date.now()}-${crypto.randomUUID()}-${safeName}`;
@@ -430,7 +438,6 @@
         await navigator.clipboard.writeText(shareUrl.toString());
         window.history.replaceState({}, "", shareUrl.toString());
         loadModel(data.publicUrl, selectedFile.name);
-
         setStatus("Share link copied to clipboard. Anyone with this link can view this GLB.", "ok");
       } catch (err) {
         console.error(err);
