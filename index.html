@@ -312,6 +312,9 @@
     const SUPABASE_URL = "https://jtwfakuwkmfigcnbqqhy.supabase.co";
     const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_51li1lZxtUxKB1cDCxjtZw_TEKVrFON";
     const BUCKET_NAME = "models";
+    // Fixed model path for this page. Everyone can use the short page URL.
+    // Uploading a new GLB replaces the model shown at /260513Progress/.
+    const FIXED_MODEL_PATH = "260513Progress/model.glb";
 
     const input = document.getElementById("modelUpload");
     const viewer = document.getElementById("viewer");
@@ -370,16 +373,40 @@
       emptyState.classList.add("hidden");
     }
 
-    function loadSharedModelFromAddressBar() {
-      const params = new URLSearchParams(window.location.search);
-      const modelUrl = params.get("model");
-      const name = params.get("name") || "Shared GLB model";
+    function getFixedPublicModelUrl(cacheBust = false) {
+      if (!supabaseReady || !sb) return null;
+      const { data } = sb.storage
+        .from(BUCKET_NAME)
+        .getPublicUrl(FIXED_MODEL_PATH);
 
+      if (!data || !data.publicUrl) return null;
+
+      if (!cacheBust) return data.publicUrl;
+      const url = new URL(data.publicUrl);
+      url.searchParams.set("v", Date.now().toString());
+      return url.toString();
+    }
+
+    async function loadFixedModelIfAvailable() {
+      const modelUrl = getFixedPublicModelUrl(true);
       if (!modelUrl) return false;
 
-      showShareUrl(window.location.href);
-      loadModel(modelUrl, name);
-      return true;
+      try {
+        const checkUrl = getFixedPublicModelUrl(true);
+        const res = await fetch(checkUrl, {
+          method: "GET",
+          headers: { Range: "bytes=0-0" },
+          cache: "no-store"
+        });
+
+        if (!(res.ok || res.status === 206)) return false;
+
+        showShareUrl(window.location.origin + window.location.pathname);
+        loadModel(modelUrl, "260513Progress model.glb");
+        return true;
+      } catch (e) {
+        return false;
+      }
     }
 
     viewer.addEventListener("load", () => {
@@ -440,13 +467,13 @@
         setStatus("Uploading GLB to cloud storage...");
 
         const safeName = sanitizeFileName(selectedFile.name);
-        const uniquePath = `${Date.now()}-${crypto.randomUUID()}-${safeName}`;
+        const uniquePath = FIXED_MODEL_PATH;
 
         const { error: uploadError } = await sb.storage
           .from(BUCKET_NAME)
           .upload(uniquePath, selectedFile, {
-            cacheControl: "3600",
-            upsert: false,
+            cacheControl: "0",
+            upsert: true,
             contentType: "model/gltf-binary"
           });
 
@@ -479,8 +506,6 @@
         }
 
         const shareUrl = new URL(window.location.origin + window.location.pathname);
-        shareUrl.searchParams.set("model", data.publicUrl);
-        shareUrl.searchParams.set("name", selectedFile.name);
         const shareUrlText = shareUrl.toString();
 
         // Critical: update the browser URL first. Refresh must preserve the model.
@@ -503,7 +528,7 @@
     });
 
     customElements.whenDefined("model-viewer").then(() => {
-      loadSharedModelFromAddressBar();
+      loadFixedModelIfAvailable();
     });
   </script>
 </body>
