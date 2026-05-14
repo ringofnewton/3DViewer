@@ -250,7 +250,7 @@
       <div id="emptyState" class="empty-state">
         <div class="empty-card">
           <h2>Upload your 3D model</h2>
-          <p>Select a <strong>.glb</strong> file for preview, then click <strong>Upload & Copy Link</strong> to create a shareable URL.</p>
+          <p>Select a <strong>.glb</strong> file for local preview. Local preview disappears after refresh. Click <strong>Upload & Copy Link</strong> to create a persistent shareable URL.</p>
         </div>
       </div>
 
@@ -395,6 +395,7 @@
 
       currentObjectUrl = URL.createObjectURL(file);
       loadModel(currentObjectUrl, file.name);
+      setStatus("Local preview loaded. It will disappear after refresh unless you click Upload & Copy Link.", "ok");
       shareButton.disabled = false;
     });
 
@@ -435,10 +436,24 @@
         shareUrl.searchParams.set("model", data.publicUrl);
         shareUrl.searchParams.set("name", selectedFile.name);
 
-        await navigator.clipboard.writeText(shareUrl.toString());
+        // Important: update the page URL first so refresh works even if clipboard copy fails.
         window.history.replaceState({}, "", shareUrl.toString());
-        loadModel(data.publicUrl, selectedFile.name);
-        setStatus("Share link copied to clipboard. Anyone with this link can view this GLB.", "ok");
+
+        // Do NOT reload the model from Supabase immediately after upload.
+        // Keep the already-working local preview active; the public URL is used on refresh/shared visits.
+        let copied = false;
+        try {
+          await navigator.clipboard.writeText(shareUrl.toString());
+          copied = true;
+        } catch (clipboardError) {
+          console.warn("Clipboard copy failed", clipboardError);
+        }
+
+        if (copied) {
+          setStatus("Share link created and copied. Refresh will reload the cloud model from the URL.", "ok");
+        } else {
+          setStatus("Share link created in the address bar. Copy the current page URL manually.", "ok");
+        }
       } catch (err) {
         console.error(err);
         setStatus(`Upload failed: ${err.message || err}`, "error");
