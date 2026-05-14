@@ -270,7 +270,6 @@
         <input id="modelUpload" type="file" accept=".glb,model/gltf-binary" />
         <span id="fileName" class="file-name">No file selected</span>
         <button id="shareButton" class="secondary" disabled>Upload & Copy Link</button>
-        <button id="testButton" class="secondary">Test Model</button>
       </div>
     </header>
 
@@ -313,14 +312,12 @@
     const SUPABASE_URL = "https://jtwfakuwkmfigcnbqqhy.supabase.co";
     const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_51li1lZxtUxKB1cDCxjtZw_TEKVrFON";
     const BUCKET_NAME = "models";
-    const TEST_MODEL_URL = "https://modelviewer.dev/shared-assets/models/Astronaut.glb";
 
     const input = document.getElementById("modelUpload");
     const viewer = document.getElementById("viewer");
     const fileName = document.getElementById("fileName");
     const emptyState = document.getElementById("emptyState");
     const shareButton = document.getElementById("shareButton");
-    const testButton = document.getElementById("testButton");
     const statusBox = document.getElementById("status");
     const sharePanel = document.getElementById("sharePanel");
     const shareUrlInput = document.getElementById("shareUrlInput");
@@ -425,13 +422,6 @@
       currentObjectUrl = URL.createObjectURL(file);
       loadModel(currentObjectUrl, file.name);
       shareButton.disabled = false;
-    });
-
-    testButton.addEventListener("click", () => {
-      selectedFile = null;
-      shareButton.disabled = true;
-      hideShareUrl();
-      loadModel(TEST_MODEL_URL, "Test model: Astronaut.glb");
     });
 
     shareButton.addEventListener("click", async () => {
