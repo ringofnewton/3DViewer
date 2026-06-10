@@ -31,6 +31,9 @@ output_mech/*.csv
 # White-pulp mimic demo: keep its figures
 !output_whitepulp/figures/
 
+# Pattern-seeding time-course demo: keep its figures
+!output_patterns/figures/
+
 # Test / sample artifacts (regenerable via fixture.py / verify_parser.py)
 sample_physicell_output/
 output_real/

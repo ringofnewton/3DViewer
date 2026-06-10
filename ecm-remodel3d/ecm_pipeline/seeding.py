@@ -111,3 +111,81 @@ def two_blocks_mask(domain, gap=40.0, block=44.0):
     def f(x, y):
         return (abs(y - c) < block) and (abs(abs(x - c) - (gap / 2 + block / 2)) < block / 2)
     return f
+
+
+# ---- pattern seeding: cells placed ALONG geometric strokes ---------------- #
+def along_segments(segments, spacing=8.0, z=110.0, jitter=1.6, seed=0):
+    """Seed cells evenly along a list of 2D line segments [(p0,p1), ...].
+
+    Any geometric pattern (polygon outline, grid, logo, lattice) is just a set of
+    strokes, so this is the general 'draw cells in this shape' primitive.
+    """
+    rng = np.random.default_rng(seed)
+    pts = []
+    for p0, p1 in segments:
+        p0 = np.asarray(p0, float)[:2]; p1 = np.asarray(p1, float)[:2]
+        L = np.linalg.norm(p1 - p0)
+        n = max(2, int(round(L / spacing)))
+        for t in np.linspace(0, 1, n):
+            pts.append(p0 * (1 - t) + p1 * t)
+    pts = np.array(pts) + rng.normal(0, jitter, (len(pts), 2))
+    # de-duplicate near-coincident points (shared polygon vertices)
+    keep = []
+    for p in pts:
+        if not keep or np.min(np.linalg.norm(np.array(keep) - p, axis=1)) > spacing * 0.4:
+            keep.append(p)
+    keep = np.array(keep)
+    return np.column_stack([keep, np.full(len(keep), z)])
+
+
+def circle_outline(center, r, n=64, z=110.0, jitter=1.6, seed=0):
+    th = np.linspace(0, 2 * np.pi, n, endpoint=False)
+    xy = np.asarray(center)[:2] + r * np.column_stack([np.cos(th), np.sin(th)])
+    rng = np.random.default_rng(seed)
+    xy = xy + rng.normal(0, jitter, xy.shape)
+    return np.column_stack([xy, np.full(n, z)])
+
+
+def polygon_outline(center, r, n_sides, per_side=14, rotation=0.0,
+                    z=110.0, jitter=1.6, seed=0):
+    """Cells along the edges of a regular polygon (triangle=3, square=4, ...)."""
+    c = np.asarray(center)[:2]
+    ang = rotation + np.linspace(0, 2 * np.pi, n_sides, endpoint=False)
+    verts = c + r * np.column_stack([np.cos(ang), np.sin(ang)])
+    segs = [(verts[i], verts[(i + 1) % n_sides]) for i in range(n_sides)]
+    return along_segments(segs, spacing=2 * np.pi * r / (n_sides * per_side),
+                          z=z, jitter=jitter, seed=seed)
+
+
+def grid_lattice(domain, spacing=34.0, margin=30.0, z=110.0, jitter=0.0, seed=0):
+    """Regularly aligned seeds on a square lattice."""
+    rng = np.random.default_rng(seed)
+    xs = np.arange(margin, domain - margin + 1e-6, spacing)
+    pts = [[x + (rng.random() - .5) * jitter, y + (rng.random() - .5) * jitter, z]
+           for x in xs for y in xs]
+    return np.array(pts)
+
+
+def hex_lattice_segments(domain, a=34.0, margin=24.0):
+    """Honeycomb (hex) lattice edges — a complex repeating geometric motif."""
+    segs = []
+    h = a * np.sqrt(3) / 2
+    # build hex centers on a triangular grid, emit the 6 edges of each hexagon
+    ang = np.pi / 6 + np.arange(6) * np.pi / 3
+    row = 0
+    y = margin + a
+    while y < domain - margin:
+        x0 = margin + a + (a * 1.5 if row % 2 else 0)
+        x = x0
+        while x < domain - margin:
+            verts = np.column_stack([x + a * np.cos(ang), y + a * np.sin(ang)])
+            for i in range(6):
+                p, q = verts[i], verts[(i + 1) % 6]
+                if margin < min(p[0], q[0]) and max(p[0], q[0]) < domain - margin \
+                        and margin < min(p[1], q[1]) and max(p[1], q[1]) < domain - margin:
+                    segs.append((p, q))
+            x += a * 3
+        y += h
+        row += 1
+    return segs
+

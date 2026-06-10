@@ -164,6 +164,25 @@ Rendering note: `ecm_pipeline/render.py` supports both `theme="light"` and
 `"dark"`, and encodes plastic reinforcement (collagen bundling into struts) as a
 continuous colour — not as discrete line thickness.
 
+### Grow ECM into any seeding pattern, over time
+
+`run_patterns.py` seeds cells along an arbitrary geometric pattern; they deposit
+collagen and condense it, so over time the ECM matures into that pattern (faint
+diffuse matrix → sharp reinforced struts along the design):
+
+1. **regular grid** of aligned seeds → a lattice ECM,
+2. **geometric shapes** — circle / triangle / square outlines → shaped ECM,
+3. **complex motif** (honeycomb) → patterned ECM.
+
+Any pattern is just a set of strokes: `seeding.along_segments`,
+`circle_outline`, `polygon_outline`, `grid_lattice`, `hex_lattice_segments`.
+Give me the coordinates (or an image) of a specific design — e.g. a lab logo —
+and it seeds that exactly.
+
+```bash
+python run_patterns.py   # output_patterns/: patterns_grid, patterns_shapes, patterns_complex
+```
+
 Why the nonlinearity matters for *prediction*: collagen transmits cell force over
 long range only because compressed fibers buckle and tense fibers stiffen,
 focusing load into tracks. A linear material diffuses force and predicts no
@@ -285,6 +304,7 @@ ecm-remodel3d/
   run_culture.py           # cell density / DLP pattern → ECM pore morphology
   run_spheroid.py          # spheroid in gel → time-course remodeling + quantification
   run_whitepulp.py         # spleen white-pulp mimic vs random control
+  run_patterns.py          # grow ECM into a chosen seeding pattern, over time
   make_track_scene.py      # export the cells' collagen tracks to viewer/scene.json
   make_viewer_scene.py     # export a grown network to viewer/scene.json
   viewer/index.html        # three.js 3D viewer (SSAO, translucent organic cells)
