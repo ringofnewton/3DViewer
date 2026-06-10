@@ -12,6 +12,10 @@ output_network/*.json
 output_network/*.vtp
 !output_network/figures/
 
+# Mechanics / morphogenesis demo: ignore bulk data, keep its figures
+output_mech/*.csv
+!output_mech/figures/
+
 # Test / sample artifacts (regenerable via fixture.py / verify_parser.py)
 sample_physicell_output/
 output_real/

@@ -32,11 +32,45 @@ persistence, so fibers curve) → branching → crosslinking → traction bundli
 degradation — and writes a growth montage so you can watch the matrix form. See
 `ecm_pipeline/ecm_network.py`.
 
+## Mechanics: cell arrangement → collagen patterning (morphogenesis)
+
+The predictive core. Cells don't paint collagen — they *pull* on it, and the
+matrix deforms to mechanical equilibrium. `run_mechanics.py` places contractile
+cells in a passive collagen network (a quasi-2D slab, the canonical explant/gel
+geometry) and relaxes the network under cell traction with a measured-collagen
+constitutive law: axial springs that **bear tension but buckle in compression**
+(strongly asymmetric), **strain-stiffening**, and **filament bending**. The
+solver is FIRE (robust force-only minimization to true force balance).
+
+The aligned, tensed collagen "track" between neighboring cells then **emerges
+from the physics** — reproducing the classic Stopak & Harris traction result.
+Three studies are produced in `output_mech/figures/`:
+
+- **A** two cells form a tensed aligned track — and the buckling nonlinearity is
+  required: a linear control builds no track (band alignment ≈ 0.51 vs 0.42,
+  isotropic 0.33).
+- **B** cell spacing tunes the track (alignment + how far force is transmitted).
+- **C** the same three cells in a line vs a triangle give different collagen
+  scaffolds — different morphogenetic templates.
+
+```bash
+python run_mechanics.py     # the morphogenesis studies (figures in output_mech/)
+python verify_mechanics.py  # asserts the physics: convergence, radial single-cell
+                            # tension, and nonlinear-only track alignment
+```
+
+Why the nonlinearity matters for *prediction*: collagen transmits cell force over
+long range only because compressed fibers buckle and tense fibers stiffen,
+focusing load into tracks. A linear material diffuses force and predicts no
+tracks — so getting this constitutive law right is what makes the simulation
+agree with experiment. See `ecm_pipeline/ecm_mechanics.py`.
+
 ## Quick start
 
 ```bash
 pip install -r requirements.txt
-python run_growth.py    # grow a connected ECM network + growth montage  (recommended)
+python run_mechanics.py # cell arrangement → collagen tracks (morphogenesis)
+python run_growth.py    # grow a connected ECM network + growth montage
 python run_demo.py      # fast scattered-rod version
 ```
 
@@ -140,9 +174,12 @@ ecm-remodel3d/
   verify_parser.py         # round-trip test of the real-data path
   requirements.txt
   run_growth.py            # grow ECM as a connected curved/branching network
+  run_mechanics.py         # cell arrangement → collagen tracks (morphogenesis)
+  verify_mechanics.py      # regression guard for the mechanics predictions
   ecm_pipeline/
     synthetic.py           # MVP1–4 scattered-rod generator (fast, PhysiMeSS-style)
     ecm_network.py         # growing branching crosslinked ECM NETWORK (web/mesh)
+    ecm_mechanics.py       # fiber-network mechanics under cell traction (FIRE solver)
     physicell_parser.py    # MultiCellDS xml + .mat → CSV schema  (← real data in)
     fixture.py             # write synthetic frames AS MultiCellDS, for verification
     metrics.py             # the 8 structural metrics + CSV loaders
