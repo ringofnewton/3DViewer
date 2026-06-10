@@ -17,7 +17,8 @@
   .row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:9px 0; font-size:13px; }
   .row label { color:var(--muted); }
   input[type=range]{ width:130px; }
-  .legend { margin-top:10px; height:10px; border-radius:6px;
+  .leg-title { margin-top:12px; font-size:12px; color:var(--ink); font-weight:600; }
+  .legend { margin-top:6px; height:12px; border-radius:6px; border:1px solid var(--line);
     background:linear-gradient(90deg,#0b0b3b,#7a1d6f,#e2643b,#ffd884); }
   .legend-l { display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-top:4px; }
   .hint { position:fixed; bottom:12px; left:50%; transform:translateX(-50%); font-size:12px; color:var(--muted);
@@ -40,8 +41,9 @@
   <div class="row"><label>Fibers</label><input id="tFibers" type="checkbox" checked></div>
   <div class="row"><label>Cell opacity</label><input id="sOpacity" type="range" min="0" max="100" value="45"></div>
   <div class="row"><label>Ambient occlusion</label><input id="tAO" type="checkbox" checked></div>
-  <div class="legend"></div>
-  <div class="legend-l"><span id="legLo">low</span><span id="legHi">high</span></div>
+  <div class="leg-title" id="legTitle">Collagen color scale</div>
+  <div class="legend" id="legBar"></div>
+  <div class="legend-l"><span id="legLo">low</span><span id="legMid"></span><span id="legHi">high</span></div>
 </div>
 <div class="hint">scene.json 을 불러옵니다 · 로컬에서 열면 <code>python -m http.server</code> 로 서빙하세요</div>
 <div id="err"></div>
@@ -73,13 +75,6 @@ function colormap(t){
   return new THREE.Color(0.99,0.85,0.55);
 }
 
-// ---- organic displacement noise (few octaves of incommensurate sines) -----
-function bump(x,y,z){
-  return 0.62*Math.sin(1.9*x+0.4)*Math.cos(2.1*y)*Math.sin(2.3*z)
-       + 0.28*Math.sin(4.1*y+1.0)*Math.sin(3.7*z+0.5)
-       + 0.18*Math.cos(5.3*x+2.0)*Math.sin(4.9*y+1.5);
-}
-
 const app = document.getElementById('app');
 const renderer = new THREE.WebGLRenderer({ antialias:true });
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
@@ -108,27 +103,18 @@ const root = new THREE.Group(); scene.add(root);
 let cellGroup = new THREE.Group(), fiberMesh = null;
 root.add(cellGroup);
 
-// ---- build cells: displaced icospheres, translucent physical material -----
+// ---- build cells: smooth translucent spheres ------------------------------
 function makeCell(p, r, tint){
-  const geo = new THREE.IcosahedronGeometry(r, 4);
-  const pos = geo.attributes.position;
-  const v = new THREE.Vector3();
-  for (let i=0;i<pos.count;i++){
-    v.fromBufferAttribute(pos, i);
-    const n = v.clone().normalize();
-    const d = r * (1 + 0.12*bump(n.x*1.6+p.x*0.05, n.y*1.6+p.y*0.05, n.z*1.6+p.z*0.05));
-    v.copy(n).multiplyScalar(d);
-    pos.setXYZ(i, v.x, v.y, v.z);
-  }
-  geo.computeVertexNormals();
+  const geo = new THREE.SphereGeometry(r, 48, 32);
   const mat = new THREE.MeshPhysicalMaterial({
-    color: tint, roughness:0.35, metalness:0.0, transmission:0.55, thickness:r*1.2,
-    ior:1.38, attenuationColor: tint, attenuationDistance: r*4,
-    clearcoat:0.5, clearcoatRoughness:0.4, transparent:true, opacity:0.85,
-    envMapIntensity:1.1, sheen:0.4, sheenColor:new THREE.Color(0xbfe0ff)
+    color: tint, roughness:0.18, metalness:0.0, transmission:0.9, thickness:r*1.4,
+    ior:1.36, attenuationColor: tint, attenuationDistance: r*6,
+    clearcoat:0.6, clearcoatRoughness:0.25, transparent:true, opacity:0.42,
+    envMapIntensity:1.2, depthWrite:false
   });
   const m = new THREE.Mesh(geo, mat);
   m.position.copy(p);
+  m.renderOrder = 2;
   return m;
 }
 
@@ -139,9 +125,9 @@ const PHENO_TINT = { producing:0x6fb0ff, contractile:0xb98cff, degrading:0xff8d8
 function buildFibers(fibers){
   let nSeg = 0;
   for (const f of fibers) nSeg += Math.max(0, f.path.length-1);
-  const cyl = new THREE.CylinderGeometry(1,1,1,7,1,true);
-  const mat = new THREE.MeshStandardMaterial({ roughness:0.6, metalness:0.0,
-    vertexColors:false, envMapIntensity:0.7 });
+  const cyl = new THREE.CylinderGeometry(1,1,1,8,1,false);
+  const mat = new THREE.MeshStandardMaterial({ roughness:0.5, metalness:0.0,
+    envMapIntensity:0.8, transparent:true, opacity:0.82, depthWrite:true });
   const mesh = new THREE.InstancedMesh(cyl, mat, nSeg);
   const up = new THREE.Vector3(0,1,0);
   const a = new THREE.Vector3(), b = new THREE.Vector3(), mid = new THREE.Vector3(),
@@ -173,7 +159,7 @@ function buildFibers(fibers){
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
 const ssao = new SSAOPass(scene, camera, innerWidth, innerHeight);
-ssao.kernelRadius = 9; ssao.minDistance = 0.002; ssao.maxDistance = 0.08;
+ssao.kernelRadius = 12; ssao.minDistance = 0.0015; ssao.maxDistance = 0.1;
 composer.addPass(ssao);
 composer.addPass(new OutputPass());
 
@@ -194,10 +180,18 @@ async function load(){
 
   const domain = data.domain || 200;
   frameScene(domain);
-  document.getElementById('legLo').textContent =
-    ({state:'nascent', tension:'slack', reinforce:'soft'})[data.scalar] || 'low';
-  document.getElementById('legHi').textContent =
-    ({state:'crosslink', tension:'high tension', reinforce:'reinforced'})[data.scalar] || 'high';
+  // build the colour scale legend straight from the colormap used on the fibers
+  let grad = [];
+  for (let i=0;i<=10;i++){ const c = colormap(i/10); grad.push(`#${c.getHexString()} ${i*10}%`); }
+  document.getElementById('legBar').style.background = `linear-gradient(90deg,${grad.join(',')})`;
+  const TITLE = {state:'Collagen — fiber maturity', tension:'Collagen — tension',
+                 reinforce:'Collagen — reinforcement'};
+  const LO = {state:'nascent', tension:'slack', reinforce:'soft'};
+  const HI = {state:'crosslinked', tension:'high tension', reinforce:'reinforced'};
+  document.getElementById('legTitle').textContent = TITLE[data.scalar] || 'Collagen color scale';
+  document.getElementById('legLo').textContent = LO[data.scalar] || 'low';
+  document.getElementById('legHi').textContent = HI[data.scalar] || 'high';
+  document.getElementById('legMid').textContent = '→';
 
   fiberMesh = buildFibers(data.fibers || []);
   root.add(fiberMesh);
