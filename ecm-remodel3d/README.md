@@ -146,6 +146,24 @@ is quantitative — `ecm_pipeline/morpho_metrics.py` measures, per time step:
 python run_spheroid.py   # output_spheroid/: timecourse, metrics, two-spheroid bridge
 ```
 
+### Spleen white-pulp mimic vs control
+
+`run_whitepulp.py` answers "how should cells be arranged to reproduce the spleen
+white-pulp reticular skeleton?" — a bounded compartment with a central arteriole,
+B-cell follicles, and a denser marginal-zone ring, all knit by a uniform FRC
+meshwork. It compares that to the same number of randomly seeded cells (the
+control) and quantifies the difference (radial density profile, pore size,
+connectivity). Rendered light-mode with a continuous blue→red reinforcement
+colour scale at constant line width.
+
+```bash
+python run_whitepulp.py   # output_whitepulp/: whitepulp_vs_control, whitepulp_metrics
+```
+
+Rendering note: `ecm_pipeline/render.py` supports both `theme="light"` and
+`"dark"`, and encodes plastic reinforcement (collagen bundling into struts) as a
+continuous colour — not as discrete line thickness.
+
 Why the nonlinearity matters for *prediction*: collagen transmits cell force over
 long range only because compressed fibers buckle and tense fibers stiffen,
 focusing load into tracks. A linear material diffuses force and predicts no
@@ -266,6 +284,7 @@ ecm-remodel3d/
   run_morphology2d.py      # 2D: cell arrangement → ECM morphology over a time axis
   run_culture.py           # cell density / DLP pattern → ECM pore morphology
   run_spheroid.py          # spheroid in gel → time-course remodeling + quantification
+  run_whitepulp.py         # spleen white-pulp mimic vs random control
   make_track_scene.py      # export the cells' collagen tracks to viewer/scene.json
   make_viewer_scene.py     # export a grown network to viewer/scene.json
   viewer/index.html        # three.js 3D viewer (SSAO, translucent organic cells)
@@ -278,6 +297,7 @@ ecm-remodel3d/
     ecm_remodel.py         # plastic, time-evolving remodeling driven by tension
     seeding.py             # cell seeding patterns + DLP masks + spheroids
     morpho_metrics.py      # quantitative ECM-architecture metrics (2D)
+    render.py              # shared 2D renderer (light/dark + gradient colour scale)
     web_export.py          # export a scene to JSON for the three.js viewer
     physicell_parser.py    # MultiCellDS xml + .mat → CSV schema  (← real data in)
     fixture.py             # write synthetic frames AS MultiCellDS, for verification

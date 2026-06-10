@@ -28,6 +28,9 @@ output_mech/*.csv
 # Spheroid time-course demo: keep its figures
 !output_spheroid/figures/
 
+# White-pulp mimic demo: keep its figures
+!output_whitepulp/figures/
+
 # Test / sample artifacts (regenerable via fixture.py / verify_parser.py)
 sample_physicell_output/
 output_real/

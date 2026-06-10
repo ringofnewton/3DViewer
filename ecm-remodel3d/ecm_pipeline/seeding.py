@@ -32,6 +32,24 @@ def jittered_grid(domain=220.0, spacing=34.0, z=110.0, jitter=0.28, margin=24.0,
     return np.array(pts)
 
 
+def line_cells(p0, p1, n=8, z=110.0, jitter=2.5, seed=0):
+    """Cells along a line — e.g. a central arteriole."""
+    rng = np.random.default_rng(seed)
+    t = np.linspace(0, 1, n)[:, None]
+    pts = np.asarray(p0)[:2] * (1 - t) + np.asarray(p1)[:2] * t
+    pts = pts + rng.normal(0, jitter, pts.shape)
+    return np.column_stack([pts, np.full(n, z)])
+
+
+def annulus(center, r_in, r_out, n=40, z=110.0, seed=0):
+    """Cells in a ring — e.g. a periarteriolar sheath or marginal zone."""
+    rng = np.random.default_rng(seed)
+    rr = np.sqrt(rng.uniform(r_in ** 2, r_out ** 2, n))
+    th = rng.uniform(0, 2 * np.pi, n)
+    xy = np.asarray(center)[:2] + np.column_stack([rr * np.cos(th), rr * np.sin(th)])
+    return np.column_stack([xy, np.full(n, z)])
+
+
 def spheroid(center, n_cells=20, radius=13.0, z=110.0, seed=0):
     """A spheroid = a dense disk-shaped cluster of cells (not a single point)."""
     rng = np.random.default_rng(seed)
