@@ -6,6 +6,10 @@ output/*.json
 # Keep the publication figures tracked so they render on GitHub:
 !output/figures/
 
+# Test / sample artifacts (regenerable via fixture.py / verify_parser.py)
+sample_physicell_output/
+output_real/
+
 __pycache__/
 *.pyc
 .DS_Store

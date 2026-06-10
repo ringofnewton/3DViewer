@@ -38,10 +38,40 @@ Outputs land in `output/` and `output/figures/`:
 | `fibers_final.vtp`, `cells_final.vtp` | open in **ParaView** (Tube filter on fibers, Glyph/sphere on cells) |
 | `scene_final.json` | feed to a **three.js / vtk.js** web viewer |
 
-## The data contract (how to plug in real PhysiCell/PhysiMeSS output)
+## Using real PhysiCell + PhysiMeSS output
 
-Every analysis function reads only these plain CSVs, so the *only* thing you
-replace is the generator:
+A parser is included. Point it at a PhysiCell output folder and it produces the
+same metrics, figures, and 3D export as the demo:
+
+```bash
+python parse_physicell.py /path/to/PhysiCell/output  output_real
+```
+
+PhysiCell writes one MultiCellDS `outputNNNNNNNN.xml` per frame naming a
+`_cells.mat` matrix plus a `<labels>` map. PhysiMeSS stores ECM fibers as
+agents in that **same** matrix, separated by `cell_type`, with the fiber axis in
+the standard `orientation` field and a length in custom data — so a fiber's
+endpoints are `position ± 0.5·length·orientation`. The parser
+(`ecm_pipeline/physicell_parser.py`) reads all of that into the CSV schema below.
+
+If your PhysiMeSS build uses different custom-data label names, adjust
+`ParseConfig` (`fiber_type_id`, `length_field`, `phenotype_field`, …) — that is
+the only place names live.
+
+**Verify the real-data path without a PhysiCell install:**
+
+```bash
+python verify_parser.py      # synthetic → MultiCellDS fixture → parser → CSV, asserted
+```
+
+This writes genuine MultiCellDS xml + `.mat` fixtures (`ecm_pipeline/fixture.py`),
+parses them back, and checks cell/fiber counts, fiber lengths (matched to ~1e-14 µm),
+and phenotype/state labels survive the round trip.
+
+### The data contract
+
+Every analysis function reads only these plain CSVs, so the parser is the *only*
+format-specific piece; swap in any simulator that emits them:
 
 ```
 cells_t{frame:03d}.csv : id, x, y, z, radius, phenotype, vx, vy, vz
@@ -50,10 +80,10 @@ tracks.csv             : cell_id, frame, x, y, z
 events.csv             : frame, step, births, deaths
 ```
 
-PhysiMeSS already represents ECM fibers as line segments (2D) / cylinders (3D)
-with two endpoints — that maps directly onto `x1..z2`. Write a parser of the
-PhysiCell `output/*.xml` + `.mat` (cells) and the PhysiMeSS fiber output into
-the schema above, and `run_demo.py` produces the same figures from real data.
+IDs are kept stable across frames (cells followed for tracks; fiber ID set
+changes give births/deaths), and phenotype / fiber-state / orientation /
+velocity are all preserved — exactly the per-agent data a cinematic Blender
+render needs later for color, material, and motion.
 
 ## Metrics implemented (`ecm_pipeline/metrics.py`)
 
@@ -89,10 +119,14 @@ Replace it with PhysiCell + PhysiMeSS for real science.
 
 ```
 ecm-remodel3d/
-  run_demo.py              # end-to-end orchestrator
+  run_demo.py              # end-to-end orchestrator (synthetic data)
+  parse_physicell.py       # same pipeline driven by REAL PhysiCell/PhysiMeSS output
+  verify_parser.py         # round-trip test of the real-data path
   requirements.txt
   ecm_pipeline/
-    synthetic.py           # MVP1–4 synthetic generator  (← swap for PhysiCell parser)
+    synthetic.py           # MVP1–4 synthetic generator (stand-in for a simulation)
+    physicell_parser.py    # MultiCellDS xml + .mat → CSV schema  (← real data in)
+    fixture.py             # write synthetic frames AS MultiCellDS, for verification
     metrics.py             # the 8 structural metrics + CSV loaders
     export_vtk.py          # dependency-free VTP (ParaView) + scene JSON (web) writers
     figures.py             # matplotlib publication figures (300 dpi)
