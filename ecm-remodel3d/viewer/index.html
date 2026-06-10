@@ -48,6 +48,35 @@
 <div class="hint">scene.json 을 불러옵니다 · 로컬에서 열면 <code>python -m http.server</code> 로 서빙하세요</div>
 <div id="err"></div>
 
+<!-- classic script: runs even when ES modules are blocked (file://) -->
+<script>
+  if (location.protocol === 'file:') {
+    document.getElementById('err').innerHTML =
+      '⚠ 파일을 더블클릭(file://)으로 열면 브라우저 보안 때문에 3D가 로드되지 않습니다.<br>' +
+      '터미널에서 &nbsp;<b>cd viewer &amp;&amp; python serve.py</b>&nbsp; 실행 후 ' +
+      '열리는 &nbsp;<b>http://localhost:8000</b>&nbsp; 으로 보세요.';
+    document.querySelector('.hint').style.display = 'none';
+  }
+  window.addEventListener('error', e => {
+    const el = document.getElementById('err');
+    if (el) el.textContent = '오류: ' + (e.message || (e.error && e.error.message) || e);
+  });
+  window.addEventListener('unhandledrejection', e => {
+    const el = document.getElementById('err');
+    if (el) el.textContent = '오류: ' + ((e.reason && e.reason.message) || e.reason || e);
+  });
+  // watchdog: if the 3D engine never boots (CDN blocked / offline), say so
+  if (location.protocol !== 'file:') {
+    window.__bootTimer = setTimeout(function(){
+      if (!window.__booted) {
+        var el = document.getElementById('err');
+        if (el) el.innerHTML = '3D 엔진 로드가 지연/실패했습니다.<br>' +
+          '인터넷 연결 또는 three.js CDN(unpkg) 접근 차단을 확인하세요.';
+      }
+    }, 6000);
+  }
+</script>
+
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -218,6 +247,8 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
 });
 
+window.__booted = true;
+if (window.__bootTimer) clearTimeout(window.__bootTimer);
 renderer.setAnimationLoop(() => {
   controls.update();
   (ssao.enabled ? composer : renderer).render(scene, camera);

@@ -28,9 +28,12 @@ colored by state/tension; orbit to rotate, scroll to zoom.
 ```bash
 python make_track_scene.py         # cells' collagen tracks (plastic remodel)  ← recommended
 python make_viewer_scene.py        # OR a grown network with many cells
-cd viewer && python -m http.server 8000
-# open http://localhost:8000
+cd viewer && python serve.py       # serves + opens the browser automatically
 ```
+
+> Do **not** double-click `index.html`. It uses ES modules + fetches `scene.json`,
+> which browsers block on `file://` (you'd get a blank page). `serve.py` serves it
+> over http — the page shows an on-screen hint if you open it the wrong way.
 
 `viewer/index.html` loads `viewer/scene.json` (schema in `ecm_pipeline/web_export.py`),
 so you can point it at any result — grown network, mechanics track, or remodeled
