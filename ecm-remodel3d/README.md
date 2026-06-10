@@ -59,6 +59,25 @@ python verify_mechanics.py  # asserts the physics: convergence, radial single-ce
                             # tension, and nonlinear-only track alignment
 ```
 
+### Plastic remodeling: tracks that outlast the cells
+
+A single equilibrium is elastic — remove the cells and it springs back. Real
+morphogenesis is *plastic*: `run_remodel.py` alternates equilibrium with
+tension-driven remodeling (reinforce + compact loaded fibers, degrade
+persistently slack ones, "use it or lose it"). Over ~10 steps the dense matrix
+is pruned to its load-bearing collagen track and that track is reinforced into a
+permanent, pre-stressed structure.
+
+We prove the plasticity by removing the cells and measuring **residual
+self-stress** — the tension the matrix holds with no cells pulling. The compacted
+track stays pre-stressed (plastic ≈ 4000–10000) while an elastic control relaxes
+to nothing (≈ 10–40), a 100–400× difference that is robust across seeds.
+
+```bash
+python run_remodel.py       # remodeling montage, build-up curves, permanence test
+python verify_remodel.py    # asserts pruning, reinforcement, and residual self-stress
+```
+
 Why the nonlinearity matters for *prediction*: collagen transmits cell force over
 long range only because compressed fibers buckle and tense fibers stiffen,
 focusing load into tracks. A linear material diffuses force and predicts no
@@ -175,11 +194,14 @@ ecm-remodel3d/
   requirements.txt
   run_growth.py            # grow ECM as a connected curved/branching network
   run_mechanics.py         # cell arrangement → collagen tracks (morphogenesis)
+  run_remodel.py           # plastic remodeling: tracks that outlast the cells
   verify_mechanics.py      # regression guard for the mechanics predictions
+  verify_remodel.py        # regression guard for plastic remodeling
   ecm_pipeline/
     synthetic.py           # MVP1–4 scattered-rod generator (fast, PhysiMeSS-style)
     ecm_network.py         # growing branching crosslinked ECM NETWORK (web/mesh)
     ecm_mechanics.py       # fiber-network mechanics under cell traction (FIRE solver)
+    ecm_remodel.py         # plastic, time-evolving remodeling driven by tension
     physicell_parser.py    # MultiCellDS xml + .mat → CSV schema  (← real data in)
     fixture.py             # write synthetic frames AS MultiCellDS, for verification
     metrics.py             # the 8 structural metrics + CSV loaders

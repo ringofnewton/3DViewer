@@ -16,6 +16,9 @@ output_network/*.vtp
 output_mech/*.csv
 !output_mech/figures/
 
+# Plastic remodeling demo: keep its figures
+!output_remodel/figures/
+
 # Test / sample artifacts (regenerable via fixture.py / verify_parser.py)
 sample_physicell_output/
 output_real/

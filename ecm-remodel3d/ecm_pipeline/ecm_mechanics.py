@@ -67,11 +67,17 @@ class FiberNetwork:
     bends: np.ndarray = field(default_factory=lambda: np.zeros((0, 3), int))  # (B,3) prev,center,next
     fixed: np.ndarray = field(default_factory=lambda: np.zeros(0, bool))      # (N,)
     state: np.ndarray = field(default_factory=lambda: np.zeros(0, object))    # (E,) labels
+    k_scale: np.ndarray = field(default_factory=lambda: np.zeros(0))          # (E,) plastic stiffness gain
+
+    def __post_init__(self):
+        if len(self.k_scale) != len(self.edges):
+            self.k_scale = np.ones(len(self.edges))
 
     def copy(self):
         return FiberNetwork(self.nodes.copy(), self.edges.copy(),
                             self.rest_length.copy(), self.bends.copy(),
-                            self.fixed.copy(), self.state.copy())
+                            self.fixed.copy(), self.state.copy(),
+                            self.k_scale.copy())
 
 
 # --------------------------------------------------------------------------- #
@@ -215,7 +221,7 @@ def compute_forces(net: FiberNetwork, cells: np.ndarray, p: MechParams):
     L = np.maximum(L, 1e-9)
     dirv = vec / L[:, None]
     strain = (L - net.rest_length) / net.rest_length
-    k = _axial_stiffness(strain, p)
+    k = _axial_stiffness(strain, p) * net.k_scale  # plastic reinforcement gain
     tension = k * (L - net.rest_length)           # >0 tension, <0 compression
     fvec = tension[:, None] * dirv
     np.add.at(F, i, fvec)
