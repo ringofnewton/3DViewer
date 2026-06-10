@@ -49,6 +49,7 @@ class MechParams:
     reach_decay: float = 14.0       # exp decay length of traction with distance
     cell_radius: float = 9.0        # traction vanishes inside the cell body (um)
     anchor_margin: float = 8.0      # nodes within this of a wall are fixed (um)
+    planar: bool = False            # constrain motion to the z=const plane (2D)
     # FIRE relaxation (robust force-only minimization of the stiff network)
     fire_dt: float = 0.15
     fire_dtmax: float = 1.0
@@ -284,6 +285,9 @@ def relax(net: FiberNetwork, cells: np.ndarray, p: MechParams | None = None,
         F, tension, Kdiag = compute_forces(net, cells, p)
         acc = F / Kdiag[:, None]
         acc[~free] = 0.0
+        if p.planar:
+            acc[:, 2] = 0.0
+            v[:, 2] = 0.0
 
         power = float(np.sum(F[free] * v[free]))
         vnorm = np.linalg.norm(v)

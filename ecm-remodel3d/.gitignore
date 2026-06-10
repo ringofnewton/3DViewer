@@ -19,6 +19,9 @@ output_mech/*.csv
 # Plastic remodeling demo: keep its figures
 !output_remodel/figures/
 
+# 2D morphology demo: keep its figures
+!output_morph2d/figures/
+
 # Test / sample artifacts (regenerable via fixture.py / verify_parser.py)
 sample_physicell_output/
 output_real/

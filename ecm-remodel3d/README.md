@@ -101,6 +101,19 @@ python run_remodel.py       # remodeling montage, build-up curves, permanence te
 python verify_remodel.py    # asserts pruning, reinforcement, and residual self-stress
 ```
 
+### 2D morphology over time (cell arrangement → collagen shape)
+
+`run_morphology2d.py` is the simplest way to *see* the idea: a flat collagen
+sheet with contractile cells, evolved plastically along a time axis. It plots a
+grid (rows = cell arrangements: pair / line / triangle / ring, columns = time)
+so you watch the ECM mature from a faint isotropic mesh into reinforced collagen
+tracks — and the tracks' shape depends on where the cells are. A line of cells
+builds the most aligned (anisotropic) matrix; a ring builds the most isotropic.
+
+```bash
+python run_morphology2d.py  # output_morph2d/: morphology_grid.png + morphology_metrics.png
+```
+
 Why the nonlinearity matters for *prediction*: collagen transmits cell force over
 long range only because compressed fibers buckle and tense fibers stiffen,
 focusing load into tracks. A linear material diffuses force and predicts no
@@ -218,6 +231,7 @@ ecm-remodel3d/
   run_growth.py            # grow ECM as a connected curved/branching network
   run_mechanics.py         # cell arrangement → collagen tracks (morphogenesis)
   run_remodel.py           # plastic remodeling: tracks that outlast the cells
+  run_morphology2d.py      # 2D: cell arrangement → ECM morphology over a time axis
   make_track_scene.py      # export the cells' collagen tracks to viewer/scene.json
   make_viewer_scene.py     # export a grown network to viewer/scene.json
   viewer/index.html        # three.js 3D viewer (SSAO, translucent organic cells)
