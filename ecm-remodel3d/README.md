@@ -17,11 +17,27 @@ PhysiCell + PhysiMeSS  ─┐
                         │                                   └─►  JSON     (web viewer)
 ```
 
+## Two ECM models
+
+| Model | `run_demo.py` (rods) | `run_growth.py` (network) |
+|---|---|---|
+| Fiber | independent straight segment (PhysiMeSS-style) | curved, branching, **crosslinked filament** |
+| Topology | scattered "buzz-cut" sticks | connected **web / mesh** |
+| Largest connected component | ~0.02 | **~0.64** |
+| Use | fast cell–fiber mechanics | realistic ECM **architecture & growth** |
+
+Real collagen ECM is a *percolating network*, not loose rods. `run_growth.py`
+models the actual assembly process — nucleation → tip elongation (with
+persistence, so fibers curve) → branching → crosslinking → traction bundling →
+degradation — and writes a growth montage so you can watch the matrix form. See
+`ecm_pipeline/ecm_network.py`.
+
 ## Quick start
 
 ```bash
 pip install -r requirements.txt
-python run_demo.py
+python run_growth.py    # grow a connected ECM network + growth montage  (recommended)
+python run_demo.py      # fast scattered-rod version
 ```
 
 Outputs land in `output/` and `output/figures/`:
@@ -123,8 +139,10 @@ ecm-remodel3d/
   parse_physicell.py       # same pipeline driven by REAL PhysiCell/PhysiMeSS output
   verify_parser.py         # round-trip test of the real-data path
   requirements.txt
+  run_growth.py            # grow ECM as a connected curved/branching network
   ecm_pipeline/
-    synthetic.py           # MVP1–4 synthetic generator (stand-in for a simulation)
+    synthetic.py           # MVP1–4 scattered-rod generator (fast, PhysiMeSS-style)
+    ecm_network.py         # growing branching crosslinked ECM NETWORK (web/mesh)
     physicell_parser.py    # MultiCellDS xml + .mat → CSV schema  (← real data in)
     fixture.py             # write synthetic frames AS MultiCellDS, for verification
     metrics.py             # the 8 structural metrics + CSV loaders

@@ -90,6 +90,53 @@ def write_cells_vtp(cells: dict, path: str):
         fh.write(xml)
 
 
+def write_filaments_vtp(nodes: np.ndarray, filaments: list, radius: float, path: str):
+    """Write filaments as continuous polylines (one PolyLine cell each).
+
+    ParaView: apply a Tube filter -> continuous curved fibers, not loose sticks.
+    """
+    polylines = [f for f in filaments if len(f) > 1]
+    coords = " ".join("%.4f" % v for v in np.asarray(nodes).ravel())
+    conn, offs, run = [], [], 0
+    for fil in polylines:
+        conn += [str(i) for i in fil]
+        run += len(fil)
+        offs.append(str(run))
+    n_pts = len(nodes)
+    xml = f"""<?xml version="1.0"?>
+<VTKFile type="PolyData" version="1.0" byte_order="LittleEndian">
+ <PolyData>
+  <Piece NumberOfPoints="{n_pts}" NumberOfVerts="0" NumberOfLines="{len(polylines)}" NumberOfStrips="0" NumberOfPolys="0">
+   <Points>
+    <DataArray type="Float32" NumberOfComponents="3" format="ascii">{coords}</DataArray>
+   </Points>
+   <Lines>
+    <DataArray type="Int64" Name="connectivity" format="ascii">{" ".join(conn)}</DataArray>
+    <DataArray type="Int64" Name="offsets" format="ascii">{" ".join(offs)}</DataArray>
+   </Lines>
+  </Piece>
+ </PolyData>
+</VTKFile>
+"""
+    with open(path, "w") as fh:
+        fh.write(xml)
+
+
+def export_graph_scene_json(nodes, filaments, cells, path: str):
+    """Per-frame network scene for the web / cinematic renderer (polylines)."""
+    import json
+    nodes = np.asarray(nodes)
+    data = dict(
+        nodes=nodes.tolist(),
+        filaments=[[int(i) for i in f] for f in filaments if len(f) > 1],
+        cells=[dict(x=float(p[0]), y=float(p[1]), z=float(p[2]),
+                    r=float(r), pheno=str(s))
+               for p, r, s in zip(cells["pos"], cells["radius"], cells["phenotype"])],
+    )
+    with open(path, "w") as fh:
+        json.dump(data, fh)
+
+
 def export_scene_json(cells: dict, fibers: dict, path: str):
     """Compact JSON for the web (three.js / vtk.js) viewer."""
     import json

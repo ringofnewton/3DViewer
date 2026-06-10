@@ -109,6 +109,58 @@ def fig_persistence(tracks_csv, path):
     plt.close(fig)
 
 
+_STATE_COLOR = {"nascent": "#75e4a8", "mature": "#7aa2ff", "aligned": _PURPLE,
+                "crosslink": "#ffd27a", "degraded": "#d04b4b"}
+
+
+def _draw_network(ax, frame, lw=0.9, alpha=0.8, draw_cells=True):
+    nodes = frame["nodes"]
+    for a, b, st, _ in frame["edges"]:
+        pa, pb = nodes[a], nodes[b]
+        ax.plot([pa[0], pb[0]], [pa[1], pb[1]], [pa[2], pb[2]],
+                color=_STATE_COLOR.get(st, "#7aa2ff"), lw=lw, alpha=alpha,
+                solid_capstyle="round")
+    if draw_cells and frame["cells"]:
+        cp = np.array([[c["x"], c["y"], c["z"]] for c in frame["cells"]])
+        ax.scatter(cp[:, 0], cp[:, 1], cp[:, 2], s=40, c=_ACCENT,
+                   edgecolors="white", linewidths=0.5, depthshade=True)
+    ax.set_xticks([]); ax.set_yticks([]); ax.set_zticks([])
+
+
+def fig_network_growth(frames, path, n_panels=6):
+    """Montage of the ECM network growing over time."""
+    idxs = np.linspace(0, len(frames) - 1, n_panels, dtype=int)
+    cols = 3
+    rows = int(np.ceil(n_panels / cols))
+    fig = plt.figure(figsize=(4.2 * cols, 4.0 * rows))
+    for k, fi in enumerate(idxs):
+        ax = fig.add_subplot(rows, cols, k + 1, projection="3d")
+        fr = frames[fi]
+        _draw_network(ax, fr, lw=0.8, alpha=0.8)
+        n_edges = len(fr["edges"])
+        ax.set_title(f"frame {fr['frame']}  ·  {n_edges} segments",
+                     fontsize=11, fontweight="bold")
+    fig.suptitle("ECM network growth — nucleation → elongation → branching → crosslinking",
+                 fontweight="bold", fontsize=14)
+    fig.tight_layout()
+    fig.savefig(path)
+    plt.close(fig)
+
+
+def fig_network_final(frame, path):
+    """Single large 3D view of the final connected ECM network."""
+    fig = plt.figure(figsize=(9, 8))
+    ax = fig.add_subplot(111, projection="3d")
+    _draw_network(ax, frame, lw=1.1, alpha=0.85)
+    ax.set_title("Final ECM network (color = fiber state)", fontweight="bold")
+    handles = [plt.Line2D([0], [0], color=c, lw=3, label=s)
+               for s, c in _STATE_COLOR.items()]
+    ax.legend(handles=handles, loc="upper left", frameon=False, fontsize=9)
+    fig.tight_layout()
+    fig.savefig(path)
+    plt.close(fig)
+
+
 def fig_scene_3d(cells, fibers, path):
     """Quick 3D preview (cells as points, fibers as line segments)."""
     fig = plt.figure(figsize=(8, 7))
