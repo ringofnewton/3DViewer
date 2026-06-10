@@ -166,6 +166,37 @@ def grid_lattice(domain, spacing=34.0, margin=30.0, z=110.0, jitter=0.0, seed=0)
     return np.array(pts)
 
 
+def text_points(lines, domain=240.0, n=420, z=110.0, fontsize=46, pad=0.12, seed=0):
+    """Seed cells on the glyphs of text (e.g. a lab name) by rasterizing it.
+
+    Pass a list of lines, e.g. ["REZA", "ABDI", "LAB"]. Returns cell positions
+    sampled on the dark text pixels, scaled into the domain.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+    fig = plt.figure(figsize=(4, 4), dpi=110)
+    fig.patch.set_facecolor("white")
+    ax = fig.add_axes([0, 0, 1, 1]); ax.axis("off")
+    ax.set_xlim(0, 1); ax.set_ylim(0, 1)
+    ax.text(0.5, 0.5, "\n".join(lines), ha="center", va="center",
+            fontsize=fontsize, fontweight="bold", family="sans-serif")
+    canvas = FigureCanvasAgg(fig); canvas.draw()
+    buf = np.asarray(canvas.buffer_rgba())
+    plt.close(fig)
+
+    gray = buf[..., :3].mean(2)
+    ys, xs = np.where(gray < 110)              # dark glyph pixels (row, col)
+    if len(xs) == 0:
+        return np.zeros((0, 3))
+    H, W = gray.shape
+    rng = np.random.default_rng(seed)
+    idx = rng.choice(len(xs), size=min(n, len(xs)), replace=False)
+    X = pad * domain + (xs[idx] / W) * (1 - 2 * pad) * domain
+    Y = pad * domain + (1 - ys[idx] / H) * (1 - 2 * pad) * domain   # flip y
+    return np.column_stack([X, Y, np.full(len(idx), z)])
+
+
 def hex_lattice_segments(domain, a=34.0, margin=24.0):
     """Honeycomb (hex) lattice edges — a complex repeating geometric motif."""
     segs = []

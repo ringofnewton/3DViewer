@@ -109,6 +109,63 @@ def remodel(net0: mech.FiberNetwork, cells: np.ndarray,
     return frames, net
 
 
+def grow_and_remodel(net_full: mech.FiberNetwork, birth: np.ndarray, cells: np.ndarray,
+                     p_mech: mech.MechParams | None = None,
+                     p_rem: "RemodelParams | None" = None, n_steps: int = 6):
+    """Reveal ECM gradually (by per-edge `birth` time) and remodel it each step.
+
+    Models cells SECRETING ECM over time: at t=0 only the cells exist; each step a
+    new fraction of fibers has been deposited, and the active network is relaxed
+    and reinforced. Returns a list of frames (FiberNetwork or None for the empty
+    t=0). Reinforcement/compaction persist across steps (plastic memory).
+    """
+    p_mech = p_mech or mech.MechParams()
+    p_rem = p_rem or RemodelParams()
+    nodes = net_full.nodes.copy()
+    edges = net_full.edges
+    rest0 = net_full.rest_length.copy()
+    rest = rest0.copy()
+    kscale = np.ones(len(edges))
+    bends_full = net_full.bends
+    frames = [None]                                   # t=0 → cells only
+
+    for thr in np.linspace(0, 1, n_steps + 1)[1:]:
+        active = birth <= thr
+        if active.sum() < 2:
+            frames.append(None)
+            continue
+        used = np.unique(edges[active].ravel())
+        remap = -np.ones(len(nodes), int)
+        remap[used] = np.arange(len(used))
+        sub_edges = remap[edges[active]]
+        if len(bends_full):
+            bmask = np.all(np.isin(bends_full, used), axis=1)
+            sub_bends = remap[bends_full[bmask]]
+        else:
+            sub_bends = np.zeros((0, 3), int)
+        sub = mech.FiberNetwork(nodes[used], sub_edges, rest[active], sub_bends,
+                                net_full.fixed[used], net_full.state[active], kscale[active])
+        sub, _ = mech.relax(sub, cells, p_mech)
+        nodes[used] = sub.nodes
+
+        _, tension, _ = mech.compute_forces(sub, cells, p_mech)
+        pos_t = tension[tension > 0]
+        hi = np.percentile(pos_t, p_rem.reinforce_pct) if len(pos_t) else np.inf
+        ks = sub.k_scale.copy()
+        rs = sub.rest_length.copy()
+        loaded = tension >= hi
+        ks[loaded] = np.minimum(ks[loaded] * (1 + p_rem.reinforce_rate), p_rem.max_k_scale)
+        rs[loaded] = np.maximum(rs[loaded] * (1 - p_rem.compaction),
+                                rest0[active][loaded] * p_rem.min_rest_frac)
+        kscale[active] = ks
+        rest[active] = rs
+
+        frames.append(mech.FiberNetwork(sub.nodes.copy(), sub.edges.copy(), rs.copy(),
+                                        sub_bends.copy(), net_full.fixed[used].copy(),
+                                        net_full.state[active].copy(), ks.copy()))
+    return frames
+
+
 def _filter_edges(net: mech.FiberNetwork, keep: np.ndarray) -> mech.FiberNetwork:
     """Return a network with only the kept edges (bends referencing dropped
     edges are conservatively retained — they reference nodes, not edges)."""

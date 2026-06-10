@@ -198,7 +198,8 @@ def _crosslink_edges(nodes, edges, states, cell):
 
 def build_deposited_network(cells, domain, fibers_per_cell=16, secretion_radius=26.0,
                             fiber_len=18.0, seg_len=6.0, crosslink_dist=4.2,
-                            z=None, anchor_margin=8.0, adhesion_frac=0.05, seed=0):
+                            z=None, anchor_margin=8.0, adhesion_frac=0.05, seed=0,
+                            return_birth=False):
     """Cells secrete ECM locally: each cell deposits short fibers around itself.
 
     Cell-free regions stay empty, so the pore size is set by how the cells are
@@ -206,12 +207,17 @@ def build_deposited_network(cells, domain, fibers_per_cell=16, secretion_radius=
     filled, fine network. A few nodes are pinned (`adhesion_frac`) to represent
     ECM/cell adhesion to the cured GelMA, so later contraction condenses the
     matrix into struts instead of collapsing it.
+
+    If `return_birth`, also returns a per-edge `birth_frac` in [0,1) (a random
+    secretion time per fiber) so a caller can reveal the ECM gradually over time.
     """
     rng = np.random.default_rng(seed)
     nodes, edges, bends, states = [], [], [], []
+    node_birth = []
     for cell in np.asarray(cells, dtype=float):
         cz = cell[2] if z is None else z
         for _ in range(fibers_per_cell):
+            fiber_birth = rng.random()
             rr = secretion_radius * np.sqrt(rng.random())
             th = rng.uniform(0, 2 * np.pi)
             center = np.array([cell[0] + rr * np.cos(th), cell[1] + rr * np.sin(th), cz])
@@ -224,12 +230,14 @@ def build_deposited_network(cells, domain, fibers_per_cell=16, secretion_radius=
             pts[:, 2] = cz
             base = len(nodes)
             nodes.extend(pts.tolist())
+            node_birth.extend([fiber_birth] * len(pts))
             for i in range(len(pts) - 1):
                 edges.append((base + i, base + i + 1)); states.append("mature")
             for i in range(1, len(pts) - 1):
                 bends.append((base + i - 1, base + i, base + i + 1))
 
     nodes = np.array(nodes)
+    n_fiber_edges = len(edges)
     edges, states = _crosslink_edges(nodes, edges, states, crosslink_dist)
     edges = np.array(edges)
     rest = np.maximum(np.linalg.norm(nodes[edges[:, 0]] - nodes[edges[:, 1]], axis=1), 1e-3)
@@ -239,8 +247,14 @@ def build_deposited_network(cells, domain, fibers_per_cell=16, secretion_radius=
     if adhesion_frac > 0:                       # sparse gel-adhesion anchors
         extra = rng.random(len(nodes)) < adhesion_frac
         fixed = fixed | extra
-    return FiberNetwork(nodes=nodes, edges=edges, rest_length=rest, bends=bends,
-                        fixed=fixed, state=np.array(states, dtype=object))
+    net = FiberNetwork(nodes=nodes, edges=edges, rest_length=rest, bends=bends,
+                       fixed=fixed, state=np.array(states, dtype=object))
+    if return_birth:
+        node_birth = np.array(node_birth)
+        # an edge appears once both its endpoints' fibers have been secreted
+        birth = np.maximum(node_birth[edges[:, 0]], node_birth[edges[:, 1]])
+        return net, birth
+    return net
 
 
 def from_growth_frame(frame, domain, anchor_margin=8.0):
