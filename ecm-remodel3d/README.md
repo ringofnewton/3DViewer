@@ -114,6 +114,22 @@ builds the most aligned (anisotropic) matrix; a ring builds the most isotropic.
 python run_morphology2d.py  # output_morph2d/: morphology_grid.png + morphology_metrics.png
 ```
 
+### Cell density / DLP pattern → ECM pore morphology
+
+`run_culture.py` reproduces the open-coarse vs dense-fine network contrast (the
+naive vs fibrotic spleen morphology) from **cell density**, and shows
+**DLP-printed seeding patterns** templating the ECM. Mechanism: cells secrete
+ECM locally and then contract it into struts around cell-free pores, so cell
+spacing sets the pore size. Matches the GelMA + DLP workflow — cells are seeded
+only where the printer cures the gel (`ecm_pipeline/seeding.py`).
+
+```bash
+python run_culture.py   # output_culture/: density_morphology, density_poresize, dlp_patterns
+```
+
+Result: median pore ~19 µm (low density, open network) → ~2 µm (high density,
+dense network); ring / stripe / block print masks give ring / stripe / block ECM.
+
 Why the nonlinearity matters for *prediction*: collagen transmits cell force over
 long range only because compressed fibers buckle and tense fibers stiffen,
 focusing load into tracks. A linear material diffuses force and predicts no
@@ -232,6 +248,7 @@ ecm-remodel3d/
   run_mechanics.py         # cell arrangement → collagen tracks (morphogenesis)
   run_remodel.py           # plastic remodeling: tracks that outlast the cells
   run_morphology2d.py      # 2D: cell arrangement → ECM morphology over a time axis
+  run_culture.py           # cell density / DLP pattern → ECM pore morphology
   make_track_scene.py      # export the cells' collagen tracks to viewer/scene.json
   make_viewer_scene.py     # export a grown network to viewer/scene.json
   viewer/index.html        # three.js 3D viewer (SSAO, translucent organic cells)
@@ -242,6 +259,7 @@ ecm-remodel3d/
     ecm_network.py         # growing branching crosslinked ECM NETWORK (web/mesh)
     ecm_mechanics.py       # fiber-network mechanics under cell traction (FIRE solver)
     ecm_remodel.py         # plastic, time-evolving remodeling driven by tension
+    seeding.py             # cell seeding patterns + DLP-printed gel masks
     web_export.py          # export a scene to JSON for the three.js viewer
     physicell_parser.py    # MultiCellDS xml + .mat → CSV schema  (← real data in)
     fixture.py             # write synthetic frames AS MultiCellDS, for verification

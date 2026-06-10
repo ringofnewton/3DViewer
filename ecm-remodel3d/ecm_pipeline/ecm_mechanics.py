@@ -174,6 +174,75 @@ def build_random_network(domain=200.0, n_fibers=140, fiber_len=70.0,
                         fixed=fixed, state=np.array(states, dtype=object))
 
 
+def _crosslink_edges(nodes, edges, states, cell):
+    """Append crosslink edges between nodes closer than `cell` (spatial hash)."""
+    import itertools
+    buckets: dict[tuple, list[int]] = {}
+    keys = np.floor(nodes / cell).astype(int)
+    for i, k in enumerate(map(tuple, keys)):
+        buckets.setdefault(k, []).append(i)
+    added = set()
+    for k, idxs in buckets.items():
+        cand = []
+        for dk in itertools.product((-1, 0, 1), repeat=3):
+            cand += buckets.get((k[0] + dk[0], k[1] + dk[1], k[2] + dk[2]), [])
+        for a in idxs:
+            for b in cand:
+                if b <= a or (a, b) in added:
+                    continue
+                dd = nodes[a] - nodes[b]
+                if dd @ dd < cell * cell:
+                    edges.append((a, b)); states.append("crosslink"); added.add((a, b))
+    return edges, states
+
+
+def build_deposited_network(cells, domain, fibers_per_cell=16, secretion_radius=26.0,
+                            fiber_len=18.0, seg_len=6.0, crosslink_dist=4.2,
+                            z=None, anchor_margin=8.0, adhesion_frac=0.05, seed=0):
+    """Cells secrete ECM locally: each cell deposits short fibers around itself.
+
+    Cell-free regions stay empty, so the pore size is set by how the cells are
+    distributed — low density / sparse pattern → big open pores, high density →
+    filled, fine network. A few nodes are pinned (`adhesion_frac`) to represent
+    ECM/cell adhesion to the cured GelMA, so later contraction condenses the
+    matrix into struts instead of collapsing it.
+    """
+    rng = np.random.default_rng(seed)
+    nodes, edges, bends, states = [], [], [], []
+    for cell in np.asarray(cells, dtype=float):
+        cz = cell[2] if z is None else z
+        for _ in range(fibers_per_cell):
+            rr = secretion_radius * np.sqrt(rng.random())
+            th = rng.uniform(0, 2 * np.pi)
+            center = np.array([cell[0] + rr * np.cos(th), cell[1] + rr * np.sin(th), cz])
+            d = np.array([rng.normal(), rng.normal(), 0.0])
+            d /= np.linalg.norm(d)
+            n_seg = max(1, int(fiber_len / seg_len))
+            pts = np.array([center - 0.5 * fiber_len * d + d * seg_len * i
+                            for i in range(n_seg + 1)])
+            pts = np.clip(pts, 1.0, domain - 1.0)
+            pts[:, 2] = cz
+            base = len(nodes)
+            nodes.extend(pts.tolist())
+            for i in range(len(pts) - 1):
+                edges.append((base + i, base + i + 1)); states.append("mature")
+            for i in range(1, len(pts) - 1):
+                bends.append((base + i - 1, base + i, base + i + 1))
+
+    nodes = np.array(nodes)
+    edges, states = _crosslink_edges(nodes, edges, states, crosslink_dist)
+    edges = np.array(edges)
+    rest = np.maximum(np.linalg.norm(nodes[edges[:, 0]] - nodes[edges[:, 1]], axis=1), 1e-3)
+    bends = np.array(bends) if bends else np.zeros((0, 3), int)
+
+    fixed = ((nodes < anchor_margin) | (nodes > domain - anchor_margin)).any(axis=1)
+    if adhesion_frac > 0:                       # sparse gel-adhesion anchors
+        extra = rng.random(len(nodes)) < adhesion_frac
+        fixed = fixed | extra
+    return FiberNetwork(nodes=nodes, edges=edges, rest_length=rest, bends=bends,
+                        fixed=fixed, state=np.array(states, dtype=object))
+
+
 def from_growth_frame(frame, domain, anchor_margin=8.0):
     """Build a FiberNetwork from an ecm_network growth frame."""
     nodes = np.asarray(frame["nodes"], dtype=float)
@@ -243,19 +312,18 @@ def compute_forces(net: FiberNetwork, cells: np.ndarray, p: MechParams):
 
     # --- cell traction (contractile cells pull nearby nodes inward) -------
     if len(cells):
-        for cpos in cells:
-            d = cpos - nodes                       # toward cell
-            dist = np.linalg.norm(d, axis=1)
-            within = (dist < p.reach) & (dist > 1e-6)
-            if not np.any(within):
-                continue
-            dd = dist[within]
-            # taper to zero inside the cell body so nodes settle on a stable
-            # shell instead of overshooting through the cell (the runaway).
-            ramp = np.clip((dd - p.cell_radius) / max(p.cell_radius, 1e-6), 0.0, 1.0)
-            mag = p.traction * np.exp(-dd / p.reach_decay) * ramp
-            F[within] += mag[:, None] * d[within] / dd[:, None]
-            Kdiag[within] += mag / p.reach_decay + p.traction / max(p.cell_radius, 1e-6)
+        cpos = np.asarray(cells, dtype=float)       # (M,3)
+        d = cpos[None, :, :] - nodes[:, None, :]     # (N,M,3) toward each cell
+        dist = np.linalg.norm(d, axis=2)             # (N,M)
+        within = (dist < p.reach) & (dist > 1e-6)
+        safe = np.where(dist > 1e-6, dist, 1.0)
+        # taper to zero inside the cell body so nodes settle on a stable shell
+        # instead of overshooting through the cell (the runaway).
+        ramp = np.clip((dist - p.cell_radius) / max(p.cell_radius, 1e-6), 0.0, 1.0)
+        mag = p.traction * np.exp(-dist / p.reach_decay) * ramp * within  # (N,M)
+        F += np.sum((mag / safe)[:, :, None] * d, axis=1)
+        Kdiag += np.sum(mag / p.reach_decay
+                        + within * (p.traction / max(p.cell_radius, 1e-6)), axis=1)
 
     return F, tension, Kdiag
 
