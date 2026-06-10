@@ -65,9 +65,10 @@ def draw_darkfield(ax, net, cells=None, show_cells=False):
         pa, pb = net.nodes[e[0]], net.nodes[e[1]]
         v = (k[idx] - 1.0) / (kmax - 1.0)
         # brighter + thicker where reinforced (the condensed struts)
-        g = 0.35 + 0.65 * min(max(v, 0), 1)
-        ax.plot([pa[0], pb[0]], [pa[1], pb[1]], color=(g, g, g*0.96+0.04),
-                lw=0.5 + 2.3 * min(max(v, 0), 1), alpha=0.92, solid_capstyle="round")
+        g = 0.30 + 0.70 * min(max(v, 0), 1)
+        ax.plot([pa[0], pb[0]], [pa[1], pb[1]], color=(g, g, min(1, g + 0.05)),
+                lw=0.22 + 0.9 * min(max(v, 0), 1), alpha=0.55 + 0.4 * min(max(v, 0), 1),
+                solid_capstyle="round")
     if show_cells and cells is not None:
         ax.scatter(cells[:, 0], cells[:, 1], s=14, c="#35d6d0", alpha=0.5, zorder=5)
     ax.set_xlim(20, DOMAIN - 20); ax.set_ylim(20, DOMAIN - 20)

@@ -32,6 +32,21 @@ def jittered_grid(domain=220.0, spacing=34.0, z=110.0, jitter=0.28, margin=24.0,
     return np.array(pts)
 
 
+def spheroid(center, n_cells=20, radius=13.0, z=110.0, seed=0):
+    """A spheroid = a dense disk-shaped cluster of cells (not a single point)."""
+    rng = np.random.default_rng(seed)
+    rr = radius * np.sqrt(rng.random(n_cells))
+    th = rng.uniform(0, 2 * np.pi, n_cells)
+    xy = np.asarray(center)[:2] + np.column_stack([rr * np.cos(th), rr * np.sin(th)])
+    return np.column_stack([xy, np.full(n_cells, z)])
+
+
+def spheroids(centers, n_cells=20, radius=13.0, z=110.0, seed=0):
+    """Several spheroids; returns the concatenated cell positions."""
+    parts = [spheroid(c, n_cells, radius, z, seed + i) for i, c in enumerate(centers)]
+    return np.concatenate(parts, axis=0) if parts else np.zeros((0, 3))
+
+
 def in_mask(domain, n, mask_fn, z=110.0, margin=12.0, seed=0, max_tries=20000):
     """Seed n cells uniformly inside the region where mask_fn(x,y) is True.
 
