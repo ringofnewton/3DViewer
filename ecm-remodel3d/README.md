@@ -17,6 +17,25 @@ PhysiCell + PhysiMeSS  ─┐
                         │                                   └─►  JSON     (web viewer)
 ```
 
+## Interactive 3D viewer (web, no Blender)
+
+A self-contained three.js viewer renders the result in the browser with the look
+you'd get from an offline renderer — **screen-space ambient occlusion** for depth,
+**translucent subsurface cells** with **organic noise-displaced (bumpy) surfaces**,
+environment-lit reflections, and ACES tone mapping. Fibers are instanced tubes
+colored by state/tension; orbit to rotate, scroll to zoom.
+
+```bash
+python make_viewer_scene.py        # writes viewer/scene.json from a grown network
+cd viewer && python -m http.server 8000
+# open http://localhost:8000
+```
+
+`viewer/index.html` loads `viewer/scene.json` (schema in `ecm_pipeline/web_export.py`),
+so you can point it at any result — grown network, mechanics track, or remodeled
+matrix — by exporting that scene to `viewer/scene.json`. Toggles for cells/fibers,
+cell opacity, and AO are in the panel.
+
 ## Two ECM models
 
 | Model | `run_demo.py` (rods) | `run_growth.py` (network) |
@@ -195,6 +214,8 @@ ecm-remodel3d/
   run_growth.py            # grow ECM as a connected curved/branching network
   run_mechanics.py         # cell arrangement → collagen tracks (morphogenesis)
   run_remodel.py           # plastic remodeling: tracks that outlast the cells
+  make_viewer_scene.py     # export a result to viewer/scene.json
+  viewer/index.html        # three.js 3D viewer (SSAO, translucent organic cells)
   verify_mechanics.py      # regression guard for the mechanics predictions
   verify_remodel.py        # regression guard for plastic remodeling
   ecm_pipeline/
@@ -202,6 +223,7 @@ ecm-remodel3d/
     ecm_network.py         # growing branching crosslinked ECM NETWORK (web/mesh)
     ecm_mechanics.py       # fiber-network mechanics under cell traction (FIRE solver)
     ecm_remodel.py         # plastic, time-evolving remodeling driven by tension
+    web_export.py          # export a scene to JSON for the three.js viewer
     physicell_parser.py    # MultiCellDS xml + .mat → CSV schema  (← real data in)
     fixture.py             # write synthetic frames AS MultiCellDS, for verification
     metrics.py             # the 8 structural metrics + CSV loaders
