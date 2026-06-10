@@ -26,7 +26,8 @@ environment-lit reflections, and ACES tone mapping. Fibers are instanced tubes
 colored by state/tension; orbit to rotate, scroll to zoom.
 
 ```bash
-python make_viewer_scene.py        # writes viewer/scene.json from a grown network
+python make_track_scene.py         # cells' collagen tracks (plastic remodel)  ← recommended
+python make_viewer_scene.py        # OR a grown network with many cells
 cd viewer && python -m http.server 8000
 # open http://localhost:8000
 ```
@@ -214,7 +215,8 @@ ecm-remodel3d/
   run_growth.py            # grow ECM as a connected curved/branching network
   run_mechanics.py         # cell arrangement → collagen tracks (morphogenesis)
   run_remodel.py           # plastic remodeling: tracks that outlast the cells
-  make_viewer_scene.py     # export a result to viewer/scene.json
+  make_track_scene.py      # export the cells' collagen tracks to viewer/scene.json
+  make_viewer_scene.py     # export a grown network to viewer/scene.json
   viewer/index.html        # three.js 3D viewer (SSAO, translucent organic cells)
   verify_mechanics.py      # regression guard for the mechanics predictions
   verify_remodel.py        # regression guard for plastic remodeling
