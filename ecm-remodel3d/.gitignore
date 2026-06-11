@@ -44,3 +44,4 @@ __pycache__/
 !output_emergent/figures/
 !output_inverse/figures/
 !output_pore/figures/
+!output_freegel/figures/
