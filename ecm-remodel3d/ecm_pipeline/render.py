@@ -47,9 +47,17 @@ def draw_network(ax, net, cells=None, theme="light", cmap="coolwarm",
     return hi
 
 
-def add_colorbar(fig, ax, cmap="coolwarm", label="collagen reinforcement (soft → strut)"):
+def add_colorbar(fig, ax=None, cmap="coolwarm", label="reinforcement (soft→strut)",
+                 rect=(0.915, 0.30, 0.012, 0.40)):
+    """Add a colour scale on a DEDICATED right-side axis (never steals panel space).
+
+    Callers should leave room on the right, e.g.
+    `fig.tight_layout(rect=[0, 0, 0.90, top])`. The `ax` argument is accepted for
+    backward compatibility but ignored for placement.
+    """
     sm = ScalarMappable(norm=Normalize(0, 1), cmap=cmap)
-    cb = fig.colorbar(sm, ax=ax, shrink=0.7, pad=0.02)
-    cb.set_label(label, fontsize=10)
+    cax = fig.add_axes(rect)
+    cb = fig.colorbar(sm, cax=cax)
+    cb.set_label(label, fontsize=9)
     cb.set_ticks([0, 1]); cb.set_ticklabels(["soft", "strut"])
     return cb

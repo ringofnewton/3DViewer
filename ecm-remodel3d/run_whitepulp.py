@@ -104,10 +104,10 @@ def main():
                             show_cells=False)
         ax.set_xlim(20, DOMAIN - 20); ax.set_ylim(20, DOMAIN - 20)
         ax.set_title(ttl, fontsize=11, fontweight="bold")
-    render.add_colorbar(fig, axes[2], cmap=CMAP)
     fig.suptitle("Reproducing the spleen white-pulp reticular skeleton vs a random control",
                  fontweight="bold", fontsize=14)
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    fig.tight_layout(rect=[0, 0, 0.91, 0.95])
+    render.add_colorbar(fig, cmap=CMAP)
     fig.savefig(os.path.join(FIG, "whitepulp_vs_control.png"), dpi=140)
     plt.close(fig)
 

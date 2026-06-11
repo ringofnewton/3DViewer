@@ -100,10 +100,10 @@ def main():
     fig, axes = plt.subplots(1, 4, figsize=(16.6, 4.6))
     for ax, (name, net, cells, target) in zip(axes, results):
         draw(ax, net, cells, name, target=target, vmax=vmax)
-    render.add_colorbar(fig, axes[-1], cmap="coolwarm")
     fig.suptitle("Clean inter-focus strut graphs (floating gel held only at the foci) — "
                  "orange dashed = intended edges", fontweight="bold", fontsize=14)
-    fig.tight_layout(rect=[0, 0, 1, 0.92])
+    fig.tight_layout(rect=[0, 0, 0.90, 0.92])
+    render.add_colorbar(fig, cmap="coolwarm")
     fig.savefig(os.path.join(FIG, "clean_graphs.png"), dpi=145); plt.close(fig)
     print("done. figures in", FIG)
 

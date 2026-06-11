@@ -95,10 +95,10 @@ def main():
              target=edges, vmax=vmax)
         draw(axes[r, 1], nf, cells, f"{name} — FREE/floating gel\n(bridges between foci)",
              target=edges, vmax=vmax)
-    render.add_colorbar(fig, axes[:, 1].tolist(), cmap="coolwarm")
     fig.suptitle("Boundary condition decides what you can build: free gel → "
                  "clean inter-focus geometric graph", fontweight="bold", fontsize=13)
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    fig.tight_layout(rect=[0, 0, 0.90, 0.95])
+    render.add_colorbar(fig, cmap="coolwarm")
     fig.savefig(os.path.join(FIG, "freegel_vs_anchored.png"), dpi=145); plt.close(fig)
     print("done. figures in", FIG)
 

@@ -119,10 +119,10 @@ def count_sweep():
         if i == best:
             for s in ax.spines.values():
                 s.set_color("#e8a000"); s.set_linewidth(2.5); s.set_visible(True)
-    render.add_colorbar(fig, axes[-1], cmap="coolwarm")
     fig.suptitle("Emergent reticular network vs spheroid number — auto-scored for spleen-likeness",
                  fontweight="bold", fontsize=14, y=1.0)
-    fig.tight_layout(rect=[0, 0, 1, 0.86])
+    fig.tight_layout(rect=[0, 0, 0.91, 0.86])
+    render.add_colorbar(fig, cmap="coolwarm")
     fig.savefig(os.path.join(FIG, "emergent_count.png"), dpi=140)
     plt.close(fig)
 
@@ -163,10 +163,10 @@ def spacing_sweep():
         ax.set_title(f"{name} spacing (R={R})\nbranch {m['branch']} · conn {m['connectivity']:.2f} · "
                      f"pore {m['pore']:.0f}µm", color="black", fontsize=11, fontweight="bold")
         print(f"      {name}: branch={m['branch']} conn={m['connectivity']:.2f} pore={m['pore']:.1f}")
-    render.add_colorbar(fig, axes[-1], cmap="coolwarm")
     fig.suptitle("Spheroid spacing: too close = one clump, too far = isolated asters, "
                  "intermediate = connected web", fontweight="bold", fontsize=14, y=1.0)
-    fig.tight_layout(rect=[0, 0, 1, 0.88])
+    fig.tight_layout(rect=[0, 0, 0.91, 0.88])
+    render.add_colorbar(fig, cmap="coolwarm")
     fig.savefig(os.path.join(FIG, "emergent_spacing.png"), dpi=140)
     plt.close(fig)
 
