@@ -42,3 +42,4 @@ __pycache__/
 *.pyc
 .DS_Store
 !output_emergent/figures/
+!output_inverse/figures/
