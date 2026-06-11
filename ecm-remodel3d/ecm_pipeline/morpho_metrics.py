@@ -30,10 +30,16 @@ def _edges_xy(net):
     return p1, p2, mid, u, L
 
 
-def pore_sizes(net, domain, n=4000, seed=1):
+def pore_sizes(net, domain, n=4000, seed=1, lo=0.0, hi=None):
+    """Pore radii = distance from random sample points to the nearest fiber.
+
+    `lo`/`hi` restrict sampling to an interior window [lo, hi]² (default: whole
+    domain), avoiding boundary effects when measuring a designed lattice.
+    """
     p1, p2, *_ = _edges_xy(net)
+    hi = domain if hi is None else hi
     rng = np.random.default_rng(seed)
-    pts = rng.uniform(0, domain, size=(n, 2))
+    pts = rng.uniform(lo, hi, size=(n, 2))
     return _m.point_segment_distance(pts, p1, p2).min(axis=1)
 
 
