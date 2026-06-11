@@ -22,7 +22,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from ecm_pipeline import ecm_mechanics as mech, ecm_remodel as rem, seeding
+from ecm_pipeline import ecm_mechanics as mech, ecm_remodel as rem, seeding, render
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "output_freegel")
@@ -61,18 +61,10 @@ def polygon(n, R, rot=np.pi / 2):
     return [(c + R * np.cos(t), c + R * np.sin(t)) for t in a]
 
 
-def draw(ax, net, cells, title=None, target=None):
-    ax.set_facecolor("white")
-    k = net.k_scale; km = max(k.max(), 1.6); cm = plt.get_cmap("coolwarm")
-    for idx in np.argsort(k):
-        e = net.edges[idx]; pa, pb = net.nodes[e[0]], net.nodes[e[1]]
-        v = min(max((k[idx] - 1) / (km - 1), 0), 1)
-        if v > 0.12:
-            ax.plot([pa[0], pb[0]], [pa[1], pb[1]], color=cm(0.5 + 0.5 * v),
-                    lw=0.7 + 1.7 * v, alpha=0.95, zorder=4, solid_capstyle="round")
-        else:
-            ax.plot([pa[0], pb[0]], [pa[1], pb[1]], color="#cdd6e3", lw=0.4,
-                    alpha=0.5, zorder=2)
+def draw(ax, net, cells, title=None, target=None, vmax=None):
+    # shared renderer: constant line width + continuous blue→red gradient
+    render.draw_network(ax, net, theme="light", cmap="coolwarm", lw=1.1,
+                        vmax=vmax, show_cells=False)
     if target is not None:
         for (x0, y0), (x1, y1) in target:
             ax.plot([x0, x1], [y0, y1], color="#f0b000", lw=1.2, ls="--", zorder=1)
@@ -87,17 +79,23 @@ def main():
     os.makedirs(FIG, exist_ok=True)
     layouts = [("triangle", polygon(3, 54)), ("square", polygon(4, 56, np.pi / 4))]
 
-    fig, axes = plt.subplots(2, 2, figsize=(10.5, 10.5))
-    for row, (name, pts) in enumerate(layouts):
+    rows = []
+    for name, pts in layouts:
         cells = foci(pts)
         edges = [(pts[i], pts[(i + 1) % len(pts)]) for i in range(len(pts))]
         print(f"  {name}: {len(pts)} foci, {len(cells)} cells")
         _, na = rem.remodel(anchored_gel(), cells, P, RP)
         _, nf = rem.remodel(free_gel(), cells, P, RP)
-        draw(axes[row, 0], na, cells, f"{name} — ANCHORED gel\n(struts radiate to walls)",
-             target=edges)
-        draw(axes[row, 1], nf, cells, f"{name} — FREE/floating gel\n(bridges between foci)",
-             target=edges)
+        rows.append((name, cells, edges, na, nf))
+
+    vmax = max(max(max(na.k_scale.max(), nf.k_scale.max()) for _, _, _, na, nf in rows), 1.6)
+    fig, axes = plt.subplots(2, 2, figsize=(11, 10.5))
+    for r, (name, cells, edges, na, nf) in enumerate(rows):
+        draw(axes[r, 0], na, cells, f"{name} — ANCHORED gel\n(struts radiate to walls)",
+             target=edges, vmax=vmax)
+        draw(axes[r, 1], nf, cells, f"{name} — FREE/floating gel\n(bridges between foci)",
+             target=edges, vmax=vmax)
+    render.add_colorbar(fig, axes[:, 1].tolist(), cmap="coolwarm")
     fig.suptitle("Boundary condition decides what you can build: free gel → "
                  "clean inter-focus geometric graph", fontweight="bold", fontsize=13)
     fig.tight_layout(rect=[0, 0, 1, 0.95])

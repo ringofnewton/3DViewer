@@ -19,7 +19,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from ecm_pipeline import ecm_mechanics as mech, ecm_remodel as rem, seeding
+from ecm_pipeline import ecm_mechanics as mech, ecm_remodel as rem, seeding, render
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "output_cleangraph")
@@ -60,18 +60,10 @@ def polygon(n, R, rot=np.pi / 2):
     return [(c + R * np.cos(t), c + R * np.sin(t)) for t in a]
 
 
-def draw(ax, net, cells, title=None, target=None):
-    ax.set_facecolor("white")
-    k = net.k_scale; km = max(k.max(), 1.6); cm = plt.get_cmap("coolwarm")
-    for idx in np.argsort(k):
-        e = net.edges[idx]; pa, pb = net.nodes[e[0]], net.nodes[e[1]]
-        v = min(max((k[idx] - 1) / (km - 1), 0), 1)
-        if v > 0.14:
-            ax.plot([pa[0], pb[0]], [pa[1], pb[1]], color=cm(0.5 + 0.5 * v),
-                    lw=0.9 + 2.0 * v, alpha=0.96, zorder=4, solid_capstyle="round")
-        else:
-            ax.plot([pa[0], pb[0]], [pa[1], pb[1]], color="#dde3ec", lw=0.35,
-                    alpha=0.35, zorder=2)
+def draw(ax, net, cells, title=None, target=None, vmax=None):
+    # shared renderer: constant line width + continuous blue→red gradient
+    render.draw_network(ax, net, theme="light", cmap="coolwarm", lw=1.1,
+                        vmax=vmax, show_cells=False)
     if target is not None:
         for (x0, y0), (x1, y1) in target:
             ax.plot([x0, x1], [y0, y1], color="#f0b000", lw=1.3, ls="--", zorder=1)
@@ -94,16 +86,21 @@ def graphs():
 def main():
     os.makedirs(FIG, exist_ok=True)
     items = graphs()
-    fig, axes = plt.subplots(1, 4, figsize=(16, 4.6))
-    for ax, (name, (pts, ring)) in zip(axes, items.items()):
+    results = []
+    for name, (pts, ring) in items.items():
         cells = foci(pts)
         if ring:
             target = [(pts[i], pts[(i + 1) % len(pts)]) for i in range(len(pts))]
         else:  # hub-spoke: center to each rim point
             target = [(pts[0], pts[i]) for i in range(1, len(pts))]
         print(f"  {name}: {len(pts)} foci, {len(cells)} cells")
-        net = emergent(cells)
-        draw(ax, net, cells, name, target=target)
+        results.append((name, emergent(cells), cells, target))
+
+    vmax = max(max(net.k_scale.max() for _, net, _, _ in results), 1.6)  # shared colour scale
+    fig, axes = plt.subplots(1, 4, figsize=(16.6, 4.6))
+    for ax, (name, net, cells, target) in zip(axes, results):
+        draw(ax, net, cells, name, target=target, vmax=vmax)
+    render.add_colorbar(fig, axes[-1], cmap="coolwarm")
     fig.suptitle("Clean inter-focus strut graphs (floating gel held only at the foci) — "
                  "orange dashed = intended edges", fontweight="bold", fontsize=14)
     fig.tight_layout(rect=[0, 0, 1, 0.92])
