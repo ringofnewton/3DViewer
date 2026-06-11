@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from ecm_pipeline import ecm_mechanics as mech, ecm_remodel as rem, seeding
-from ecm_pipeline import morpho_metrics as mm
+from ecm_pipeline import morpho_metrics as mm, render
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "output_emergent")
@@ -72,18 +72,12 @@ def metrics(net):
 
 
 def darkfield(ax, net, cells=None):
-    ax.set_facecolor("black")
-    k = net.k_scale
-    kmax = max(k.max(), 1.5)
-    for idx in np.argsort(k):
-        e = net.edges[idx]
-        pa, pb = net.nodes[e[0]], net.nodes[e[1]]
-        v = min(max((k[idx] - 1) / (kmax - 1), 0), 1)
-        col = plt.cm.inferno(0.25 + 0.7 * v)
-        ax.plot([pa[0], pb[0]], [pa[1], pb[1]], color=col, lw=0.25 + 1.0 * v,
-                alpha=0.5 + 0.45 * v, solid_capstyle="round")
+    """Light-mode render with the blue→red reinforcement colour scale."""
+    render.draw_network(ax, net, theme="light", cmap="coolwarm", lw=0.9,
+                        show_cells=False)
     if cells is not None:
-        ax.scatter(cells[:, 0], cells[:, 1], s=4, c="#35d6d0", alpha=0.4, zorder=5)
+        ax.scatter(cells[:, 0], cells[:, 1], s=5, c="#0d3b4f", alpha=0.8,
+                   edgecolors="none", zorder=6)
     ax.set_xlim(15, DOMAIN - 15); ax.set_ylim(15, DOMAIN - 15)
     ax.set_aspect("equal"); ax.set_xticks([]); ax.set_yticks([])
 
@@ -117,19 +111,19 @@ def count_sweep():
     best = int(np.argmax([r["score"] for r in rows]))
 
     fig, axes = plt.subplots(1, len(layouts), figsize=(16, 4.4))
-    fig.patch.set_facecolor("#0a0a0a")
     for i, (ax, net, cells, m) in enumerate(zip(axes, nets, cellss, rows)):
         darkfield(ax, net, cells)
         star = "  ★ best" if i == best else ""
         ax.set_title(f"{m['k']} spheroids\nspleen-score {m['score']:.2f}{star}",
-                     color=("#ffd27a" if i == best else "white"), fontsize=11, fontweight="bold")
+                     color=("#c47f00" if i == best else "black"), fontsize=11, fontweight="bold")
         if i == best:
             for s in ax.spines.values():
-                s.set_color("#ffd27a"); s.set_linewidth(2.5); s.set_visible(True)
+                s.set_color("#e8a000"); s.set_linewidth(2.5); s.set_visible(True)
+    render.add_colorbar(fig, axes[-1], cmap="coolwarm")
     fig.suptitle("Emergent reticular network vs spheroid number — auto-scored for spleen-likeness",
-                 color="white", fontweight="bold", fontsize=14, y=1.0)
+                 fontweight="bold", fontsize=14, y=1.0)
     fig.tight_layout(rect=[0, 0, 1, 0.86])
-    fig.savefig(os.path.join(FIG, "emergent_count.png"), dpi=140, facecolor=fig.get_facecolor())
+    fig.savefig(os.path.join(FIG, "emergent_count.png"), dpi=140)
     plt.close(fig)
 
     # score / metrics figure
@@ -162,18 +156,18 @@ def spacing_sweep():
     print("[2/2] spacing sweep (fixed 4 spheroids) …")
     spacings = [(34, "tight"), (52, "medium"), (72, "wide")]
     fig, axes = plt.subplots(1, 3, figsize=(15, 5.2))
-    fig.patch.set_facecolor("#0a0a0a")
     for ax, (R, name) in zip(axes, spacings):
         net, cells = emergent(ring_centers(4, R=R))
         m = metrics(net)
         darkfield(ax, net, cells)
         ax.set_title(f"{name} spacing (R={R})\nbranch {m['branch']} · conn {m['connectivity']:.2f} · "
-                     f"pore {m['pore']:.0f}µm", color="white", fontsize=11, fontweight="bold")
+                     f"pore {m['pore']:.0f}µm", color="black", fontsize=11, fontweight="bold")
         print(f"      {name}: branch={m['branch']} conn={m['connectivity']:.2f} pore={m['pore']:.1f}")
+    render.add_colorbar(fig, axes[-1], cmap="coolwarm")
     fig.suptitle("Spheroid spacing: too close = one clump, too far = isolated asters, "
-                 "intermediate = connected web", color="white", fontweight="bold", fontsize=14, y=1.0)
+                 "intermediate = connected web", fontweight="bold", fontsize=14, y=1.0)
     fig.tight_layout(rect=[0, 0, 1, 0.88])
-    fig.savefig(os.path.join(FIG, "emergent_spacing.png"), dpi=140, facecolor=fig.get_facecolor())
+    fig.savefig(os.path.join(FIG, "emergent_spacing.png"), dpi=140)
     plt.close(fig)
 
 
