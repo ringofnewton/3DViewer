@@ -41,3 +41,4 @@ output_real/
 __pycache__/
 *.pyc
 .DS_Store
+!output_emergent/figures/

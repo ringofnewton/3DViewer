@@ -105,6 +105,39 @@ def connectivity(net, k_thresh=1.4):
     return float(max(sizes.values()) / len(used_nodes))
 
 
+def branch_points(net, k_thresh=1.4):
+    """Number of strut junctions (reinforced-fiber nodes of degree >= 3).
+
+    A reticular / cotton-candy network is highly branched, so this counts the
+    divergent junctions where struts split or meet.
+    """
+    sel = net.k_scale > k_thresh
+    if sel.sum() < 3:
+        return 0
+    deg = {}
+    for a, b in net.edges[sel]:
+        deg[a] = deg.get(a, 0) + 1
+        deg[b] = deg.get(b, 0) + 1
+    return int(sum(1 for d in deg.values() if d >= 3))
+
+
+def coverage(net, domain, radius=12.0, n=3000, k_thresh=1.4, seed=2):
+    """Fraction of the domain within `radius` of a reinforced strut.
+
+    High when the strut network SPANS the area (divergent reach), low when ECM is
+    confined to blobs — distinguishes a spanning reticular web from local clumps.
+    """
+    sel = net.k_scale > k_thresh
+    if sel.sum() < 2:
+        return 0.0
+    p1 = net.nodes[net.edges[sel, 0]][:, :2]
+    p2 = net.nodes[net.edges[sel, 1]][:, :2]
+    rng = np.random.default_rng(seed)
+    pts = rng.uniform(0, domain, size=(n, 2))
+    d = _m.point_segment_distance(pts, p1, p2).min(axis=1)
+    return float(np.mean(d < radius))
+
+
 def density_profile(net, center, domain, k_thresh=1.4, nbins=12):
     """Reinforced-fiber length per unit area vs distance from `center`."""
     _, _, mid, _, L = _edges_xy(net)
