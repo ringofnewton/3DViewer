@@ -45,3 +45,4 @@ __pycache__/
 !output_inverse/figures/
 !output_pore/figures/
 !output_freegel/figures/
+!output_cleangraph/figures/
