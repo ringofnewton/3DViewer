@@ -55,22 +55,10 @@ def foci(centers, n_cells=16, radius=12.0):
                              n_cells=n_cells, radius=radius, seed=1)
 
 
-def draw(ax, net, cells, title=None, target=None):
-    """High-contrast: reinforced struts bold red, background fibers very faint."""
-    ax.set_facecolor("white")
-    k = net.k_scale
-    kmax = max(k.max(), 1.6)
-    cmap = plt.get_cmap("coolwarm")
-    for idx in np.argsort(k):
-        e = net.edges[idx]
-        pa, pb = net.nodes[e[0]], net.nodes[e[1]]
-        v = min(max((k[idx] - 1) / (kmax - 1), 0), 1)
-        if v > 0.12:                              # reinforced strut
-            ax.plot([pa[0], pb[0]], [pa[1], pb[1]], color=cmap(0.5 + 0.5 * v),
-                    lw=0.7 + 1.8 * v, alpha=0.95, solid_capstyle="round", zorder=4)
-        else:                                     # faint background
-            ax.plot([pa[0], pb[0]], [pa[1], pb[1]], color="#cdd6e3",
-                    lw=0.4, alpha=0.5, solid_capstyle="round", zorder=2)
+def draw(ax, net, cells, title=None, target=None, vmax=None):
+    """Shared renderer: constant line width + continuous blue→red gradient."""
+    render.draw_network(ax, net, theme="light", cmap="coolwarm", lw=1.0,
+                        vmax=vmax, show_cells=False)
     if target is not None:                       # faint guide of the intended pattern
         for (x0, y0), (x1, y1) in target:
             ax.plot([x0, x1], [y0, y1], color="#f0b000", lw=1.2, ls="--", zorder=1)
@@ -119,8 +107,9 @@ def study_principle():
     fig.suptitle("The limit: in an anchored continuum, foci make radial asters + "
                  "inter-focus bridges — arbitrary clean lines do NOT transfer",
                  fontweight="bold", fontsize=13)
-    fig.tight_layout(rect=[0, 0, 1, 0.93])
-    fig.savefig(os.path.join(FIG, "inverse_principle.png"), dpi=140); plt.close(fig)
+    fig.tight_layout(rect=[0, 0, 0.90, 0.93])
+    render.add_colorbar(fig, cmap="coolwarm")
+    fig.savefig(os.path.join(FIG, "inverse_principle.png"), dpi=200); plt.close(fig)
 
 
 def study_pore():
@@ -138,8 +127,9 @@ def study_pore():
         draw(ax, emergent(cells), cells, name)
     fig.suptitle("What you CAN control cleanly: pores. Cell-free regions stay open; "
                  "foci surround / tile them", fontweight="bold", fontsize=13)
-    fig.tight_layout(rect=[0, 0, 1, 0.9])
-    fig.savefig(os.path.join(FIG, "inverse_pore.png"), dpi=140); plt.close(fig)
+    fig.tight_layout(rect=[0, 0, 0.90, 0.9])
+    render.add_colorbar(fig, cmap="coolwarm")
+    fig.savefig(os.path.join(FIG, "inverse_pore.png"), dpi=200); plt.close(fig)
 
 
 def study_bridge_rule():
@@ -167,7 +157,7 @@ def study_bridge_rule():
     fig.suptitle("How far apart two foci can be and still build a connecting strut",
                  fontweight="bold", fontsize=14)
     fig.tight_layout(rect=[0, 0, 1, 0.94])
-    fig.savefig(os.path.join(FIG, "inverse_bridge_rule.png"), dpi=140); plt.close(fig)
+    fig.savefig(os.path.join(FIG, "inverse_bridge_rule.png"), dpi=200); plt.close(fig)
 
 
 def main():
