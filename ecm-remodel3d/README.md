@@ -40,6 +40,21 @@ so you can point it at any result — grown network, mechanics track, or remodel
 matrix — by exporting that scene to `viewer/scene.json`. Toggles for cells/fibers,
 cell opacity, and AO are in the panel.
 
+### Export to GLB for the main 3DViewer
+
+The repo's main `index.html` is a Google `<model-viewer>` page that loads **GLB**
+models and can publish a shareable link. To view an ECM result there, convert the
+scene to a GLB (fibers → colored tubes, cells → tinted spheres, same colormap as
+the three.js viewer):
+
+```bash
+pip install trimesh
+python export_glb.py                      # viewer/scene.json -> viewer/model.glb
+```
+
+Then open the main `index.html`, choose **`viewer/model.glb`**, and (optionally)
+click **Upload & Copy Link** to share it.
+
 ## Two ECM models
 
 | Model | `run_demo.py` (rods) | `run_growth.py` (network) |
