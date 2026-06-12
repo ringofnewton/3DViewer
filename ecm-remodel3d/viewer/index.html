@@ -20,7 +20,13 @@
   .row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:9px 0; font-size:13px; }
   .row label { color:var(--muted); }
   input[type=range]{ width:130px; }
+  select { background:var(--panel); color:var(--ink); border:1px solid var(--line);
+    border-radius:8px; padding:3px 6px; font-size:12px; }
   .leg-title { margin-top:12px; font-size:12px; color:var(--ink); font-weight:600; }
+  .stats { margin-top:6px; font-size:11.5px; color:var(--muted); }
+  .stats .s { display:flex; justify-content:space-between; gap:10px; padding:2px 0;
+    border-bottom:1px solid var(--line); }
+  .stats .s b { color:var(--ink); font-weight:600; }
   .legend { margin-top:6px; height:12px; border-radius:6px; border:1px solid var(--line);
     background:linear-gradient(90deg,#0b0b3b,#7a1d6f,#e2643b,#ffd884); }
   .legend-l { display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-top:4px; }
@@ -45,9 +51,12 @@
   <div class="row"><label>Cell opacity</label><input id="sOpacity" type="range" min="0" max="100" value="45"></div>
   <div class="row"><label>Ambient occlusion</label><input id="tAO" type="checkbox" checked></div>
   <div class="row"><label>Light mode</label><input id="tLight" type="checkbox"></div>
+  <div class="row"><label>Color by</label><select id="sScalar"></select></div>
   <div class="leg-title" id="legTitle">Collagen color scale</div>
   <div class="legend" id="legBar"></div>
   <div class="legend-l"><span id="legLo">low</span><span id="legMid"></span><span id="legHi">high</span></div>
+  <div class="leg-title">Matrix metrics</div>
+  <div class="stats" id="stats"></div>
 </div>
 <div class="hint">scene.json 을 불러옵니다 · 로컬에서 열면 <code>python -m http.server</code> 로 서빙하세요</div>
 <div id="err"></div>
@@ -172,7 +181,19 @@ const PHENO_TINT = { producing:0x6fb0ff, contractile:0xb98cff, degrading:0xff8d8
                      quiescent:0x9fe0d0 };
 
 // ---- build fibers: one InstancedMesh of thin cylinders (per segment) -------
-function buildFibers(fibers){
+let INST_FIBER = [];   // instance index -> source fiber (for recoloring)
+
+function fiberValue(f, key){
+  return (f.vals && (key in f.vals)) ? f.vals[key] : f.v;
+}
+function recolorFibers(key){
+  if (!fiberMesh) return;
+  for (let k=0;k<INST_FIBER.length;k++) fiberMesh.setColorAt(k, colormap(fiberValue(INST_FIBER[k], key)));
+  if (fiberMesh.instanceColor) fiberMesh.instanceColor.needsUpdate = true;
+}
+
+function buildFibers(fibers, key){
+  INST_FIBER = [];
   let nSeg = 0;
   for (const f of fibers) nSeg += Math.max(0, f.path.length-1);
   const cyl = new THREE.CylinderGeometry(1,1,1,8,1,false);
@@ -185,7 +206,7 @@ function buildFibers(fibers){
         m4 = new THREE.Matrix4();
   let k = 0;
   for (const f of fibers){
-    const col = colormap(f.v);
+    const col = colormap(fiberValue(f, key));
     for (let i=0;i<f.path.length-1;i++){
       a.fromArray(f.path[i]); b.fromArray(f.path[i+1]);
       const len = a.distanceTo(b); if (len < 1e-6) continue;
@@ -196,6 +217,7 @@ function buildFibers(fibers){
       m4.compose(mid, q, s);
       mesh.setMatrixAt(k, m4);
       mesh.setColorAt(k, col);
+      INST_FIBER[k] = f;
       k++;
     }
   }
@@ -234,17 +256,48 @@ async function load(){
   let grad = [];
   for (let i=0;i<=10;i++){ const c = colormap(i/10); grad.push(`#${c.getHexString()} ${i*10}%`); }
   document.getElementById('legBar').style.background = `linear-gradient(90deg,${grad.join(',')})`;
-  const TITLE = {state:'Collagen — fiber maturity', tension:'Collagen — tension',
-                 reinforce:'Collagen — reinforcement'};
-  const LO = {state:'nascent', tension:'slack', reinforce:'soft'};
-  const HI = {state:'crosslinked', tension:'high tension', reinforce:'reinforced'};
-  document.getElementById('legTitle').textContent = TITLE[data.scalar] || 'Collagen color scale';
-  document.getElementById('legLo').textContent = LO[data.scalar] || 'low';
-  document.getElementById('legHi').textContent = HI[data.scalar] || 'high';
   document.getElementById('legMid').textContent = '→';
 
-  fiberMesh = buildFibers(data.fibers || []);
+  // available per-fiber scalars (fall back to a single scalar for old scenes)
+  const FALLBACK = {reinforce:['Collagen — reinforcement','soft','reinforced'],
+                    tension:['Collagen — tension','slack','high tension'],
+                    state:['Collagen — fiber maturity','nascent','crosslinked']};
+  const scalars = (data.scalars && data.scalars.length) ? data.scalars
+    : [{key:data.scalar||'reinforce',
+        title:(FALLBACK[data.scalar]||['Collagen color scale'])[0],
+        lo:(FALLBACK[data.scalar]||[,'low'])[1], hi:(FALLBACK[data.scalar]||[,, 'high'])[2]}];
+  const SCALARS = {}; scalars.forEach(s => SCALARS[s.key] = s);
+
+  function setLegend(key){
+    const s = SCALARS[key] || {title:'Collagen color scale', lo:'low', hi:'high'};
+    document.getElementById('legTitle').textContent = s.title;
+    document.getElementById('legLo').textContent = s.lo || 'low';
+    document.getElementById('legHi').textContent = s.hi || 'high';
+  }
+
+  // populate the "Color by" selector
+  const sel = document.getElementById('sScalar');
+  sel.innerHTML = '';
+  scalars.forEach(s => { const o = document.createElement('option');
+    o.value = s.key; o.textContent = s.key; sel.appendChild(o); });
+  let curKey = data.scalar || scalars[0].key;
+  sel.value = curKey;
+  sel.onchange = e => { curKey = e.target.value; recolorFibers(curKey); setLegend(curKey); };
+
+  setLegend(curKey);
+  fiberMesh = buildFibers(data.fibers || [], curKey);
   root.add(fiberMesh);
+
+  // scene-level metrics panel
+  if (data.stats){
+    const labels = data.stat_labels || {};
+    const fmt = v => (typeof v === 'number')
+      ? (Number.isInteger(v) ? v.toString()
+         : (Math.abs(v) < 0.01 ? v.toExponential(2) : v.toFixed(3)))
+      : v;
+    document.getElementById('stats').innerHTML = Object.entries(data.stats)
+      .map(([k,v]) => `<div class="s"><span>${labels[k]||k}</span><b>${fmt(v)}</b></div>`).join('');
+  }
 
   for (const c of (data.cells||[])){
     const tint = PHENO_TINT[c.pheno] ?? 0x8fb6ff;

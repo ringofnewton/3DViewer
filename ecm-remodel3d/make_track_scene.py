@@ -45,9 +45,9 @@ def main():
         cells_xyz, np.full(len(cells_xyz), 9.0),
         ["contractile"] * len(cells_xyz))
 
-    print("[3/3] exporting", OUT)
-    web_export.from_network(OUT, final, cells, DOMAIN, scalar="reinforce",
-                            radius=0.85)
+    print("[3/3] exporting", OUT, "(all per-fiber scalars + scene stats)")
+    web_export.from_network_metrics(OUT, final, cells, cells_xyz, DOMAIN,
+                                    p_mech=P, default="reinforce", radius=0.85)
     print("done. serve viewer/ and open index.html")
 
 

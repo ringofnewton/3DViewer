@@ -38,7 +38,25 @@ cd viewer && python serve.py       # serves + opens the browser automatically
 `viewer/index.html` loads `viewer/scene.json` (schema in `ecm_pipeline/web_export.py`),
 so you can point it at any result — grown network, mechanics track, or remodeled
 matrix — by exporting that scene to `viewer/scene.json`. Toggles for cells/fibers,
-cell opacity, and AO are in the panel.
+cell opacity, light mode, and AO are in the panel.
+
+**All metrics in one scene.** `make_track_scene.py` exports via
+`web_export.from_network_metrics`, which attaches *every* per-fiber scalar to each
+fiber and a block of scene-level metrics. The viewer's **Color by** selector
+recolors the fibers live by:
+
+| per-fiber scalar | meaning |
+|---|---|
+| `reinforce` | plastic stiffness gain (load-bearing tracks) |
+| `tension`   | current axial tension |
+| `maturity`  | fiber state (nascent → crosslinked) |
+| `length`    | segment length |
+| `alignment` | alignment to the dominant matrix axis |
+
+and a **Matrix metrics** panel shows the whole-matrix numbers (ECM volume fraction,
+global/local alignment, mean & median pore size, cell–ECM contact, network
+components, largest connected fraction). Time-series-only metrics (migration
+persistence, remodeling rate) are not part of a single snapshot.
 
 ### Export to GLB for the main 3DViewer
 

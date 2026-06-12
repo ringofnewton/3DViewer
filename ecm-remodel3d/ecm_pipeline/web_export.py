@@ -74,6 +74,121 @@ def cells_payload(positions, radius, phenotypes):
             for p, r, s in zip(positions, radius, phenotypes)]
 
 
+# --------------------------------------------------------------------------- #
+# Multi-metric export: every per-fiber scalar + scene-level stats in one scene.
+# --------------------------------------------------------------------------- #
+_STATE_VALUE = {"nascent": 0.12, "mature": 0.34, "aligned": 0.72,
+                "reinforced": 0.85, "degraded": 0.0, "crosslink": 0.95}
+
+# Per-fiber scalars the viewer can color by (key -> title, low label, high label).
+_SCALAR_INFO = {
+    "reinforce": ("Collagen — reinforcement", "soft", "reinforced"),
+    "tension":   ("Collagen — tension", "slack", "high tension"),
+    "maturity":  ("Collagen — fiber maturity", "nascent", "crosslinked"),
+    "length":    ("Collagen — segment length", "short", "long"),
+    "alignment": ("Collagen — alignment to main axis", "off-axis", "on-axis"),
+}
+
+# Scene-level (whole-matrix) metrics, with display labels for the stats panel.
+_STAT_LABELS = {
+    "n_fibers": "Fibers",
+    "n_cells": "Cells",
+    "volume_fraction": "ECM volume fraction",
+    "alignment_index": "Global alignment index",
+    "local_alignment": "Local alignment (near cells)",
+    "mean_pore": "Mean pore size (µm)",
+    "median_pore": "Median pore size (µm)",
+    "mean_contacts": "Mean cell–ECM contacts",
+    "fraction_in_contact": "Cells in contact with ECM",
+    "n_components": "Network components",
+    "largest_component": "Largest connected fraction",
+}
+
+
+def _fibers_dict_from_network(net, phys_radius):
+    """Build the metrics.py 'fibers' schema straight from a FiberNetwork."""
+    p1 = net.nodes[net.edges[:, 0]]
+    p2 = net.nodes[net.edges[:, 1]]
+    seg = p2 - p1
+    length = np.linalg.norm(seg, axis=1)
+    safe = np.where(length[:, None] > 1e-9, seg, np.array([1.0, 0, 0]))
+    direction = safe / np.where(length[:, None] > 1e-9, length[:, None], 1.0)
+    return dict(p1=p1, p2=p2, center=0.5 * (p1 + p2), direction=direction,
+                length=length, radius=np.full(len(net.edges), phys_radius),
+                state=np.asarray(net.state))
+
+
+def from_network_metrics(path, net, cells, cells_xyz, domain, p_mech=None,
+                         default="reinforce", radius=0.85, phys_radius=0.5):
+    """Export a relaxed FiberNetwork with ALL per-fiber scalars + scene stats.
+
+    `cells` is the cells_payload() list (for rendering); `cells_xyz` is the raw
+    (N,3) cell-center array (for the contact / alignment metrics).
+    """
+    from . import ecm_mechanics as mech
+    from . import metrics as M
+
+    edges = net.edges
+    p1 = net.nodes[edges[:, 0]]
+    p2 = net.nodes[edges[:, 1]]
+    seg = p2 - p1
+    length = np.linalg.norm(seg, axis=1)
+    direction = np.where(length[:, None] > 1e-9, seg / np.where(length[:, None] > 1e-9, length[:, None], 1.0), 0.0)
+
+    # --- per-edge raw scalars ---
+    reinforce = np.asarray(net.k_scale, float)
+    cell_arr = np.asarray(cells_xyz, float).reshape(-1, 3)
+    _, tension, _ = mech.compute_forces(net, cell_arr, p_mech or mech.MechParams())
+    tension = np.clip(tension, 0, None)
+    maturity = np.array([_STATE_VALUE.get(str(s), 0.34) for s in net.state], float)
+
+    fdict = _fibers_dict_from_network(net, phys_radius)
+    aniso = M.fiber_anisotropy(fdict)
+    axis = np.asarray(aniso["dominant_axis"], float)
+    alignment = np.abs(direction @ axis) if len(direction) else np.zeros(0)
+
+    raw = dict(reinforce=reinforce, tension=tension, maturity=maturity,
+               length=length, alignment=alignment)
+    norm = {k: _norm(v) for k, v in raw.items()}
+
+    # --- build fibers with every normalized scalar attached ---
+    fibers = []
+    for i in range(len(edges)):
+        vals = {k: float(norm[k][i]) for k in raw}
+        fibers.append(dict(path=[p1[i].tolist(), p2[i].tolist()],
+                           v=vals[default], r=radius, vals=vals))
+
+    # --- scene-level metrics (reuse metrics.py) ---
+    cells_m = dict(pos=cell_arr, radius=np.full(len(cell_arr), 9.0),
+                   phenotype=np.array([c.get("pheno", "") for c in cells]),
+                   vel=np.zeros((len(cell_arr), 3)))
+    pores = M.pore_size_distribution(fdict, domain)
+    conn = M.network_connectivity(fdict)
+    contact = M.cell_ecm_contact(cells_m, fdict)
+    stats = dict(
+        n_fibers=len(edges),
+        n_cells=len(cell_arr),
+        volume_fraction=M.ecm_volume_fraction(fdict, domain),
+        alignment_index=aniso["alignment_index"],
+        local_alignment=M.local_alignment_index(cells_m, fdict),
+        mean_pore=float(np.mean(pores)) if len(pores) else float("nan"),
+        median_pore=float(np.median(pores)) if len(pores) else float("nan"),
+        mean_contacts=contact["mean_contacts"],
+        fraction_in_contact=contact["fraction_in_contact"],
+        n_components=conn["n_components"],
+        largest_component=conn["largest_fraction"],
+    )
+
+    scalars = [dict(key=k, title=_SCALAR_INFO[k][0], lo=_SCALAR_INFO[k][1],
+                    hi=_SCALAR_INFO[k][2]) for k in raw]
+    scene = dict(domain=float(domain), scalar=default, scalars=scalars,
+                 fibers=fibers, cells=list(cells), stats=stats,
+                 stat_labels=_STAT_LABELS)
+    with open(path, "w") as fh:
+        json.dump(scene, fh)
+    return scene
+
+
 def _write(path, domain, scalar, fibers, cells):
     scene = dict(domain=float(domain), scalar=scalar, fibers=fibers,
                  cells=list(cells))

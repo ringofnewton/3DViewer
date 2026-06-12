@@ -8,6 +8,7 @@ tinted by phenotype.
 
     python export_glb.py                         # viewer/scene.json -> viewer/model.glb
     python export_glb.py scene.json out.glb      # explicit paths
+    python export_glb.py scene.json out.glb tension   # color by a chosen scalar
 """
 
 from __future__ import annotations
@@ -77,12 +78,20 @@ def cell_mesh(center, radius, pheno):
     return sph
 
 
-def build(scene: dict) -> trimesh.Trimesh:
+def fiber_value(f, key):
+    vals = f.get("vals")
+    if key and vals and key in vals:
+        return vals[key]
+    return f.get("v", 0.5)
+
+
+def build(scene: dict, scalar=None) -> trimesh.Trimesh:
+    key = scalar or scene.get("scalar")
     parts = []
     for f in scene["fibers"]:
         if len(f.get("path", [])) < 2:
             continue
-        parts.extend(fiber_mesh(f["path"], float(f.get("r", 0.5)), colormap(f.get("v", 0.5))))
+        parts.extend(fiber_mesh(f["path"], float(f.get("r", 0.5)), colormap(fiber_value(f, key))))
     for c in scene.get("cells", []):
         parts.append(cell_mesh(np.asarray(c["p"], dtype=float), float(c["r"]), c.get("pheno", "")))
 
@@ -98,13 +107,15 @@ def build(scene: dict) -> trimesh.Trimesh:
 def main():
     src = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "viewer", "scene.json")
     dst = sys.argv[2] if len(sys.argv) > 2 else os.path.join(HERE, "viewer", "model.glb")
+    scalar = sys.argv[3] if len(sys.argv) > 3 else None
 
     with open(src) as fh:
         scene = json.load(fh)
 
+    key = scalar or scene.get("scalar")
     print(f"[1/2] building mesh from {os.path.relpath(src, HERE)} "
-          f"({len(scene['fibers'])} fibers, {len(scene.get('cells', []))} cells) …")
-    mesh = build(scene)
+          f"({len(scene['fibers'])} fibers, {len(scene.get('cells', []))} cells, color={key}) …")
+    mesh = build(scene, scalar)
     print(f"      {len(mesh.vertices)} vertices · {len(mesh.faces)} faces")
 
     print(f"[2/2] writing {os.path.relpath(dst, HERE)}")
