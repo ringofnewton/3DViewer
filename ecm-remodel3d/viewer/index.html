@@ -5,9 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>ECM 3D Viewer — cells & collagen</title>
 <style>
-  :root { --ink:#e8f0ff; --muted:#9fb0c8; --panel:rgba(14,22,38,.72); --line:rgba(255,255,255,.12); }
+  :root { --ink:#e8f0ff; --muted:#9fb0c8; --panel:rgba(14,22,38,.72); --line:rgba(255,255,255,.12);
+    --bg:#05080f; --err:#ff9aa6; }
+  :root[data-theme="light"] { --ink:#15203a; --muted:#5a6580; --panel:rgba(255,255,255,.80);
+    --line:rgba(20,28,46,.14); --bg:#eef1f6; --err:#c8324f; }
   * { box-sizing: border-box; }
-  html,body { margin:0; height:100%; background:#05080f; color:var(--ink);
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR",sans-serif; overflow:hidden; }
   #app { position:fixed; inset:0; }
   .panel { position:fixed; top:14px; left:14px; background:var(--panel); border:1px solid var(--line);
@@ -23,7 +26,7 @@
   .legend-l { display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-top:4px; }
   .hint { position:fixed; bottom:12px; left:50%; transform:translateX(-50%); font-size:12px; color:var(--muted);
     background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:7px 14px; backdrop-filter:blur(14px); }
-  #err { position:fixed; inset:auto 14px 14px 14px; color:#ff9aa6; font-size:12px; white-space:pre-wrap; }
+  #err { position:fixed; inset:auto 14px 14px 14px; color:var(--err); font-size:12px; white-space:pre-wrap; }
 </style>
 <script type="importmap">
 { "imports": {
@@ -41,6 +44,7 @@
   <div class="row"><label>Fibers</label><input id="tFibers" type="checkbox" checked></div>
   <div class="row"><label>Cell opacity</label><input id="sOpacity" type="range" min="0" max="100" value="45"></div>
   <div class="row"><label>Ambient occlusion</label><input id="tAO" type="checkbox" checked></div>
+  <div class="row"><label>Light mode</label><input id="tLight" type="checkbox"></div>
   <div class="leg-title" id="legTitle">Collagen color scale</div>
   <div class="legend" id="legBar"></div>
   <div class="legend-l"><span id="legLo">low</span><span id="legMid"></span><span id="legHi">high</span></div>
@@ -126,7 +130,24 @@ controls.dampingFactor = 0.06;
 
 const key = new THREE.DirectionalLight(0xffffff, 2.2); key.position.set(1,1.5,1); scene.add(key);
 const rim = new THREE.DirectionalLight(0x88aaff, 1.1); rim.position.set(-1,0.4,-1); scene.add(rim);
-scene.add(new THREE.AmbientLight(0x33405a, 0.6));
+const amb = new THREE.AmbientLight(0x33405a, 0.6); scene.add(amb);
+
+// ---- light / dark theme ----------------------------------------------------
+const THEME = {
+  dark:  { bg:0x05080f, amb:0x33405a, ambI:0.6 },
+  light: { bg:0xeef1f6, amb:0xc4d0e4, ambI:1.0 },
+};
+function applyTheme(name){
+  const isLight = name === 'light';
+  const t = isLight ? THEME.light : THEME.dark;
+  document.documentElement.setAttribute('data-theme', isLight ? 'light' : 'dark');
+  scene.background = new THREE.Color(t.bg);
+  amb.color.setHex(t.amb); amb.intensity = t.ambI;
+  const cb = document.getElementById('tLight'); if (cb) cb.checked = isLight;
+  try { localStorage.setItem('ecm-viewer-theme', isLight ? 'light' : 'dark'); } catch(e){}
+}
+applyTheme((() => { try { return localStorage.getItem('ecm-viewer-theme'); } catch(e){ return null; } })() || 'dark');
+document.getElementById('tLight').onchange = e => applyTheme(e.target.checked ? 'light' : 'dark');
 
 const root = new THREE.Group(); scene.add(root);
 let cellGroup = new THREE.Group(), fiberMesh = null;
