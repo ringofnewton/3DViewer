@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>ECM 2D Simulations</title>
+<style>
+  :root { --bg:#0a0d14; --panel:rgba(255,255,255,.05); --line:rgba(255,255,255,.12);
+    --ink:#e8f0ff; --muted:#9fb0c8; --accent:#8ab4ff; --card:rgba(255,255,255,.03); }
+  :root[data-theme="light"] { --bg:#eef1f6; --panel:rgba(20,28,46,.04); --line:rgba(20,28,46,.14);
+    --ink:#15203a; --muted:#5a6580; --accent:#2f6bd8; --card:#ffffff; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR",sans-serif; }
+  header { position:sticky; top:0; z-index:10; display:flex; flex-wrap:wrap; gap:12px;
+    align-items:center; justify-content:space-between; padding:16px 22px;
+    background:color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--line); }
+  header h1 { margin:0; font-size:19px; letter-spacing:-.02em; }
+  header .sub { color:var(--muted); font-size:12.5px; margin-top:2px; }
+  .actions { display:flex; gap:8px; align-items:center; }
+  a.btn, button.btn { font:inherit; font-size:13px; font-weight:600; cursor:pointer;
+    text-decoration:none; color:var(--ink); background:var(--panel);
+    border:1px solid var(--line); border-radius:10px; padding:8px 12px; }
+  a.btn:hover, button.btn:hover { border-color:var(--accent); }
+  main { max-width:1180px; margin:0 auto; padding:24px 22px 60px; }
+  section { margin:34px 0; }
+  section h2 { font-size:16px; margin:0 0 4px; }
+  section .desc { color:var(--muted); font-size:13px; line-height:1.55; margin:0 0 14px; max-width:760px; }
+  .grid { display:grid; gap:16px; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); }
+  figure { margin:0; background:var(--card); border:1px solid var(--line); border-radius:14px;
+    overflow:hidden; display:flex; flex-direction:column; }
+  figure a { display:block; background:#fff; }
+  figure img { display:block; width:100%; height:auto; }
+  figcaption { padding:10px 12px; font-size:12.5px; color:var(--muted); line-height:1.5; }
+  figcaption b { color:var(--ink); font-weight:600; }
+  .toc { display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 8px; }
+  .toc a { font-size:12px; color:var(--muted); text-decoration:none; border:1px solid var(--line);
+    border-radius:999px; padding:5px 11px; }
+  .toc a:hover { color:var(--ink); border-color:var(--accent); }
+  footer { color:var(--muted); font-size:12px; text-align:center; padding:30px 20px; border-top:1px solid var(--line); }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>ECM 2D Simulations</h1>
+    <div class="sub">세포 배치 → 콜라겐 형태형성(mechanics + 소성 리모델링). 그림 클릭 = 원본 크게 보기.</div>
+  </div>
+  <div class="actions">
+    <a class="btn" href="viewer/">3D viewer →</a>
+    <button class="btn" id="theme" type="button">🌙 Dark</button>
+  </div>
+</header>
+
+<main>
+  <nav class="toc" id="toc"></nav>
+  <div id="content"></div>
+</main>
+
+<footer>
+  Generated figures from the <code>ecm-remodel3d</code> pipeline · 각 스터디는 <code>run_*.py</code> 로 재현 가능합니다.
+</footer>
+
+<script>
+// Each study: id, title, description, and its figures (file + caption).
+const STUDIES = [
+  { id:"morph2d", title:"2D 형태형성 (시간 경과)", run:"run_morphology2d.py",
+    desc:"평면 콜라겐 시트 위 수축성 세포. 시간이 지나며 하중을 받는 섬유는 보강·압축되고 느슨한 섬유는 가지치기되어 ECM이 하중 전달 구조로 '성숙'합니다. 세포 배치가 다르면 성숙한 형태도 달라집니다.",
+    figs:[
+      ["output_morph2d/figures/morphology_grid.png","배치별 형태 성숙 격자 — 같은 시간, 다른 세포 배치가 만든 서로 다른 ECM 형태."],
+      ["output_morph2d/figures/morphology_metrics.png","정량 지표 시간 추이 — 정렬도·연결성 등이 성숙과 함께 변합니다."],
+    ]},
+  { id:"culture", title:"세포 밀도 / DLP 패턴 → 공극 형태", run:"run_culture.py",
+    desc:"세포 밀도가 ECM 망의 공극 형태를 정합니다. 낮은 밀도는 성긴 거친 망(열린 공극), 높은 밀도는 촘촘한 미세 망 — 정상 vs 섬유화 비장 형태의 대비를 시뮬레이션으로 재현.",
+    figs:[
+      ["output_culture/figures/density_morphology.png","밀도에 따른 망 형태 — 성긴 망 ↔ 촘촘한 망."],
+      ["output_culture/figures/dlp_patterns.png","DLP 조사 패턴 → 그에 따라 응축된 ECM 구조."],
+      ["output_culture/figures/density_poresize.png","공극 크기 분포 — 밀도가 오를수록 공극이 작아집니다."],
+    ]},
+  { id:"patterns", title:"패턴 시딩 → ECM 성장 (시간 경과)", run:"run_patterns.py",
+    desc:"t=0에는 시딩한 세포만 보이고, 이후 세포가 콜라겐을 분비·수축시켜 ECM이 의도한 패턴으로 자라납니다. 격자·도형·글자·복합 모티프.",
+    figs:[
+      ["output_patterns/figures/patterns_grid.png","격자 패턴이 시간에 따라 ECM으로 성장."],
+      ["output_patterns/figures/patterns_shapes.png","도형 패턴 성장."],
+      ["output_patterns/figures/patterns_text.png","글자 패턴 — 시딩으로 형태를 '쓸' 수 있음."],
+      ["output_patterns/figures/patterns_complex.png","복합 모티프 성장."],
+    ]},
+  { id:"pore", title:"공극 격자 설계", run:"run_pore_design.py",
+    desc:"세포가 없는 영역은 열린 채로 남으므로, 세포 초점(foci)을 격자로 배치하면 공간이 공극으로 타일링되고 그 사이에 스트럿이 응축됩니다. 초점 간격이 공극 크기/주기를 정합니다.",
+    figs:[
+      ["output_pore/figures/pore_lattice.png","초점 격자 → 규칙적 공극 격자."],
+      ["output_pore/figures/pore_hex.png","육각 배치 → 육각 공극."],
+      ["output_pore/figures/pore_curve.png","초점 간격 vs 공극 크기 관계 곡선."],
+    ]},
+  { id:"inverse", title:"역설계 (목표 패턴 → 세포 배치)", run:"run_inverse.py",
+    desc:"창발 규칙: 스트럿은 세포 초점 사이의 '다리'로 형성되고, 세포가 없는 곳은 공극으로 남습니다. 따라서 스트럿 위치에 초점을 두면 원하는 ECM 패턴을 설계할 수 있습니다.",
+    figs:[
+      ["output_inverse/figures/inverse_principle.png","역설계 원리 — 초점 배치가 만드는 구조."],
+      ["output_inverse/figures/inverse_bridge_rule.png","다리(bridge) 규칙 — 초점 사이에 스트럿 형성."],
+      ["output_inverse/figures/inverse_pore.png","목표 공극 패턴을 만드는 시딩."],
+    ]},
+  { id:"emergent", title:"창발 그물망 (스페로이드 배치)", run:"run_emergent.py",
+    desc:"구조는 시딩이 그리는 것이 아니라, 단순히 배치된 스페로이드들이 스스로 조직해 비장 백색속질 같은 발산형 그물망을 만듭니다.",
+    figs:[
+      ["output_emergent/figures/emergent_spacing.png","스페로이드 간격에 따른 창발 그물망."],
+      ["output_emergent/figures/emergent_count.png","스페로이드 수에 따른 변화."],
+      ["output_emergent/figures/emergent_scores.png","구조 점수 정량화."],
+    ]},
+  { id:"spheroid", title:"스페로이드 시간 경과 + 정량", run:"run_spheroid.py",
+    desc:"균일한 콜라겐 시트 속 수축성 스페로이드. 시간이 지나며 주변 매트릭스를 방사형으로 정렬·응축시킵니다. 두 스페로이드는 그 사이에 다리를 형성.",
+    figs:[
+      ["output_spheroid/figures/spheroid_timecourse.png","단일 스페로이드 시간 경과 — 방사형 정렬."],
+      ["output_spheroid/figures/spheroid_metrics.png","정량 지표."],
+      ["output_spheroid/figures/two_spheroid_bridge.png","두 스페로이드 사이 콜라겐 다리."],
+      ["output_spheroid/figures/two_spheroid_alignment.png","다리 정렬도."],
+    ]},
+  { id:"whitepulp", title:"비장 백색속질 모방 vs 대조군", run:"run_whitepulp.py",
+    desc:"중심 세동맥 주변으로 조직된 백색속질 그물 골격(PALS·여포·변연부)을 무작위 대조군과 비교.",
+    figs:[
+      ["output_whitepulp/figures/whitepulp_vs_control.png","백색속질 모방 vs 무작위 대조군."],
+      ["output_whitepulp/figures/whitepulp_metrics.png","조직화 정량 지표."],
+    ]},
+  { id:"mech", title:"역학: 세포 배치 → 콜라겐 패터닝", run:"run_mechanics.py",
+    desc:"예측의 핵심. '세포 사이에 섬유를 그려라'라고 지시하지 않습니다. 수축성 세포를 수동적 콜라겐 망에 두고 망이 역학 평형으로 이완하도록 두면 정렬 트랙이 창발합니다.",
+    figs:[
+      ["output_mech/figures/A_two_cell_track.png","두 세포 사이 창발한 정렬 콜라겐 트랙."],
+      ["output_mech/figures/B_spacing_sweep.png","세포 간격 스윕 — 트랙 형성 조건."],
+      ["output_mech/figures/C_geometry.png","배치 기하에 따른 패턴."],
+    ]},
+  { id:"remodel", title:"소성 리모델링 (세포보다 오래 남는 트랙)", run:"run_remodel.py",
+    desc:"역학 평형과 장력 기반 리모델링(하중 섬유 보강·압축, 지속 느슨 섬유 분해)을 번갈아 적용. 시간이 지나면 매트릭스가 굳어 세포가 사라져도 트랙이 남습니다.",
+    figs:[
+      ["output_remodel/figures/remodel_montage.png","리모델링 시간 경과 몽타주."],
+      ["output_remodel/figures/remodel_curves.png","보강/분해 곡선."],
+      ["output_remodel/figures/remodel_permanence.png","영속성 — 세포 제거 후에도 남는 트랙."],
+    ]},
+];
+
+const content = document.getElementById("content");
+const toc = document.getElementById("toc");
+for (const s of STUDIES) {
+  const a = document.createElement("a"); a.href = "#" + s.id; a.textContent = s.title; toc.appendChild(a);
+  const sec = document.createElement("section"); sec.id = s.id;
+  sec.innerHTML = `<h2>${s.title} <span style="color:var(--muted);font-weight:400;font-size:12px">· ${s.run}</span></h2>
+    <p class="desc">${s.desc}</p>`;
+  const grid = document.createElement("div"); grid.className = "grid";
+  for (const [src, cap] of s.figs) {
+    const fig = document.createElement("figure");
+    fig.innerHTML = `<a href="${src}" target="_blank" rel="noopener"><img loading="lazy" src="${src}" alt="${cap}"></a>
+      <figcaption>${cap}</figcaption>`;
+    grid.appendChild(fig);
+  }
+  sec.appendChild(grid); content.appendChild(sec);
+}
+
+// theme toggle (shared key with the 3D viewer)
+const tbtn = document.getElementById("theme");
+function applyTheme(t){ const light = t === "light";
+  document.documentElement.setAttribute("data-theme", light ? "light" : "dark");
+  tbtn.textContent = light ? "☀️ Light" : "🌙 Dark";
+  try { localStorage.setItem("ecm-viewer-theme", light ? "light" : "dark"); } catch(e){} }
+applyTheme((()=>{ try { return localStorage.getItem("ecm-viewer-theme"); } catch(e){ return null; } })() || "dark");
+tbtn.onclick = () => applyTheme(document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light");
+</script>
+</body>
+</html>
