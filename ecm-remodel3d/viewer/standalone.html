@@ -174,51 +174,103 @@ function makeCell(p, r, tint){
 const PHENO_TINT = { producing:0x6fb0ff, contractile:0xb98cff, degrading:0xff8d8d,
                      quiescent:0x9fe0d0 };
 
-// ---- build fibers: one InstancedMesh of thin cylinders (per segment) -------
-let INST_FIBER = [];   // instance index -> source fiber (for recoloring)
+// ---- build fibers: smooth tapered tubes (pointed organic ends) -------------
+// One merged mesh; each filament is a continuous tube whose radius tapers to a
+// point at both tips (no flat cylinder caps, no bent-wire joints). Vertex colors
+// are stored per filament so we can recolor by any scalar live.
+let FIB_RANGES = [];          // [{f, start, count}] vertex range per filament
+let FIB_COLOR_ATTR = null;
 
 function fiberValue(f, key){
   return (f.vals && (key in f.vals)) ? f.vals[key] : f.v;
 }
-function recolorFibers(key){
-  if (!fiberMesh) return;
-  for (let k=0;k<INST_FIBER.length;k++) fiberMesh.setColorAt(k, colormap(fiberValue(INST_FIBER[k], key)));
-  if (fiberMesh.instanceColor) fiberMesh.instanceColor.needsUpdate = true;
+
+// append a tapered tube around polyline `path` into pos/idx; returns #vertices
+function tubeInto(pos, idx, path, radius, radial, taperN){
+  const n = path.length;
+  if (n < 2) return 0;
+  const P = path.map(p => new THREE.Vector3(p[0], p[1], p[2]));
+  const T = [];
+  for (let i=0;i<n;i++){
+    let t;
+    if (i===0) t = new THREE.Vector3().subVectors(P[1], P[0]);
+    else if (i===n-1) t = new THREE.Vector3().subVectors(P[n-1], P[n-2]);
+    else t = new THREE.Vector3().subVectors(P[i+1], P[i-1]);
+    if (t.lengthSq() < 1e-12) t.set(0,0,1);
+    T.push(t.normalize());
+  }
+  // parallel-transport frame to avoid twisting
+  let normal = new THREE.Vector3(0,0,1);
+  if (Math.abs(T[0].z) > 0.9) normal.set(0,1,0);
+  normal.crossVectors(T[0], normal).normalize();
+  let binormal = new THREE.Vector3().crossVectors(T[0], normal).normalize();
+  const base = pos.length/3;
+  const dir = new THREE.Vector3();
+  for (let i=0;i<n;i++){
+    if (i>0){
+      const v = new THREE.Vector3().crossVectors(T[i-1], T[i]);
+      const c = Math.min(1, Math.max(-1, T[i-1].dot(T[i])));
+      const ang = Math.acos(c);
+      if (v.lengthSq() > 1e-12 && ang > 1e-6){ v.normalize(); normal.applyAxisAngle(v, ang); }
+      binormal.crossVectors(T[i], normal).normalize();
+      normal.crossVectors(binormal, T[i]).normalize();
+    }
+    // taper to a point at the ends: smoothstep ramp over the first/last taperN samples
+    const edge = Math.min(i, n-1-i) / taperN;
+    const e = Math.min(1, edge);
+    const ramp = e*e*(3-2*e);                 // smoothstep
+    const r = radius * (0.06 + 0.94*ramp);    // ~0 at tip, full in the middle
+    for (let j=0;j<radial;j++){
+      const th = 2*Math.PI*j/radial;
+      dir.set(0,0,0)
+         .addScaledVector(normal, Math.cos(th)*r)
+         .addScaledVector(binormal, Math.sin(th)*r);
+      pos.push(P[i].x+dir.x, P[i].y+dir.y, P[i].z+dir.z);
+    }
+  }
+  for (let i=0;i<n-1;i++){
+    for (let j=0;j<radial;j++){
+      const a = base + i*radial + j;
+      const b = base + i*radial + (j+1)%radial;
+      const c = base + (i+1)*radial + j;
+      const d = base + (i+1)*radial + (j+1)%radial;
+      idx.push(a,c,b,  b,c,d);
+    }
+  }
+  return n*radial;
 }
 
 function buildFibers(fibers, key){
-  INST_FIBER = [];
-  let nSeg = 0;
-  for (const f of fibers) nSeg += Math.max(0, f.path.length-1);
-  const cyl = new THREE.CylinderGeometry(1,1,1,8,1,false);
-  const mat = new THREE.MeshStandardMaterial({ roughness:0.5, metalness:0.0,
-    envMapIntensity:0.8, transparent:true, opacity:0.82, depthWrite:true });
-  const mesh = new THREE.InstancedMesh(cyl, mat, nSeg);
-  const up = new THREE.Vector3(0,1,0);
-  const a = new THREE.Vector3(), b = new THREE.Vector3(), mid = new THREE.Vector3(),
-        dir = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3(),
-        m4 = new THREE.Matrix4();
-  let k = 0;
+  FIB_RANGES = [];
+  const pos = [], idx = [];
+  const radial = 6, taperN = 4;
   for (const f of fibers){
-    const col = colormap(fiberValue(f, key));
-    for (let i=0;i<f.path.length-1;i++){
-      a.fromArray(f.path[i]); b.fromArray(f.path[i+1]);
-      const len = a.distanceTo(b); if (len < 1e-6) continue;
-      mid.addVectors(a,b).multiplyScalar(0.5);
-      dir.subVectors(b,a).normalize();
-      q.setFromUnitVectors(up, dir);
-      s.set(f.r, len, f.r);
-      m4.compose(mid, q, s);
-      mesh.setMatrixAt(k, m4);
-      mesh.setColorAt(k, col);
-      INST_FIBER[k] = f;
-      k++;
-    }
+    if (!f.path || f.path.length < 2) continue;
+    const start = pos.length/3;
+    const added = tubeInto(pos, idx, f.path, f.r || 0.5, radial, taperN);
+    if (added) FIB_RANGES.push({ f, start, count: added });
   }
-  mesh.count = k;
-  mesh.instanceMatrix.needsUpdate = true;
-  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(pos.length), 3));
+  FIB_COLOR_ATTR = geo.getAttribute('color');
+  const mat = new THREE.MeshStandardMaterial({ vertexColors:true, roughness:0.42,
+    metalness:0.0, envMapIntensity:0.7 });
+  const mesh = new THREE.Mesh(geo, mat);
+  recolorFibers(key);
   return mesh;
+}
+
+function recolorFibers(key){
+  if (!FIB_COLOR_ATTR) return;
+  const arr = FIB_COLOR_ATTR.array;
+  for (const { f, start, count } of FIB_RANGES){
+    const c = colormap(fiberValue(f, key));
+    for (let v=0; v<count; v++){ const o = (start+v)*3; arr[o]=c.r; arr[o+1]=c.g; arr[o+2]=c.b; }
+  }
+  FIB_COLOR_ATTR.needsUpdate = true;
 }
 
 // ---- composer (SSAO) -------------------------------------------------------

@@ -56,11 +56,17 @@ def _rgba(rgb01, alpha=255) -> np.ndarray:
     return np.array([*(np.clip(np.asarray(rgb01) * 255, 0, 255)), alpha], dtype=np.uint8)
 
 
-def fiber_mesh(path, radius, rgb01, stride=2):
-    """A tube along a polyline as a chain of colored cylinders.
+def _rodrigues(v, axis, ang):
+    c, s = np.cos(ang), np.sin(ang)
+    return v * c + np.cross(axis, v) * s + axis * (axis @ v) * (1 - c)
 
-    `stride` decimates dense (spline-smoothed) paths to keep the GLB light;
-    the curve stays smooth because the endpoints are always kept.
+
+def fiber_mesh(path, radius, rgb01, stride=2, radial=6, taper_n=4):
+    """A smooth tapered tube along a polyline (pointed tips, no flat cap).
+
+    `stride` decimates dense (spline-smoothed) paths to keep the GLB light; the
+    curve stays smooth because the endpoints are always kept. The radius tapers
+    to ~0 at both ends so fibers end in organic points, not cut cylinders.
     """
     pts = np.asarray(path, dtype=float)
     if stride > 1 and len(pts) > 3:
@@ -68,15 +74,55 @@ def fiber_mesh(path, radius, rgb01, stride=2):
         if keep[-1] != len(pts) - 1:
             keep.append(len(pts) - 1)
         pts = pts[keep]
-    color = _rgba(rgb01)
-    segs = []
-    for a, b in zip(pts[:-1], pts[1:]):
-        if np.linalg.norm(b - a) < 1e-6:
-            continue
-        cyl = trimesh.creation.cylinder(radius=radius, segment=[a, b], sections=6)
-        cyl.visual.vertex_colors = np.tile(color, (len(cyl.vertices), 1))
-        segs.append(cyl)
-    return segs
+    n = len(pts)
+    if n < 2:
+        return []
+
+    # unit tangents
+    T = np.zeros((n, 3))
+    T[1:-1] = pts[2:] - pts[:-2]
+    T[0] = pts[1] - pts[0]
+    T[-1] = pts[-1] - pts[-2]
+    tn = np.linalg.norm(T, axis=1, keepdims=True)
+    tn[tn < 1e-12] = 1.0
+    T = T / tn
+
+    # parallel-transport frame
+    ref = np.array([0.0, 0.0, 1.0]) if abs(T[0, 2]) < 0.9 else np.array([0.0, 1.0, 0.0])
+    normal = np.cross(T[0], ref)
+    normal /= (np.linalg.norm(normal) or 1.0)
+    binormal = np.cross(T[0], normal)
+    binormal /= (np.linalg.norm(binormal) or 1.0)
+
+    verts = []
+    for i in range(n):
+        if i > 0:
+            v = np.cross(T[i - 1], T[i])
+            c = float(np.clip(T[i - 1] @ T[i], -1, 1))
+            ang = np.arccos(c)
+            if np.linalg.norm(v) > 1e-12 and ang > 1e-6:
+                v /= np.linalg.norm(v)
+                normal = _rodrigues(normal, v, ang)
+            binormal = np.cross(T[i], normal); binormal /= (np.linalg.norm(binormal) or 1.0)
+            normal = np.cross(binormal, T[i]); normal /= (np.linalg.norm(normal) or 1.0)
+        e = min(1.0, min(i, n - 1 - i) / taper_n)
+        r = radius * (0.06 + 0.94 * (e * e * (3 - 2 * e)))
+        for j in range(radial):
+            th = 2 * np.pi * j / radial
+            verts.append(pts[i] + normal * np.cos(th) * r + binormal * np.sin(th) * r)
+
+    faces = []
+    for i in range(n - 1):
+        for j in range(radial):
+            a = i * radial + j
+            b = i * radial + (j + 1) % radial
+            c = (i + 1) * radial + j
+            d = (i + 1) * radial + (j + 1) % radial
+            faces.append([a, c, b]); faces.append([b, c, d])
+
+    m = trimesh.Trimesh(vertices=np.array(verts), faces=np.array(faces), process=False)
+    m.visual.vertex_colors = np.tile(_rgba(rgb01), (len(m.vertices), 1))
+    return [m]
 
 
 def cell_mesh(center, radius, pheno):
