@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Interactive 2D ECM Simulation</title>
+<style>
+  :root { --bg:#0a0d14; --panel:rgba(16,22,34,.82); --line:rgba(255,255,255,.12);
+    --ink:#e8f0ff; --muted:#9fb0c8; --accent:#8ab4ff; }
+  :root[data-theme="light"] { --bg:#eef1f6; --panel:rgba(255,255,255,.86); --line:rgba(20,28,46,.14);
+    --ink:#15203a; --muted:#5a6580; --accent:#2f6bd8; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; overflow:hidden; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR",sans-serif; }
+  #cv { position:fixed; inset:0; display:block; touch-action:none; }
+  .panel { position:fixed; top:12px; left:12px; width:268px; max-height:calc(100% - 24px);
+    overflow:auto; background:var(--panel); border:1px solid var(--line); border-radius:16px;
+    padding:14px 16px; backdrop-filter:blur(14px); }
+  .panel h1 { font-size:15px; margin:0 0 2px; letter-spacing:-.02em; }
+  .panel p.sub { margin:0 0 10px; font-size:12px; color:var(--muted); line-height:1.5; }
+  .row { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:7px 0; font-size:12.5px; }
+  .row label { color:var(--muted); }
+  input[type=range]{ width:128px; }
+  select { background:var(--panel); color:var(--ink); border:1px solid var(--line);
+    border-radius:8px; padding:3px 6px; font-size:12px; }
+  .btns { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 4px; }
+  button { font:inherit; font-size:12px; font-weight:600; cursor:pointer; color:var(--ink);
+    background:rgba(138,180,255,.16); border:1px solid var(--line); border-radius:9px; padding:6px 9px; }
+  button:hover { border-color:var(--accent); }
+  button.primary { background:var(--accent); color:#06101f; border-color:transparent; }
+  .sec { margin-top:11px; font-size:11px; font-weight:700; text-transform:uppercase;
+    letter-spacing:.04em; color:var(--muted); }
+  .legend { margin-top:6px; height:11px; border-radius:6px; border:1px solid var(--line); }
+  .legend-l { display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-top:3px; }
+  .stats { margin-top:8px; font-size:11.5px; color:var(--muted); }
+  .stats .s { display:flex; justify-content:space-between; padding:2px 0; border-bottom:1px solid var(--line); }
+  .stats .s b { color:var(--ink); font-weight:600; }
+  .hint { position:fixed; bottom:12px; left:50%; transform:translateX(-50%); font-size:12px;
+    color:var(--muted); background:var(--panel); border:1px solid var(--line); border-radius:999px;
+    padding:7px 14px; backdrop-filter:blur(14px); max-width:90vw; text-align:center; }
+  a { color:var(--accent); }
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div class="panel">
+  <h1>2D ECM 시뮬레이션</h1>
+  <p class="sub">캔버스를 <b>클릭/드래그</b>해 수축 세포를 놓으세요. 세포가 콜라겐을 당겨 정렬·보강된 트랙이 형성됩니다.</p>
+
+  <div class="btns">
+    <button class="primary" id="play">⏸ Pause</button>
+    <button id="step">Step</button>
+    <button id="clearCells">Clear cells</button>
+    <button id="reset">New matrix</button>
+  </div>
+
+  <div class="sec">Presets</div>
+  <div class="btns">
+    <button data-preset="two">Two cells</button>
+    <button data-preset="line">Line</button>
+    <button data-preset="ring">Ring</button>
+    <button data-preset="grid">Grid</button>
+  </div>
+
+  <div class="sec">Parameters</div>
+  <div class="row"><label>Matrix density</label><input id="density" type="range" min="40" max="280" value="140"></div>
+  <div class="row"><label>Traction</label><input id="traction" type="range" min="0" max="300" value="120"></div>
+  <div class="row"><label>Reach</label><input id="reach" type="range" min="15" max="80" value="42"></div>
+  <div class="row"><label>Fiber stiffness</label><input id="stiff" type="range" min="20" max="200" value="100"></div>
+  <div class="row"><label>Remodeling</label><input id="remodel" type="checkbox" checked></div>
+
+  <div class="sec">Display</div>
+  <div class="row"><label>Color by</label>
+    <select id="scalar">
+      <option value="tension">tension</option>
+      <option value="reinforce">reinforce</option>
+      <option value="alignment">alignment</option>
+      <option value="length">length</option>
+    </select>
+  </div>
+  <div class="row"><label>Light mode</label><input id="light" type="checkbox"></div>
+  <div class="legend" id="legend"></div>
+  <div class="legend-l"><span id="lo">low</span><span>→</span><span id="hi">high</span></div>
+
+  <div class="sec">Live metrics</div>
+  <div class="stats" id="stats"></div>
+
+  <div class="sec">More</div>
+  <p class="sub" style="margin-top:6px"><a href="viewer/">3D viewer →</a> &nbsp; <a href="sim2d.html">2D gallery →</a></p>
+</div>
+
+<div class="hint" id="hint">클릭=세포 추가 · 드래그=세포 이동 · Shift+클릭=세포 삭제</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Inferno-like colormap (matches the 3D viewer)
+function colormap(t){
+  t = Math.min(1, Math.max(0, t));
+  const s = [[0,0.02,0.02,0.23],[0.25,0.42,0.07,0.43],[0.5,0.74,0.21,0.33],
+             [0.75,0.95,0.5,0.16],[1,0.99,0.85,0.55]];
+  for (let i=0;i<s.length-1;i++){ const a=s[i],b=s[i+1];
+    if (t>=a[0]&&t<=b[0]){ const u=(t-a[0])/(b[0]-a[0]);
+      return [a[1]+(b[1]-a[1])*u, a[2]+(b[2]-a[2])*u, a[3]+(b[3]-a[3])*u]; } }
+  return [0.99,0.85,0.55];
+}
+const css = c => `rgb(${(c[0]*255)|0},${(c[1]*255)|0},${(c[2]*255)|0})`;
+
+// ---------------------------------------------------------------------------
+const DOMAIN = 200;
+const P = { kT:1.0, buckle:0.05, alpha:4.0, kBend:0.12, traction:1.2, reach:42,
+            decay:16, cellR:8, anchor:8, subIters:4, relax:0.7, maxStep:2.2,
+            remodelEvery:18, reinforcePct:0.85, slackPct:0.13, slackPersist:5 };
+
+// network state (typed arrays)
+let N=0, px, py, ox, oy, fx, fy, kdiag, fixed;
+let E=0, ea, eb, rest, orest, kscale, estate, slackAge;   // estate: 0 normal,1 reinforced,2 degraded
+let bends = [];   // [a,b,c]
+let cells = [];   // {x,y}
+let frame = 0, remodelTick = 0;
+
+function rnd(a,b){ return a + Math.random()*(b-a); }
+
+function buildNetwork(density){
+  // Mikado-style: random straight filaments, subdivided, then crosslinked.
+  const nFib = density|0, fiberLen=70, segLen=9, xdist=5.0;
+  const nx=[], ny=[], edA=[], edB=[], st=[]; bends=[];
+  for (let f=0; f<nFib; f++){
+    const cx=rnd(0.1,0.9)*DOMAIN, cy=rnd(0.1,0.9)*DOMAIN;
+    const ang=rnd(0,Math.PI*2), dx=Math.cos(ang), dy=Math.sin(ang);
+    const nseg=Math.max(2,(fiberLen/segLen)|0);
+    const base=nx.length;
+    for (let i=0;i<=nseg;i++){
+      const t=(i/nseg-0.5)*fiberLen;
+      nx.push(Math.min(DOMAIN-1,Math.max(1,cx+dx*t+rnd(-1,1)*1.2)));
+      ny.push(Math.min(DOMAIN-1,Math.max(1,cy+dy*t+rnd(-1,1)*1.2)));
+    }
+    for (let i=0;i<nseg;i++){ edA.push(base+i); edB.push(base+i+1); st.push(0); }
+    for (let i=1;i<nseg;i++) bends.push([base+i-1,base+i,base+i+1]);
+  }
+  // crosslink via spatial hash
+  const cell=xdist, buckets=new Map();
+  const key=(x,y)=>(Math.floor(x/cell))+','+(Math.floor(y/cell));
+  for (let i=0;i<nx.length;i++){ const k=key(nx[i],ny[i]); (buckets.get(k)||buckets.set(k,[]).get(k)).push(i); }
+  const added=new Set();
+  for (let i=0;i<nx.length;i++){
+    const gx=Math.floor(nx[i]/cell), gy=Math.floor(ny[i]/cell);
+    for (let dx=-1;dx<=1;dx++) for (let dy=-1;dy<=1;dy++){
+      const arr=buckets.get((gx+dx)+','+(gy+dy)); if(!arr) continue;
+      for (const j of arr){ if (j<=i) continue;
+        const p=(i<j?i+'_'+j:j+'_'+i); if (added.has(p)) continue;
+        const ddx=nx[i]-nx[j], ddy=ny[i]-ny[j];
+        if (ddx*ddx+ddy*ddy < cell*cell){ edA.push(i); edB.push(j); st.push(0); added.add(p); }
+      }
+    }
+  }
+  // commit to typed arrays
+  N=nx.length; E=edA.length;
+  px=new Float32Array(nx); py=new Float32Array(ny);
+  ox=px.slice(); oy=py.slice();
+  fx=new Float32Array(N); fy=new Float32Array(N); kdiag=new Float32Array(N);
+  fixed=new Uint8Array(N);
+  for (let i=0;i<N;i++) if (px[i]<P.anchor||px[i]>DOMAIN-P.anchor||py[i]<P.anchor||py[i]>DOMAIN-P.anchor) fixed[i]=1;
+  ea=new Int32Array(edA); eb=new Int32Array(edB);
+  rest=new Float32Array(E); kscale=new Float32Array(E); estate=new Uint8Array(st);
+  slackAge=new Uint16Array(E);
+  for (let e=0;e<E;e++){ const dx=px[eb[e]]-px[ea[e]], dy=py[eb[e]]-py[ea[e]];
+    rest[e]=Math.max(1e-3,Math.hypot(dx,dy)); kscale[e]=1; }
+  orest=rest.slice();
+  frame=0; remodelTick=0;
+}
+
+function physicsStep(){
+  fx.fill(0); fy.fill(0); kdiag.fill(0);
+  const kT=P.kT, buckle=P.buckle, alpha=P.alpha;
+  for (let e=0;e<E;e++){
+    if (estate[e]===2) continue;
+    const a=ea[e], b=eb[e];
+    const dx=px[b]-px[a], dy=py[b]-py[a];
+    const len=Math.hypot(dx,dy); if (len<1e-6) continue;
+    const ux=dx/len, uy=dy/len, strain=(len-rest[e])/rest[e];
+    const k=(strain>0 ? kT*(1+alpha*strain) : kT*buckle) * kscale[e];
+    const f=k*(len-rest[e]);
+    fx[a]+=f*ux; fy[a]+=f*uy; fx[b]-=f*ux; fy[b]-=f*uy;
+    kdiag[a]+=k; kdiag[b]+=k;
+  }
+  // bending (discrete Laplacian toward straightness)
+  const kb=P.kBend;
+  for (let i=0;i<bends.length;i++){ const [a,bn,c]=bends[i];
+    const lx=(px[a]+px[c])*0.5-px[bn], ly=(py[a]+py[c])*0.5-py[bn];
+    fx[bn]+=kb*lx; fy[bn]+=kb*ly;
+    fx[a]-=0.5*kb*lx; fy[a]-=0.5*kb*ly; fx[c]-=0.5*kb*lx; fy[c]-=0.5*kb*ly;
+    kdiag[bn]+=kb;
+  }
+  // cell traction
+  const tr=P.traction, reach=P.reach, decay=P.decay, cr=P.cellR;
+  for (let c=0;c<cells.length;c++){ const cx=cells[c].x, cy=cells[c].y;
+    for (let n=0;n<N;n++){ if (fixed[n]) continue;
+      const dx=cx-px[n], dy=cy-py[n]; const d=Math.hypot(dx,dy);
+      if (d>cr && d<reach){ const m=tr*Math.exp(-(d-cr)/decay);
+        fx[n]+=m*dx/d; fy[n]+=m*dy/d; kdiag[n]+=m/Math.max(d,1); }
+    }
+  }
+  // preconditioned overdamped integration
+  const relax=P.relax, ms=P.maxStep;
+  for (let n=0;n<N;n++){ if (fixed[n]) continue;
+    const inv=relax/(kdiag[n]+1e-3);
+    let sx=fx[n]*inv, sy=fy[n]*inv;
+    const s=Math.hypot(sx,sy); if (s>ms){ sx*=ms/s; sy*=ms/s; }
+    px[n]+=sx; py[n]+=sy;
+  }
+}
+
+function edgeTension(e){
+  if (estate[e]===2) return 0;
+  const a=ea[e], b=eb[e]; const len=Math.hypot(px[b]-px[a],py[b]-py[a]);
+  const strain=(len-rest[e])/rest[e];
+  const k=(strain>0 ? P.kT*(1+P.alpha*strain) : P.kT*P.buckle)*kscale[e];
+  return Math.max(0, k*(len-rest[e]));
+}
+
+function remodel(){
+  const ten=new Float32Array(E); const pos=[];
+  for (let e=0;e<E;e++){ ten[e]=edgeTension(e); if (estate[e]!==2 && ten[e]>0) pos.push(ten[e]); }
+  if (!pos.length) return;
+  pos.sort((a,b)=>a-b);
+  const hi=pos[Math.min(pos.length-1,(pos.length*P.reinforcePct)|0)];
+  const lo=pos[(pos.length*P.slackPct)|0]||0;
+  for (let e=0;e<E;e++){ if (estate[e]===2) continue;
+    const t=ten[e];
+    if (t>=hi){ kscale[e]=Math.min(kscale[e]*1.15,4); rest[e]=Math.max(rest[e]*0.97, orest[e]*0.5);
+                estate[e]=1; slackAge[e]=0; }
+    else if (t<=lo){ slackAge[e]++; if (slackAge[e]>=P.slackPersist && kscale[e]<1.4) estate[e]=2; }
+    else slackAge[e]=0;
+  }
+}
+
+// ---- scalar value per edge for coloring ----
+let meanAxis=[1,0], Lmax=1, tenMax=1;
+function refreshNorms(){
+  // mean orientation (for alignment) + dynamic maxima
+  let txx=0,txy=0,tyy=0,w=0; Lmax=1; tenMax=1e-6;
+  for (let e=0;e<E;e++){ if (estate[e]===2) continue;
+    const a=ea[e],b=eb[e]; const dx=px[b]-px[a],dy=py[b]-py[a]; const L=Math.hypot(dx,dy);
+    if (L<1e-6) continue; const ux=dx/L,uy=dy/L;
+    txx+=ux*ux*L; txy+=ux*uy*L; tyy+=uy*uy*L; w+=L; if (L>Lmax) Lmax=L;
+    const t=edgeTension(e); if (t>tenMax) tenMax=t;
+  }
+  if (w>0){ txx/=w; txy/=w; tyy/=w;
+    // dominant eigenvector of 2x2 [[txx,txy],[txy,tyy]]
+    const tr=txx+tyy, det=txx*tyy-txy*txy; const l=tr/2+Math.sqrt(Math.max(0,tr*tr/4-det));
+    let vx=txy, vy=l-txx; const n=Math.hypot(vx,vy); if (n<1e-9){ vx=1; vy=0; } else { vx/=n; vy/=n; }
+    meanAxis=[vx,vy];
+  }
+}
+function edgeValue(e, key){
+  const a=ea[e],b=eb[e]; const dx=px[b]-px[a],dy=py[b]-py[a]; const L=Math.hypot(dx,dy)||1e-6;
+  if (key==='reinforce') return Math.min(1,(kscale[e]-1)/3);
+  if (key==='length') return Math.min(1, L/Lmax);
+  if (key==='alignment'){ const c=Math.abs((dx/L)*meanAxis[0]+(dy/L)*meanAxis[1]); return c; }
+  // tension (default)
+  return Math.min(1, edgeTension(e)/tenMax);
+}
+
+// ---------------------------------------------------------------------------
+// rendering
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+let scale=1, offx=0, offy=0;
+function resize(){ const dpr=Math.min(devicePixelRatio||1,2);
+  cv.width=innerWidth*dpr; cv.height=innerHeight*dpr; cv.style.width=innerWidth+'px'; cv.style.height=innerHeight+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  const fit=Math.min(innerWidth,innerHeight)*0.92; scale=fit/DOMAIN;
+  offx=(innerWidth-DOMAIN*scale)/2; offy=(innerHeight-DOMAIN*scale)/2;
+}
+addEventListener('resize', resize); resize();
+const SX=x=>offx+x*scale, SY=y=>offy+y*scale;
+const toWorld=(cx,cy)=>[ (cx-offx)/scale, (cy-offy)/scale ];
+
+function draw(){
+  const light=document.documentElement.getAttribute('data-theme')==='light';
+  ctx.clearRect(0,0,innerWidth,innerHeight);
+  const key=document.getElementById('scalar').value;
+  ctx.lineWidth=Math.max(0.7, scale*0.5); ctx.lineCap='round';
+  for (let e=0;e<E;e++){ if (estate[e]===2) continue;
+    const a=ea[e],b=eb[e];
+    ctx.strokeStyle=css(colormap(edgeValue(e,key)));
+    ctx.beginPath(); ctx.moveTo(SX(px[a]),SY(py[a])); ctx.lineTo(SX(px[b]),SY(py[b])); ctx.stroke();
+  }
+  for (const c of cells){
+    const r=P.cellR*scale;
+    const g=ctx.createRadialGradient(SX(c.x),SY(c.y),r*0.2,SX(c.x),SY(c.y),r);
+    g.addColorStop(0,'rgba(185,140,255,0.95)'); g.addColorStop(1,'rgba(150,110,230,0.25)');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(SX(c.x),SY(c.y),r,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle=light?'rgba(40,40,70,.6)':'rgba(255,255,255,.7)'; ctx.lineWidth=1; ctx.stroke();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// stats
+let statTick=0;
+function updateStats(){
+  let active=0, reinforced=0, tsum=0; for (let e=0;e<E;e++){ if (estate[e]===2) continue;
+    active++; if (kscale[e]>1.4) reinforced++; tsum+=edgeTension(e); }
+  // alignment index from meanAxis eigenvalue proxy: recompute simple anisotropy
+  let txx=0,tyy=0,txy=0,w=0; for (let e=0;e<E;e++){ if (estate[e]===2) continue;
+    const a=ea[e],b=eb[e]; const dx=px[b]-px[a],dy=py[b]-py[a]; const L=Math.hypot(dx,dy); if (L<1e-6) continue;
+    const ux=dx/L,uy=dy/L; txx+=ux*ux*L; tyy+=uy*uy*L; txy+=ux*uy*L; w+=L; }
+  let align=0; if (w>0){ txx/=w; tyy/=w; txy/=w; const tr=txx+tyy, det=txx*tyy-txy*txy;
+    const l=tr/2+Math.sqrt(Math.max(0,tr*tr/4-det)); align=2*l-1; }   // 0=isotropic,1=aligned (2D)
+  const rows=[['Cells',cells.length],['Active fibers',active],
+    ['Reinforced',active?Math.round(100*reinforced/active)+'%':'—'],
+    ['Mean tension',active?(tsum/active).toFixed(3):'—'],
+    ['Alignment index',align.toFixed(3)]];
+  document.getElementById('stats').innerHTML=rows.map(r=>`<div class="s"><span>${r[0]}</span><b>${r[1]}</b></div>`).join('');
+}
+
+// ---------------------------------------------------------------------------
+// main loop
+let playing=true;
+function tick(){
+  if (playing){
+    for (let i=0;i<P.subIters;i++) physicsStep();
+    frame++;
+    if (document.getElementById('remodel').checked && (++remodelTick % P.remodelEvery===0)) remodel();
+  }
+  if ((statTick++ % 4)===0) refreshNorms();
+  draw();
+  if ((statTick % 20)===0) updateStats();
+  requestAnimationFrame(tick);
+}
+
+// ---------------------------------------------------------------------------
+// interaction
+let dragging=-1;
+function nearestCell(wx,wy){ let best=-1,bd=1e9; for (let i=0;i<cells.length;i++){
+  const d=Math.hypot(cells[i].x-wx,cells[i].y-wy); if (d<bd){bd=d;best=i;} } return [best,bd]; }
+function pointerDown(ev){ ev.preventDefault();
+  const [wx,wy]=toWorld(ev.clientX,ev.clientY);
+  const [i,d]=nearestCell(wx,wy);
+  if (ev.shiftKey){ if (i>=0 && d<P.cellR*1.6) cells.splice(i,1); return; }
+  if (i>=0 && d<P.cellR*1.4){ dragging=i; }
+  else { cells.push({x:Math.max(0,Math.min(DOMAIN,wx)),y:Math.max(0,Math.min(DOMAIN,wy))}); dragging=cells.length-1; }
+}
+function pointerMove(ev){ if (dragging<0) return; const [wx,wy]=toWorld(ev.clientX,ev.clientY);
+  cells[dragging].x=Math.max(0,Math.min(DOMAIN,wx)); cells[dragging].y=Math.max(0,Math.min(DOMAIN,wy)); }
+function pointerUp(){ dragging=-1; }
+cv.addEventListener('pointerdown', pointerDown);
+cv.addEventListener('pointermove', pointerMove);
+addEventListener('pointerup', pointerUp);
+cv.addEventListener('contextmenu', e=>{ e.preventDefault(); const [wx,wy]=toWorld(e.clientX,e.clientY);
+  const [i,d]=nearestCell(wx,wy); if (i>=0 && d<P.cellR*1.6) cells.splice(i,1); });
+
+// presets
+function preset(kind){ cells=[]; const c=DOMAIN/2;
+  if (kind==='two'){ cells.push({x:c-34,y:c},{x:c+34,y:c}); }
+  if (kind==='line'){ for (let i=0;i<5;i++) cells.push({x:40+i*30,y:c}); }
+  if (kind==='ring'){ for (let i=0;i<8;i++){ const a=i/8*Math.PI*2; cells.push({x:c+55*Math.cos(a),y:c+55*Math.sin(a)});} }
+  if (kind==='grid'){ for (let i=0;i<3;i++) for (let j=0;j<3;j++) cells.push({x:60+i*40,y:60+j*40}); }
+}
+document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>preset(b.dataset.preset));
+
+// controls
+const play=document.getElementById('play');
+play.onclick=()=>{ playing=!playing; play.textContent=playing?'⏸ Pause':'▶ Play'; };
+document.getElementById('step').onclick=()=>{ for (let i=0;i<P.subIters;i++) physicsStep();
+  if (document.getElementById('remodel').checked) remodel(); refreshNorms(); draw(); updateStats(); };
+document.getElementById('clearCells').onclick=()=>cells=[];
+document.getElementById('reset').onclick=()=>buildNetwork(+density.value);
+const density=document.getElementById('density');
+density.onchange=()=>buildNetwork(+density.value);
+document.getElementById('traction').oninput=e=>P.traction=+e.target.value/100;
+document.getElementById('reach').oninput=e=>P.reach=+e.target.value;
+document.getElementById('stiff').oninput=e=>P.kT=+e.target.value/100;
+
+// color legend
+(function(){ let g=[]; for (let i=0;i<=10;i++){ g.push(css(colormap(i/10))+' '+(i*10)+'%'); }
+  document.getElementById('legend').style.background='linear-gradient(90deg,'+g.join(',')+')'; })();
+const LO={tension:'slack',reinforce:'soft',alignment:'off-axis',length:'short'};
+const HI={tension:'high tension',reinforce:'reinforced',alignment:'on-axis',length:'long'};
+function setLegendLabels(){ const k=document.getElementById('scalar').value;
+  document.getElementById('lo').textContent=LO[k]; document.getElementById('hi').textContent=HI[k]; }
+document.getElementById('scalar').onchange=setLegendLabels; setLegendLabels();
+
+// theme (shared key with the 3D viewer)
+const lt=document.getElementById('light');
+function applyTheme(t){ const light=t==='light';
+  document.documentElement.setAttribute('data-theme', light?'light':'dark'); lt.checked=light;
+  try{ localStorage.setItem('ecm-viewer-theme', light?'light':'dark'); }catch(e){} }
+applyTheme((()=>{ try{ return localStorage.getItem('ecm-viewer-theme'); }catch(e){ return null; } })()||'dark');
+lt.onchange=e=>applyTheme(e.target.checked?'light':'dark');
+
+// go
+buildNetwork(+density.value); preset('two'); tick();
+</script>
+</body>
+</html>
