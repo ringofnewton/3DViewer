@@ -56,15 +56,24 @@ def _rgba(rgb01, alpha=255) -> np.ndarray:
     return np.array([*(np.clip(np.asarray(rgb01) * 255, 0, 255)), alpha], dtype=np.uint8)
 
 
-def fiber_mesh(path, radius, rgb01):
-    """A tube along a polyline as a chain of colored cylinders."""
+def fiber_mesh(path, radius, rgb01, stride=2):
+    """A tube along a polyline as a chain of colored cylinders.
+
+    `stride` decimates dense (spline-smoothed) paths to keep the GLB light;
+    the curve stays smooth because the endpoints are always kept.
+    """
     pts = np.asarray(path, dtype=float)
+    if stride > 1 and len(pts) > 3:
+        keep = list(range(0, len(pts), stride))
+        if keep[-1] != len(pts) - 1:
+            keep.append(len(pts) - 1)
+        pts = pts[keep]
     color = _rgba(rgb01)
     segs = []
     for a, b in zip(pts[:-1], pts[1:]):
         if np.linalg.norm(b - a) < 1e-6:
             continue
-        cyl = trimesh.creation.cylinder(radius=radius, segment=[a, b], sections=8)
+        cyl = trimesh.creation.cylinder(radius=radius, segment=[a, b], sections=6)
         cyl.visual.vertex_colors = np.tile(color, (len(cyl.vertices), 1))
         segs.append(cyl)
     return segs

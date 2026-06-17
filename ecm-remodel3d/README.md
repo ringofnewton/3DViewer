@@ -40,9 +40,12 @@ so you can point it at any result — grown network, mechanics track, or remodel
 matrix — by exporting that scene to `viewer/scene.json`. Toggles for cells/fibers,
 cell opacity, light mode, and AO are in the panel.
 
-**All metrics in one scene.** `make_track_scene.py` exports via
-`web_export.from_network_metrics`, which attaches *every* per-fiber scalar to each
-fiber and a block of scene-level metrics. The viewer's **Color by** selector
+**Organic, curved matrix.** `make_track_scene.py` grows a dense, branching,
+crosslinked network (`ecm_network`) and relaxes it *gently* under contractile-cell
+traction, so the collagen renders as flowing curved filaments (Catmull-Rom
+smoothed) — not straight rods. It exports via `web_export.from_polylines_metrics`,
+which attaches *every* per-fiber scalar to each filament and a block of
+scene-level metrics. The viewer's **Color by** selector
 recolors the fibers live by:
 
 | per-fiber scalar | meaning |
