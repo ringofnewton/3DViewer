@@ -72,7 +72,24 @@ the distance-limited failure seen between large explants. Capturing failure need
 finite cell force + matrix yielding/turnover + finite gel size (future work).
 Figure: `output_validation/figures/bridge_alignment.png`.
 
-### 1.4 Parameter sensitivity / robustness (`sensitivity.py`)
+### 1.4 Reticular morphometry vs literature ranges (`morphometry_compare.py`)
+The emergent grown network's architecture over n=8 seeds (mean ± 95% CI;
+1 length unit = 1 µm per CALIBRATION.md):
+
+| metric | model | reticular/FRC literature range |
+|---|---:|---|
+| branch-point coordination | **3.09 ± 0.02** | ≈ 3 (trivalent junctions) |
+| trivalent fraction | **0.92 ± 0.02** | majority 3-way |
+| pore size (median) | **21.9 ± 1.0 µm** | tens of µm |
+| largest connected fraction | 0.27 ± 0.14 | (partially percolating; raises with growth) |
+
+The branch points are **predominantly trivalent (≈3-way)** and pores sit in the
+**tens-of-µm** range — both consistent with collagen / lymphoid-reticular network
+morphology. Figure: `output_validation/figures/morphometry.png`. **Caveat:** this
+compares to literature *ranges*, not a digitized dataset; a distribution-level test
+(KS/EMD vs a published FRC pore/degree histogram) is the remaining step.
+
+### 1.5 Parameter sensitivity / robustness (`sensitivity.py`)
 OAT sweep of the bridge conclusion (sep = 60 µm, n=2 seeds) over each parameter at
 [low, default, high]. The **axis-specific bridge survives every single-parameter
 variation** (axis ≫ isotropic AND axis ≫ perpendicular in all 15 runs). Influence
@@ -94,7 +111,7 @@ the two nonlinear mechanisms are **partially redundant** (either alone retains m
 of the effect). So the nonlinear constitutive law is the load-bearing assumption —
 now *quantified*, not just asserted.
 
-### 1.5 Statistical power (`stats_power.py`)
+### 1.6 Statistical power (`stats_power.py`)
 Headline mechanics results over **n=16 seeds** (mean ± 95% CI; paired effect size):
 
 | result | treatment | control | difference | Cohen's d |
@@ -105,7 +122,7 @@ Headline mechanics results over **n=16 seeds** (mean ± 95% CI; paired effect si
 Both paired-difference CIs exclude 0 → **significant at 95%** with **large effect
 sizes** (isotropic baseline 0.333). Figure: `output_validation/figures/stats_power.png`.
 
-### 1.6 Full-3D reproduction (`validate_3d.py`)
+### 1.7 Full-3D reproduction (`validate_3d.py`)
 The headline results hold without the planar constraint (full 3D, n=10 seeds,
 mean ± 95% CI; isotropic nematic order along any axis = 1/3):
 
@@ -120,7 +137,7 @@ the bridge axis−transverse gap is **identical to 2D (0.161)** with axis ≫ is
 diluting the in-axis fraction — expected; the *contrast* is what matters and is
 unchanged.) Figure: `output_validation/figures/validate_3d.png`.
 
-### 1.7 Face validity (no fitting, METHODS §9.3)
+### 1.8 Face validity (no fitting, METHODS §9.3)
 Reproduces documented phenomena qualitatively: radial collagen asters around
 contractile cells and aligned matrix bridges between two foci (Stopak & Harris
 explant traction-structuring); long-range force transmission requiring fiber
@@ -146,8 +163,10 @@ Prioritized. Items 1–3 are needed for any *quantitative* claim; 4–6 strength
    explant bridge vs separation (`experiment_bridge.py`, §1.3). Reproduces the
    axis-specific aligned bridge quantitatively (n=4 seeds, SEMs); identifies a real
    discrepancy (no distance-failure in this regime — long-range nonlinear
-   transmission). Next: compare *distributions* (pore size, node degree) of a
-   reticular target (FRC / white-pulp) against published morphometry.
+   transmission). **Reticular morphometry** (`morphometry_compare.py`, §1.4) adds a
+   second comparison: trivalent branch points (3.09) and tens-of-µm pores match
+   reticular-network ranges. Next: a *distribution-level* test (KS/EMD) vs a
+   digitized FRC pore/degree histogram.
 3. **[DONE — OAT] Parameter sensitivity / identifiability** (`sensitivity.py`, §1.4).
    OAT sweep: the bridge conclusion is robust to every single parameter; nonlinearity
    (buckling-dominant, partially redundant with stiffening) ~doubles the signal. Next:
@@ -185,6 +204,7 @@ python convergence_test.py      # discretization independence of the emergent tr
 python calibrate.py             # reduced -> SI units + stiffness/traction consistency
 python rheology_test.py         # network shear modulus -> G ~ 0.8 Pa (soft gel)
 python experiment_bridge.py     # explant-bridge alignment vs separation (+ figure)
+python morphometry_compare.py   # reticular morphometry (coordination, pore size) vs ranges
 python sensitivity.py           # OAT robustness + nonlinearity decomposition
 python stats_power.py           # headline metrics: mean ± 95% CI, effect sizes (+ figure)
 python validate_3d.py           # headline results reproduced in full 3D (+ figure)
