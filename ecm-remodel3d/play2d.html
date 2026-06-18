@@ -46,7 +46,8 @@
 
 <div class="panel">
   <h1>2D ECM 시뮬레이션</h1>
-  <p class="sub">세포가 <b>콜라겐을 분비</b>해 ECM이 자라나고(축적), 세포 수축이 그걸 트랙으로 <b>정렬·보강</b>합니다. 캔버스 클릭/드래그로 세포를 놓으세요.</p>
+  <p class="sub">세포가 주변에 <b>콜라겐을 분비</b>(축적)하고, 수축이 그걸 트랙으로 <b>정렬·보강</b>합니다. 캔버스 클릭/드래그로 세포를 놓으세요.</p>
+  <p class="sub" style="color:#d8a23a;border:1px solid var(--line);border-radius:8px;padding:6px 8px">⚠ 실시간 <b>교육용 일러스트레이션</b>입니다 — 검증된 솔버가 아닙니다. 정량 결과는 Python 파이프라인(<a href="METHODS.md">METHODS</a>)을 쓰세요.</p>
 
   <div class="btns">
     <button class="primary" id="play">⏸ Pause</button>
@@ -64,8 +65,9 @@
   </div>
 
   <div class="sec">Cell behavior</div>
-  <div class="row"><label>Secretion rate</label><input id="secrete" type="range" min="0" max="100" value="55"></div>
-  <div class="row"><label>Contraction</label><input id="traction" type="range" min="0" max="300" value="40"></div>
+  <div class="row"><label>Secretion rate</label><input id="secrete" type="range" min="0" max="100" value="60"></div>
+  <div class="row"><label>Secretion radius</label><input id="srad" type="range" min="12" max="70" value="34"></div>
+  <div class="row"><label>Contraction</label><input id="traction" type="range" min="0" max="300" value="60"></div>
   <div class="row"><label>Reach</label><input id="reach" type="range" min="15" max="80" value="46"></div>
   <div class="row"><label>Remodeling</label><input id="remodel" type="checkbox" checked></div>
 
@@ -106,26 +108,25 @@ const css=c=>`rgb(${(c[0]*255)|0},${(c[1]*255)|0},${(c[2]*255)|0})`;
 
 // ---------------------------------------------------------------------------
 const DOMAIN=200;
-const P={ kT:1.0,buckle:0.05,alpha:4.0,kBend:0.12, traction:0.4,reach:46,decay:18,cellR:8,
-  anchor:7, subIters:3, relax:0.6, maxStep:1.2,
-  // growth (secretion)
-  segLen:5.5, persistence:0.85, branchProb:0.05, crosslinkDist:5.0, minLinkAge:5,
-  secreteEvery:3, secreteProb:0.55, tipLifetime:34, maxNodes:4200, maxTips:280,
-  matureFrames:45,
+const P={ kT:1.0,buckle:0.05,alpha:4.0,kBend:0.12, traction:0.6,reach:46,decay:18,cellR:8,
+  anchor:7, subIters:6, relax:0.6, maxStep:1.4,
+  // secretion (deposited-disk model, METHODS §6)
+  secretionRadius:34, fiberLen:20, segPerFiber:4, crosslinkDist:5.0,
+  secreteEvery:3, secreteProb:0.6, maxNodes:4600,
   // remodeling
   remodelEvery:20, reinforcePct:0.85, slackPct:0.13, slackPersist:6 };
 
 // dynamic network state (plain arrays so cells can ADD ECM over time)
-let px,py,fixed,nodeAge;          // nodes
+let px,py,fixed;                  // nodes
 let ea,eb,rest,orest,kscale,estate,slackAge,eage;  // edges; estate 0/1/2 = normal/reinforced/degraded
 let bendMap;                      // node -> list of incident node neighbors (for bending), built lazily
-let tips, cells, grid, frame, simTime, secreteTick, remodelTick;
+let cells, grid, frame, simTime, secreteTick, remodelTick;
 let fx,fy,kdiag;                  // force scratch (resized on demand)
 
 function resetState(){
-  px=[]; py=[]; fixed=[]; nodeAge=[];
+  px=[]; py=[]; fixed=[];
   ea=[]; eb=[]; rest=[]; orest=[]; kscale=[]; estate=[]; slackAge=[]; eage=[];
-  tips=[]; grid=new Map(); frame=0; simTime=0; secreteTick=0; remodelTick=0;
+  grid=new Map(); frame=0; simTime=0; secreteTick=0; remodelTick=0;
 }
 const gkey=(x,y)=>Math.floor(x/P.crosslinkDist)+','+Math.floor(y/P.crosslinkDist);
 function gridAdd(i){ const k=gkey(px[i],py[i]); let a=grid.get(k); if(!a){a=[];grid.set(k,a);} a.push(i); }
@@ -134,51 +135,34 @@ function gridNear(x,y){ const gx=Math.floor(x/P.crosslinkDist),gy=Math.floor(y/P
 function addNode(x,y){ x=Math.min(DOMAIN,Math.max(0,x)); y=Math.min(DOMAIN,Math.max(0,y));
   const i=px.length; px.push(x); py.push(y);
   fixed.push((x<P.anchor||x>DOMAIN-P.anchor||y<P.anchor||y>DOMAIN-P.anchor)?1:0);
-  nodeAge.push(0); gridAdd(i); return i; }
+  gridAdd(i); return i; }
 function addEdge(a,b){ if(a===b)return; const dx=px[b]-px[a],dy=py[b]-py[a],L=Math.max(1e-3,Math.hypot(dx,dy));
   ea.push(a); eb.push(b); rest.push(L); orest.push(L); kscale.push(1); estate.push(0); slackAge.push(0); eage.push(0); }
 
-// ---- secretion / growth: cells lay down new collagen tips that elongate ----
-function grow(){
-  const rate=P.secreteProb;
-  // 1) nucleate new tips at cells
-  for(const c of cells){
-    if(px.length>=P.maxNodes || tips.length>=P.maxTips) break;
-    if(Math.random()<rate){
-      const a=Math.random()*Math.PI*2, dx=Math.cos(a), dy=Math.sin(a);
-      const n=addNode(c.x+dx*P.cellR, c.y+dy*P.cellR);
-      tips.push({n, dx, dy, age:0});
-    }
-  }
-  // 2) elongate existing tips
-  const survivors=[];
-  for(const t of tips){
-    if(px.length>=P.maxNodes){ survivors.push(t); continue; }
-    const base=t.n;
-    // persistent direction + a little randomness => curved filaments
-    let dx=P.persistence*t.dx+(1-P.persistence)*(Math.random()*2-1);
-    let dy=P.persistence*t.dy+(1-P.persistence)*(Math.random()*2-1);
-    const L=Math.hypot(dx,dy)||1; dx/=L; dy/=L;
-    const nx=px[base]+dx*P.segLen, ny=py[base]+dy*P.segLen;
-    // crosslink: snap to a nearby existing node (closes loops -> a real mesh),
-    // but only once the tip has extended outward (young tips must reach out first)
-    if(t.age>=P.minLinkAge){
-      let snap=-1, sd=P.crosslinkDist;
-      for(const j of gridNear(nx,ny)){ if(j===base) continue;
-        const d=Math.hypot(px[j]-nx,py[j]-ny); if(d<sd){ sd=d; snap=j; } }
-      if(snap>=0){ addEdge(base,snap); continue; }   // tip terminates into the mesh
-    }
-    const nn=addNode(nx,ny); addEdge(base,nn);
-    t.n=nn; t.dx=dx; t.dy=dy; t.age++;
-    if(t.age<P.tipLifetime){
-      survivors.push(t);
-      if(Math.random()<P.branchProb && tips.length+survivors.length<P.maxTips){
-        const ba=(Math.random()*2-1)*0.9, cb=Math.cos(ba), sb=Math.sin(ba);
-        survivors.push({n:nn, dx:dx*cb-dy*sb, dy:dx*sb+dy*cb, age:0});
-      }
-    }
-  }
-  tips=survivors;
+// ---- secretion: cells deposit short collagen fibers in a disk around them --
+// Mirrors the validated pipeline (METHODS §6, build_deposited_network): fibers
+// are laid down uniformly in a disk of radius rho_s about each cell and crosslink
+// into a connected mesh. No ad-hoc "tip growth" or maturity tricks — deposition
+// builds the matrix, mechanics (relax-to-equilibrium) + remodeling organize it.
+function diskPoint(cx,cy,R){ const r=R*Math.sqrt(Math.random()), a=Math.random()*Math.PI*2;
+  return [cx+r*Math.cos(a), cy+r*Math.sin(a)]; }
+function depositFiber(cx,cy){
+  const [mx,my]=diskPoint(cx,cy,P.secretionRadius);
+  const ang=Math.random()*Math.PI*2, dx=Math.cos(ang), dy=Math.sin(ang);
+  const segs=P.segPerFiber, L=P.fiberLen;
+  const made=[]; let prev=-1;
+  for(let i=0;i<=segs;i++){ const t=(i/segs-0.5)*L;
+    const n=addNode(mx+dx*t, my+dy*t); made.push(n); if(prev>=0) addEdge(prev,n); prev=n; }
+  // crosslink each new node to the nearest existing node of a DIFFERENT fiber
+  const mset=new Set(made);
+  for(const n of made){ let best=-1, bd=P.crosslinkDist;
+    for(const j of gridNear(px[n],py[n])){ if(mset.has(j)) continue;
+      const d=Math.hypot(px[j]-px[n],py[j]-py[n]); if(d<bd){ bd=d; best=j; } }
+    if(best>=0) addEdge(n,best); }
+}
+function secrete(){
+  for(const c of cells){ if(px.length>=P.maxNodes) break;
+    if(Math.random()<P.secreteProb) depositFiber(c.x,c.y); }
 }
 
 // ---- mechanics: contraction relaxes the (growing) network ------------------
@@ -193,14 +177,12 @@ function physicsStep(){
     const ux=dx/len,uy=dy/len,strain=(len-rest[e])/rest[e];
     const k=(strain>0?kT*(1+alpha*strain):kT*buckle)*kscale[e]; const f=k*(len-rest[e]);
     fx[a]+=f*ux; fy[a]+=f*uy; fx[b]-=f*ux; fy[b]-=f*uy; kdiag[a]+=k; kdiag[b]+=k; }
-  // cell contraction (traction toward each cell, decaying with distance).
-  // Freshly secreted collagen is compliant: contraction ramps in only as a node
-  // matures, so new fibers extend OUTWARD first and get organized later.
-  const tr=P.traction,reach=P.reach,decay=P.decay,cr=P.cellR,mf=P.matureFrames;
-  for(let n=0;n<N;n++){ if(fixed[n]) continue;
-    const mat=Math.min(1, nodeAge[n]/mf); if(mat<=0) continue;
-    for(const c of cells){ const dx=c.x-px[n],dy=c.y-py[n],d=Math.hypot(dx,dy);
-      if(d>cr && d<reach){ const m=tr*mat*Math.exp(-(d-cr)/decay); fx[n]+=m*dx/d; fy[n]+=m*dy/d; kdiag[n]+=m/Math.max(d,1); } } }
+  // cell contraction: integrin-mediated traction toward each cell, decaying with
+  // distance (METHODS §4). Acts on the connected, boundary-anchored network.
+  const tr=P.traction,reach=P.reach,decay=P.decay,cr=P.cellR;
+  for(const c of cells){ for(let n=0;n<N;n++){ if(fixed[n]) continue;
+    const dx=c.x-px[n],dy=c.y-py[n],d=Math.hypot(dx,dy);
+    if(d>cr && d<reach){ const m=tr*Math.exp(-(d-cr)/decay); fx[n]+=m*dx/d; fy[n]+=m*dy/d; kdiag[n]+=m/Math.max(d,1); } } }
   const relax=P.relax,ms=P.maxStep;
   for(let n=0;n<N;n++){ if(fixed[n]) continue;
     const inv=relax/(kdiag[n]+1e-3); let sx=fx[n]*inv, sy=fy[n]*inv;
@@ -275,10 +257,9 @@ let playing=true;
 function tick(){
   if(playing){
     const sr=+document.getElementById('secrete').value/100; P.secreteProb=sr;
-    if(sr>0 && (++secreteTick % P.secreteEvery===0)) grow();
+    if(sr>0 && (++secreteTick % P.secreteEvery===0)) secrete();
     for(let i=0;i<P.subIters;i++) physicsStep();
     for(let e=0;e<eage.length;e++) eage[e]++;
-    for(let i=0;i<nodeAge.length;i++) nodeAge[i]++;
     frame++;
     if(document.getElementById('remodel').checked && (++remodelTick % P.remodelEvery===0)) remodel();
   }
@@ -310,10 +291,11 @@ document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>preset(b.dat
 
 const play=document.getElementById('play');
 play.onclick=()=>{ playing=!playing; play.textContent=playing?'⏸ Pause':'▶ Play'; };
-document.getElementById('step').onclick=()=>{ grow(); for(let i=0;i<P.subIters;i++) physicsStep(); for(let e=0;e<eage.length;e++) eage[e]++; for(let i=0;i<nodeAge.length;i++) nodeAge[i]++; if(document.getElementById('remodel').checked) remodel(); refreshNorms(); draw(); updateStats(); };
+document.getElementById('step').onclick=()=>{ secrete(); for(let i=0;i<P.subIters;i++) physicsStep(); for(let e=0;e<eage.length;e++) eage[e]++; if(document.getElementById('remodel').checked) remodel(); refreshNorms(); draw(); updateStats(); };
 document.getElementById('clearEcm').onclick=()=>{ const keep=cells.slice(); resetState(); cells=keep; };
 document.getElementById('clearCells').onclick=()=>cells=[];
 document.getElementById('traction').oninput=e=>P.traction=+e.target.value/100;
+document.getElementById('srad').oninput=e=>P.secretionRadius=+e.target.value;
 document.getElementById('reach').oninput=e=>P.reach=+e.target.value;
 
 (function(){ let g=[]; for(let i=0;i<=10;i++) g.push(css(colormap(i/10))+' '+(i*10)+'%');
