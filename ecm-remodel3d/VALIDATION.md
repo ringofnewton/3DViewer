@@ -87,7 +87,18 @@ the two nonlinear mechanisms are **partially redundant** (either alone retains m
 of the effect). So the nonlinear constitutive law is the load-bearing assumption —
 now *quantified*, not just asserted.
 
-### 1.5 Face validity (no fitting, METHODS §9.3)
+### 1.5 Statistical power (`stats_power.py`)
+Headline mechanics results over **n=16 seeds** (mean ± 95% CI; paired effect size):
+
+| result | treatment | control | difference | Cohen's d |
+|---|---:|---:|---:|---:|
+| single-cell aster | tension-wtd radiality **0.969 ± 0.004** | uniform 0.689 ± 0.016 | **0.281 ± 0.017** | **9.06** |
+| inter-cell bridge | axis align **0.532 ± 0.017** | perpendicular 0.371 ± 0.018 | **0.161 ± 0.035** | **2.47** |
+
+Both paired-difference CIs exclude 0 → **significant at 95%** with **large effect
+sizes** (isotropic baseline 0.333). Figure: `output_validation/figures/stats_power.png`.
+
+### 1.6 Face validity (no fitting, METHODS §9.3)
 Reproduces documented phenomena qualitatively: radial collagen asters around
 contractile cells and aligned matrix bridges between two foci (Stopak & Harris
 explant traction-structuring); long-range force transmission requiring fiber
@@ -119,8 +130,9 @@ Prioritized. Items 1–3 are needed for any *quantitative* claim; 4–6 strength
    OAT sweep: the bridge conclusion is robust to every single parameter; nonlinearity
    (buckling-dominant, partially redundant with stiffening) ~doubles the signal. Next:
    a global (Sobol/LHS) sweep + sensitivity of the remodeling percentiles.
-4. **Statistical power.** Report every emergent metric as mean ± CI over ≥10–20
-   seeds; current studies often use few seeds.
+4. **[DONE — headline metrics] Statistical power** (`stats_power.py`, §1.5). The two
+   central mechanics results are now reported at n=16 with 95% CIs and large effect
+   sizes (d = 9.06, 2.47). Next: extend CIs to the remodeling / emergence studies.
 5. **3D.** The force law is already 3D; rerun the headline studies in 3D (higher
    cost) to show the 2D conclusions survive, or scope the paper explicitly to 2D.
 6. **Mechanistic upgrades (optional, for a stronger model).** Replace the
@@ -151,4 +163,5 @@ python calibrate.py             # reduced -> SI units + stiffness/traction consi
 python rheology_test.py         # network shear modulus -> G ~ 0.8 Pa (soft gel)
 python experiment_bridge.py     # explant-bridge alignment vs separation (+ figure)
 python sensitivity.py           # OAT robustness + nonlinearity decomposition
+python stats_power.py           # headline metrics: mean ± 95% CI, effect sizes (+ figure)
 ```
