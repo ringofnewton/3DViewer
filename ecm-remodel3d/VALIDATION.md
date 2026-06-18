@@ -6,11 +6,18 @@ What is and isn't established for the discrete fiber-network ECM model
 lists concretely what remains before the model supports a *quantitative*,
 publishable claim.
 
-> Scope reminder (METHODS §10): the model is in **reduced units and is not yet
-> calibrated**. Its present, defensible claim is **qualitative**: cell-driven
-> mechanical self-organization of a nonlinear fiber network produces — and lets
-> us control — reticular collagen architecture. Quantitative/predictive claims
-> require the work in §"Required for publication" below.
+> **Status (updated).** The core validation roadmap (§2 items 1–5) is now done:
+> internal regression, discretization independence, order-of-magnitude **SI
+> calibration** (length 1 µm, force 0.156 nN, stress 156 Pa, network modulus
+> ~0.8 Pa, step ~2 h), one **quantitative experiment comparison** (explant bridge,
+> with an honest discrepancy logged), **parameter robustness** (OAT + nonlinearity
+> decomposition), **statistical power** (n=16, large effect sizes), and **full-3D
+> reproduction**. The defensible claim is now **qualitative + order-of-magnitude
+> calibrated**: cell-driven mechanical self-organization of a nonlinear fiber
+> network produces — and controls — reticular collagen architecture, robustly and
+> in 3D. Remaining for a *fully quantitative/predictive* paper: distribution-level
+> comparison to a reticular target, a global (Sobol/LHS) sweep, tighter (periodic-BC)
+> rheology, and the optional mechanistic upgrades in §2.6.
 
 ---
 
@@ -98,7 +105,22 @@ Headline mechanics results over **n=16 seeds** (mean ± 95% CI; paired effect si
 Both paired-difference CIs exclude 0 → **significant at 95%** with **large effect
 sizes** (isotropic baseline 0.333). Figure: `output_validation/figures/stats_power.png`.
 
-### 1.6 Face validity (no fitting, METHODS §9.3)
+### 1.6 Full-3D reproduction (`validate_3d.py`)
+The headline results hold without the planar constraint (full 3D, n=10 seeds,
+mean ± 95% CI; isotropic nematic order along any axis = 1/3):
+
+| result | 3D treatment | 3D control | 2D ref |
+|---|---:|---:|---:|
+| single-cell aster | tension-wtd radiality **0.960 ± 0.007** | uniform 0.612 ± 0.026 | 0.969 / 0.689 |
+| inter-cell bridge | axis align **0.440 ± 0.021** | transverse 0.280 ± 0.010 | 0.532 / 0.371 |
+
+Both conclusions survive in 3D: the aster is if anything stronger (Δ 0.348), and
+the bridge axis−transverse gap is **identical to 2D (0.161)** with axis ≫ isotropic.
+(Bridge axis alignment is lower in 3D because fibers can also align out of plane,
+diluting the in-axis fraction — expected; the *contrast* is what matters and is
+unchanged.) Figure: `output_validation/figures/validate_3d.png`.
+
+### 1.7 Face validity (no fitting, METHODS §9.3)
 Reproduces documented phenomena qualitatively: radial collagen asters around
 contractile cells and aligned matrix bridges between two foci (Stopak & Harris
 explant traction-structuring); long-range force transmission requiring fiber
@@ -133,8 +155,9 @@ Prioritized. Items 1–3 are needed for any *quantitative* claim; 4–6 strength
 4. **[DONE — headline metrics] Statistical power** (`stats_power.py`, §1.5). The two
    central mechanics results are now reported at n=16 with 95% CIs and large effect
    sizes (d = 9.06, 2.47). Next: extend CIs to the remodeling / emergence studies.
-5. **3D.** The force law is already 3D; rerun the headline studies in 3D (higher
-   cost) to show the 2D conclusions survive, or scope the paper explicitly to 2D.
+5. **[DONE] 3D.** Headline results reproduced in full 3D (`validate_3d.py`, §1.6):
+   aster Δ 0.348, bridge axis−transverse gap 0.161 (identical to 2D). The 2D
+   conclusions are not an artifact of the planar constraint.
 6. **Mechanistic upgrades (optional, for a stronger model).** Replace the
    phenomenological percentile remodeling with explicit LOX/MMP-style kinetics;
    add active cell migration/contractile-feedback; fiber–fiber steric contact.
@@ -164,4 +187,5 @@ python rheology_test.py         # network shear modulus -> G ~ 0.8 Pa (soft gel)
 python experiment_bridge.py     # explant-bridge alignment vs separation (+ figure)
 python sensitivity.py           # OAT robustness + nonlinearity decomposition
 python stats_power.py           # headline metrics: mean ± 95% CI, effect sizes (+ figure)
+python validate_3d.py           # headline results reproduced in full 3D (+ figure)
 ```
