@@ -65,7 +65,29 @@ the distance-limited failure seen between large explants. Capturing failure need
 finite cell force + matrix yielding/turnover + finite gel size (future work).
 Figure: `output_validation/figures/bridge_alignment.png`.
 
-### 1.4 Face validity (no fitting, METHODS §9.3)
+### 1.4 Parameter sensitivity / robustness (`sensitivity.py`)
+OAT sweep of the bridge conclusion (sep = 60 µm, n=2 seeds) over each parameter at
+[low, default, high]. The **axis-specific bridge survives every single-parameter
+variation** (axis ≫ isotropic AND axis ≫ perpendicular in all 15 runs). Influence
+ranking (range of bridge alignment): `buckle_ratio` (0.089) > `k_bend` (0.041) >
+`reach` ≈ `stiffen_alpha` (0.024) > `traction` (0.014).
+
+Nonlinearity decomposition (axis − perpendicular signal):
+
+| control | axis | perp | axis−perp |
+|---|---:|---:|---:|
+| full nonlinear (default) | 0.535 | 0.376 | **0.160** |
+| buckling only (α=0) | 0.512 | 0.355 | 0.156 |
+| stiffening only (r_b=1) | 0.446 | 0.345 | 0.102 |
+| **fully linear** (r_b=1, α=0) | 0.430 | 0.349 | **0.081** |
+
+**Refined claim:** nonlinearity ~**doubles** the axis-specific bridge signal vs a
+fully-linear matrix (0.160 vs 0.081); **buckling is the dominant contributor** and
+the two nonlinear mechanisms are **partially redundant** (either alone retains much
+of the effect). So the nonlinear constitutive law is the load-bearing assumption —
+now *quantified*, not just asserted.
+
+### 1.5 Face validity (no fitting, METHODS §9.3)
 Reproduces documented phenomena qualitatively: radial collagen asters around
 contractile cells and aligned matrix bridges between two foci (Stopak & Harris
 explant traction-structuring); long-range force transmission requiring fiber
@@ -93,10 +115,10 @@ Prioritized. Items 1–3 are needed for any *quantitative* claim; 4–6 strength
    discrepancy (no distance-failure in this regime — long-range nonlinear
    transmission). Next: compare *distributions* (pore size, node degree) of a
    reticular target (FRC / white-pulp) against published morphometry.
-3. **Parameter sensitivity / identifiability.** Sweep the key parameters
-   (`buckle_ratio`, `stiffen_alpha`, `k_bend`, `traction`, `reach`,
-   reinforce/slack percentiles) and report which conclusions are robust vs
-   parameter-dependent. A one-at-a-time + a global (e.g. Sobol/LHS) sweep.
+3. **[DONE — OAT] Parameter sensitivity / identifiability** (`sensitivity.py`, §1.4).
+   OAT sweep: the bridge conclusion is robust to every single parameter; nonlinearity
+   (buckling-dominant, partially redundant with stiffening) ~doubles the signal. Next:
+   a global (Sobol/LHS) sweep + sensitivity of the remodeling percentiles.
 4. **Statistical power.** Report every emergent metric as mean ± CI over ≥10–20
    seeds; current studies often use few seeds.
 5. **3D.** The force law is already 3D; rerun the headline studies in 3D (higher
@@ -128,4 +150,5 @@ python convergence_test.py      # discretization independence of the emergent tr
 python calibrate.py             # reduced -> SI units + stiffness/traction consistency
 python rheology_test.py         # network shear modulus -> G ~ 0.8 Pa (soft gel)
 python experiment_bridge.py     # explant-bridge alignment vs separation (+ figure)
+python sensitivity.py           # OAT robustness + nonlinearity decomposition
 ```
