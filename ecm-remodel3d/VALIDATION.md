@@ -59,6 +59,13 @@ Prioritized. Items 1–3 are needed for any *quantitative* claim; 4–6 strength
    shear/Young's modulus), traction → nN per cell (measured single-cell tractions),
    and remodeling steps → hours (collagen turnover rates). Report all parameters in
    SI with sources. Until then, only qualitative/relative claims are defensible.
+   **Started — see [`CALIBRATION.md`](CALIBRATION.md) (`python calibrate.py`).**
+   Anchoring on measured cell traction gives length = 1 µm, force ≈ 0.156 nN,
+   stress ≈ 156 Pa, step ≈ 2 h. Key finding: a single-fibril stiffness anchor and
+   the traction anchor disagree by ~4×10³, so `k_s = 1` is an *effective network*
+   element (bending/buckling-dominated), not a taut fibril. **Still open:** an
+   independent network-shear-modulus measurement (rheology sim) to confirm the
+   stress unit lands in the 1–100 Pa collagen-gel range.
 2. **Quantitative comparison to experiment.** Pick ≥1 dataset with measurable
    geometry (e.g. two-explant bridge alignment vs separation; FRC/white-pulp
    reticular pore-size and node-degree distributions) and compare *distributions*
@@ -95,4 +102,5 @@ pip install -r requirements.txt
 python verify_mechanics.py      # equilibrium, radial aster, nonlinearity
 python verify_remodel.py        # plastic memory after cell removal
 python convergence_test.py      # discretization independence of the emergent track
+python calibrate.py             # reduced -> SI units + stiffness/traction consistency
 ```
