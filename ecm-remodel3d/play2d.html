@@ -65,8 +65,8 @@
 
   <div class="sec">Cell behavior</div>
   <div class="row"><label>Secretion rate</label><input id="secrete" type="range" min="0" max="100" value="55"></div>
-  <div class="row"><label>Contraction</label><input id="traction" type="range" min="0" max="300" value="90"></div>
-  <div class="row"><label>Reach</label><input id="reach" type="range" min="15" max="80" value="42"></div>
+  <div class="row"><label>Contraction</label><input id="traction" type="range" min="0" max="300" value="40"></div>
+  <div class="row"><label>Reach</label><input id="reach" type="range" min="15" max="80" value="46"></div>
   <div class="row"><label>Remodeling</label><input id="remodel" type="checkbox" checked></div>
 
   <div class="sec">Display</div>
@@ -106,12 +106,12 @@ const css=c=>`rgb(${(c[0]*255)|0},${(c[1]*255)|0},${(c[2]*255)|0})`;
 
 // ---------------------------------------------------------------------------
 const DOMAIN=200;
-const P={ kT:1.0,buckle:0.05,alpha:4.0,kBend:0.12, traction:0.9,reach:42,decay:16,cellR:8,
-  anchor:7, subIters:3, relax:0.6, maxStep:1.8,
+const P={ kT:1.0,buckle:0.05,alpha:4.0,kBend:0.12, traction:0.4,reach:46,decay:18,cellR:8,
+  anchor:7, subIters:3, relax:0.6, maxStep:1.2,
   // growth (secretion)
-  segLen:5.5, persistence:0.82, branchProb:0.05, crosslinkDist:5.0,
-  secreteEvery:3, secreteProb:0.55, tipLifetime:26, maxNodes:4200, maxTips:240,
-  matureAge:60,
+  segLen:5.5, persistence:0.85, branchProb:0.05, crosslinkDist:5.0, minLinkAge:5,
+  secreteEvery:3, secreteProb:0.55, tipLifetime:34, maxNodes:4200, maxTips:280,
+  matureFrames:45,
   // remodeling
   remodelEvery:20, reinforcePct:0.85, slackPct:0.13, slackPersist:6 };
 
@@ -160,11 +160,14 @@ function grow(){
     let dy=P.persistence*t.dy+(1-P.persistence)*(Math.random()*2-1);
     const L=Math.hypot(dx,dy)||1; dx/=L; dy/=L;
     const nx=px[base]+dx*P.segLen, ny=py[base]+dy*P.segLen;
-    // crosslink: snap to a nearby existing node (closes loops -> a real mesh)
-    let snap=-1, sd=P.crosslinkDist;
-    for(const j of gridNear(nx,ny)){ if(j===base) continue;
-      const d=Math.hypot(px[j]-nx,py[j]-ny); if(d<sd){ sd=d; snap=j; } }
-    if(snap>=0){ addEdge(base,snap); continue; }   // tip terminates into the mesh
+    // crosslink: snap to a nearby existing node (closes loops -> a real mesh),
+    // but only once the tip has extended outward (young tips must reach out first)
+    if(t.age>=P.minLinkAge){
+      let snap=-1, sd=P.crosslinkDist;
+      for(const j of gridNear(nx,ny)){ if(j===base) continue;
+        const d=Math.hypot(px[j]-nx,py[j]-ny); if(d<sd){ sd=d; snap=j; } }
+      if(snap>=0){ addEdge(base,snap); continue; }   // tip terminates into the mesh
+    }
     const nn=addNode(nx,ny); addEdge(base,nn);
     t.n=nn; t.dx=dx; t.dy=dy; t.age++;
     if(t.age<P.tipLifetime){
@@ -190,11 +193,14 @@ function physicsStep(){
     const ux=dx/len,uy=dy/len,strain=(len-rest[e])/rest[e];
     const k=(strain>0?kT*(1+alpha*strain):kT*buckle)*kscale[e]; const f=k*(len-rest[e]);
     fx[a]+=f*ux; fy[a]+=f*uy; fx[b]-=f*ux; fy[b]-=f*uy; kdiag[a]+=k; kdiag[b]+=k; }
-  // cell contraction (traction toward each cell, decaying with distance)
-  const tr=P.traction,reach=P.reach,decay=P.decay,cr=P.cellR;
-  for(const c of cells){ for(let n=0;n<N;n++){ if(fixed[n]) continue;
-    const dx=c.x-px[n],dy=c.y-py[n],d=Math.hypot(dx,dy);
-    if(d>cr && d<reach){ const m=tr*Math.exp(-(d-cr)/decay); fx[n]+=m*dx/d; fy[n]+=m*dy/d; kdiag[n]+=m/Math.max(d,1); } } }
+  // cell contraction (traction toward each cell, decaying with distance).
+  // Freshly secreted collagen is compliant: contraction ramps in only as a node
+  // matures, so new fibers extend OUTWARD first and get organized later.
+  const tr=P.traction,reach=P.reach,decay=P.decay,cr=P.cellR,mf=P.matureFrames;
+  for(let n=0;n<N;n++){ if(fixed[n]) continue;
+    const mat=Math.min(1, nodeAge[n]/mf); if(mat<=0) continue;
+    for(const c of cells){ const dx=c.x-px[n],dy=c.y-py[n],d=Math.hypot(dx,dy);
+      if(d>cr && d<reach){ const m=tr*mat*Math.exp(-(d-cr)/decay); fx[n]+=m*dx/d; fy[n]+=m*dy/d; kdiag[n]+=m/Math.max(d,1); } } }
   const relax=P.relax,ms=P.maxStep;
   for(let n=0;n<N;n++){ if(fixed[n]) continue;
     const inv=relax/(kdiag[n]+1e-3); let sx=fx[n]*inv, sy=fy[n]*inv;
@@ -272,6 +278,7 @@ function tick(){
     if(sr>0 && (++secreteTick % P.secreteEvery===0)) grow();
     for(let i=0;i<P.subIters;i++) physicsStep();
     for(let e=0;e<eage.length;e++) eage[e]++;
+    for(let i=0;i<nodeAge.length;i++) nodeAge[i]++;
     frame++;
     if(document.getElementById('remodel').checked && (++remodelTick % P.remodelEvery===0)) remodel();
   }
@@ -303,7 +310,7 @@ document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>preset(b.dat
 
 const play=document.getElementById('play');
 play.onclick=()=>{ playing=!playing; play.textContent=playing?'⏸ Pause':'▶ Play'; };
-document.getElementById('step').onclick=()=>{ grow(); for(let i=0;i<P.subIters;i++) physicsStep(); for(let e=0;e<eage.length;e++) eage[e]++; if(document.getElementById('remodel').checked) remodel(); refreshNorms(); draw(); updateStats(); };
+document.getElementById('step').onclick=()=>{ grow(); for(let i=0;i<P.subIters;i++) physicsStep(); for(let e=0;e<eage.length;e++) eage[e]++; for(let i=0;i<nodeAge.length;i++) nodeAge[i]++; if(document.getElementById('remodel').checked) remodel(); refreshNorms(); draw(); updateStats(); };
 document.getElementById('clearEcm').onclick=()=>{ const keep=cells.slice(); resetState(); cells=keep; };
 document.getElementById('clearCells').onclick=()=>cells=[];
 document.getElementById('traction').oninput=e=>P.traction=+e.target.value/100;
