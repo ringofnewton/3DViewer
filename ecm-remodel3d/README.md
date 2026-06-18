@@ -116,7 +116,14 @@ Three studies are produced in `output_mech/figures/`:
 python run_mechanics.py     # the morphogenesis studies (figures in output_mech/)
 python verify_mechanics.py  # asserts the physics: convergence, radial single-cell
                             # tension, and nonlinear-only track alignment
+python convergence_test.py  # emergent track is discretization-independent
 ```
+
+> **Scientific status.** See [`VALIDATION.md`](VALIDATION.md) for what is validated
+> (internal regression, discretization independence, face validity) vs. what is
+> still required for a *quantitative*, publishable claim (unit calibration,
+> quantitative experimental comparison, sensitivity, statistics, 3D). The web
+> viewers are illustrations, not the validated solver.
 
 ### Plastic remodeling: tracks that outlast the cells
 
