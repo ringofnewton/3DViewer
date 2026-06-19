@@ -26,7 +26,9 @@ reinforcement and turnover) in which cells secrete and contract collagen. The
 model reproduces, without fitting, the radial collagen asters around single
 contractile cells and the aligned matrix bridges between cell pairs (Stopak &
 Harris), with large effect sizes (Cohen's d = 9.1 and 2.5, n=16). We show the
-emergent reticular network is **controlled by spheroid spacing** [RESULT], and
+emergent reticular network is **controlled by spheroid spacing** (largest-connected
+fraction rises monotonically from 0.25 ± 0.07 at tight spacing to 0.74 ± 0.18 at
+wide spacing, n=5), and
 that the nonlinear constitutive law is the load-bearing assumption (it ~doubles
 the axis-specific bridge signal; buckling dominant). Results are discretization-
 independent, reproduce in full 3D, and the emergent morphometry (trivalent branch
@@ -39,7 +41,7 @@ model at the soft-collagen-gel scale.
 |---|---|---|---|
 | C1 | Single contractile cells build radial collagen asters | tension-wtd radiality 0.97 vs 0.69, d=9.1 (n=16) | `stats_power.py` |
 | C2 | Cell pairs build axis-specific aligned bridges | axis 0.53 vs perp 0.37, d=2.5 (n=16); widens with distance | `stats_power.py`, `experiment_bridge.py` |
-| C3 | **Seeding geometry controls emergent connectivity** (headline) | spacing sweep [RESULT] | `emergence_control.py` |
+| C3 | **Seeding geometry controls emergent connectivity** (headline) | connectivity tight 0.25 → wide 0.74 (monotonic, ~3×, n=5) | `emergence_control.py` |
 | C4 | Nonlinearity is the driver | nonlinear ~2× linear; buckling dominant; partially redundant | `sensitivity.py` |
 | C5 | Plastic memory: structure outlasts the cells | residual self-stress 4250 vs 11 (~400×) | `verify_remodel.py` |
 | C6 | Emergent morphometry matches reticular networks | coordination 3.09 (92% trivalent), pores ~22 µm | `morphometry_compare.py` |
