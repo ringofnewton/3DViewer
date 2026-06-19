@@ -1,14 +1,13 @@
 name: Deploy to GitHub Pages
 
-# Publishes the repo as a static site so the viewers are reachable by URL:
-#   <user>.github.io/<repo>/                         -> root index.html (GLB viewer)
-#   <user>.github.io/<repo>/ecm-remodel3d/viewer/    -> ECM 3D viewer
+# Auto-deploy disabled. To re-enable, restore the push trigger below.
 on:
-  push:
-    branches:
-      - claude/html-review-software-options-8ls41y
-      - main
   workflow_dispatch:
+    inputs:
+      deploy:
+        description: 'Manually trigger deploy'
+        required: true
+        default: 'false'
 
 permissions:
   contents: read
