@@ -19,6 +19,7 @@ from ecm_pipeline import ecm_periodic as per, ecm_viscoelastic as ve, ecm_mechan
 
 L, NF = 90.0, 170
 GAMMA0 = 0.03
+SEEDS = [1, 2, 3]                      # seed-average to suppress relaxation noise
 PM = mech.MechParams(traction=0.0, max_iter=3500, ftol=2.5e-2, k_bend=0.15)
 
 
@@ -27,39 +28,50 @@ def net(seed=1):
                                       crosslink_dist=4.5, seed=seed)
 
 
+def relax_curve_avg(k0, bell=True):
+    """Seed-averaged sigma(t)/sigma0 (Step-1 'tighten': the small-strain regime
+    converges, so averaging over networks cleanly removes the stochastic ripple)."""
+    norms = []
+    last = None
+    for s in SEEDS:
+        r = ve.stress_relaxation(net(s), GAMMA0,
+                                 ve.ViscoParams(k0=k0, F_star=0.6, dt=1.0,
+                                                n_steps=18, seed=0),
+                                 PM, bell=bell)
+        norms.append(r["sigma"] / r["sigma0"]); last = r
+    norm = np.mean(norms, axis=0)
+    return dict(t=last["t"], norm=norm, sem=np.std(norms, axis=0, ddof=1) / np.sqrt(len(SEEDS)))
+
+
 def main():
     print(f"Viscoelastic stress relaxation (periodic box L={L:.0f}, step shear gamma={GAMMA0})\n")
 
-    # 1. elastic reference
-    el = ve.stress_relaxation(net(1), GAMMA0,
-                              ve.ViscoParams(n_steps=10, dt=1.0, seed=0),
-                              PM, bell=False)
-    el_drift = el["sigma"][-1] / el["sigma0"]
+    # 1. elastic reference (seed-averaged)
+    el = relax_curve_avg(0.0, bell=False)
+    el_drift = el["norm"][-1]
     print(f"ELASTIC reference (no unbinding): sigma(end)/sigma0 = {el_drift:.3f}"
-          f"  ({'flat as expected' if el_drift > 0.9 else 'drift'})")
+          f"  ({'flat as expected' if el_drift > 0.9 else 'drift'})  [n={len(SEEDS)} seeds]")
 
     # 2+3. viscoelastic, tuning the relaxation rate via the bare off-rate k0
-    print(f"\n{'k0':>8} {'tau':>7} {'plateau':>8}   relaxation sigma(t)/sigma0")
+    print(f"\n{'k0':>8} {'tau':>7} {'plateau':>8}   relaxation sigma(t)/sigma0 (seed-avg)")
     curves = {}
     taus = {}
     K0S = (0.03, 0.07, 0.15)
     for k0 in K0S:
-        r = ve.stress_relaxation(net(1),
-                                 GAMMA0,
-                                 ve.ViscoParams(k0=k0, F_star=0.6, dt=1.0,
-                                                n_steps=18, seed=0),
-                                 PM, bell=True)
-        tau, plateau = ve.relaxation_time(r["t"], r["sigma"])
+        r = relax_curve_avg(k0, bell=True)
+        tau, plateau = ve.relaxation_time(r["t"], r["norm"])
         curves[k0] = r
         taus[k0] = tau
-        norm = np.round(r["sigma"] / r["sigma0"], 2)
-        print(f"{k0:8.3f} {tau:7.1f} {plateau:8.2f}   {list(norm)}")
+        print(f"{k0:8.3f} {tau:7.1f} {plateau:8.2f}   {list(np.round(r['norm'], 2))}")
 
     # the claim: smaller k0 (slower bond turnover) -> longer relaxation time
     ordered = [taus[k] for k in K0S]
     ok = ordered[0] >= ordered[-1]
+    plateaus = [ve.relaxation_time(curves[k]["t"], curves[k]["norm"])[1] for k in K0S]
     print(f"\ntau(k0={K0S[0]})={ordered[0]:.1f} >= tau(k0={K0S[-1]})={ordered[-1]:.1f}: "
-          f"{'YES — relaxation time is tunable by crosslink turnover rate' if ok else 'no (noisy)'}")
+          f"{'YES' if ok else 'no'}")
+    print(f"plateau falls with turnover: {plateaus[0]:.2f} -> {plateaus[-1]:.2f} "
+          f"({'YES — more turnover, more relaxation' if plateaus[0] > plateaus[-1] else 'no'})")
     print("Interpretation: viscoelasticity EMERGES from force-accelerated crosslink")
     print("unbinding; the relaxation timescale is a material property set by k0/F_star.")
 
@@ -67,11 +79,11 @@ def main():
         import matplotlib; matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         fig, ax = plt.subplots(figsize=(6.2, 4.2))
-        ax.plot(el["t"], el["sigma"] / el["sigma0"], "k--", label="elastic (no unbinding)")
+        ax.plot(el["t"], el["norm"], "k--", label="elastic (no unbinding)")
         for k0, c in [(0.03, "#2c6fbb"), (0.07, "#e67e22"), (0.15, "#c0392b")]:
             r = curves[k0]
-            ax.plot(r["t"], r["sigma"] / r["sigma0"], "o-", color=c,
-                    label=f"k0={k0} (tau={taus[k0]:.1f})")
+            ax.errorbar(r["t"], r["norm"], yerr=r["sem"], fmt="o-", color=c, capsize=2,
+                        label=f"k0={k0} (tau={taus[k0]:.1f})")
         ax.set_xlabel("time (reduced units)"); ax.set_ylabel("sigma(t) / sigma0")
         ax.set_title("Stress relaxation from transient crosslinks (Bell)")
         ax.set_ylim(0, 1.05); ax.grid(alpha=0.3); ax.legend(fontsize=8)
