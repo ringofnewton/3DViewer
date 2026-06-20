@@ -114,22 +114,77 @@ matched-linear matrix (cf. TFM long-range transmission; Notbohm 2015).
 - Cells are **active and mechanosensitive** (Step 4).
 - Sensitivity is **global**, not OAT (Step 5a).
 
-## What still remains for a fully quantitative/predictive paper
-- Tighten high-strain rheology and low-turnover relaxation (Newton solver /
-  seed-averaging).
-- Distribution-level KS/EMD comparison against a **digitized** experimental
-  dataset (FRC/collagen) — done qualitatively vs literature ranges only.
-- **Bayesian** parameter inference (posterior + UQ) and a true **predictive**
-  validation (fit one experiment, predict another).
-- Couple the new layers together (viscoelastic + mechanochemical + migrating
-  cells in one run) and push fully to 3D at scale.
+---
+
+# Second batch — the remaining roadmap items (now done)
+
+## Item 1 — Tightened numerics (seed-averaging)
+**Updated** `verify_viscoelastic.py` (seed-averaged, n=3).
+The small-strain relaxation regime *does* converge, so averaging over network
+seeds removes the stochastic ripple: flat elastic reference (0.95) and a clean
+**monotone plateau-vs-turnover** (0.70 → 0.58 as k0 rises 0.03 → 0.15).
+*Solver note:* I implemented and tested preconditioned nonlinear-CG and
+steepest-descent energy minimizers for the **high-strain rheology**; both lose to
+FIRE because the sub-isostatic network's **floppy (zero-stiffness) modes** are
+amplified by Jacobi preconditioning and defeat a naive line search. FIRE (inertial)
+is retained; the high-strain rheology caveat therefore stands (a floppy-mode-aware
+preconditioner or true Newton step is the real fix).
+
+## Item 2 — Distribution-level comparison (KS / EMD)
+**Module** `ecm_pipeline/dist_stats.py` · **Script** `distribution_compare.py`
+· **Figure** `output_validation/figures/distribution_compare.png`
+Numpy-only two-sample **KS** (asymptotic p) and **Wasserstein-1 (EMD)**.
+- **GOF:** emergent pore distribution vs a literature-style log-normal (median
+  25 µm) — **KS D=0.19, EMD=4.4 µm**: close in central tendency (model median
+  22.5 µm) but **distinguishable in shape** (p<0.05). Matching ranges ≠ matching
+  distributions — exactly what a distribution-level test is for.
+- **Power (positive control):** dense vs sparse pores separate at **p<1e-4** —
+  the test has real discriminating power.
+- *Caveat:* the reference is synthesized from literature **summary statistics**,
+  not a raw digitized histogram; swapping one in is a drop-in change.
+
+## Item 3 — Bayesian inference + predictive validation
+**Script** `bayesian_infer.py` · **Figure** `output_validation/figures/bayesian_infer.png`
+Grid posterior over (buckle_ratio, stiffen_alpha) from the **bridge** experiment,
+then prediction of a **held-out single-cell aster**.
+- Posterior recovers truth within (broad) uncertainty: buckle_ratio 0.10 ± 0.10
+  (true 0.02), stiffen_alpha 6.05 ± 4.22 (true 6.0).
+- **Predictive validation PASSES:** posterior-predictive aster **0.793 ± 0.028**
+  covers the held-out datum **0.808** — parameters fit on one experiment predict
+  an independent one (the test that separates a fitted from a predictive model).
+
+## Item 4 — Coupled 3-D morphogenesis
+**Script** `coupled_sim.py` · **Figure** `output_validation/figures/coupled_3d.png`
+Migration + mechanosensing + mechanochemistry co-evolving in **full 3-D** (n=3).
+- **Emergent reinforced network:** connectivity **0.00 → 0.23 ± 0.14** — the
+  matrix self-organizes from the coupled dynamics.
+- **Honest negative:** cells do **not** aggregate under pure durotaxis (pairwise
+  distance 54.7 → 65.2 µm); each climbs its *own* self-built stiffness, so
+  trajectories are variable. Aggregation needs chemotaxis / inter-cell mechanical
+  guidance to dominate the gradient — a clear next step. The *coupling itself works.*
+
+---
+
+## Status after both batches
+Done: boundary-free + (partly) tightened rheology; viscoelasticity; mechanochemical
+mass-conserving remodeling; active mechanosensing cells; global sensitivity;
+distribution-level KS/EMD with power; Bayesian inference with a passing predictive
+validation; all layers coupled in 3-D.
+
+Still open (honest): a floppy-mode-aware solver for high-strain rheology; a
+**digitized** experimental dataset for the KS/EMD GOF; richer inference (full MCMC,
+more parameters); and cell **aggregation** (chemotaxis / stronger mechanical
+guidance) in the coupled 3-D model.
 
 ## Reproduce
 ```bash
 python rheology_periodic.py     # Step 1: periodic modulus + stiffening
-python verify_viscoelastic.py   # Step 2: stress relaxation, tunable tau
+python verify_viscoelastic.py   # Step 2 + Item 1: relaxation, tunable tau (seed-avg)
 python verify_mechanochem.py    # Step 3: mechanochemical remodeling vs percentile
 python verify_migration.py      # Step 4: durotaxis
 python sobol_sensitivity.py     # Step 5a: global sensitivity
 python verify_displacement.py   # Step 5b: TFM-style displacement field
+python distribution_compare.py  # Item 2: KS / EMD distribution-level comparison
+python bayesian_infer.py        # Item 3: Bayesian inference + predictive validation
+python coupled_sim.py           # Item 4: coupled migration+remodeling in 3-D
 ```
