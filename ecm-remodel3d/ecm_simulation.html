@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ECM 형태형성 — 통합 시뮬레이션</title>
+<style>
+  :root{ --bg:#eef1f6; --card:#fff; --ink:#1f2933; --muted:#5b6776; --line:#e2e8f0;
+         --soft:#f1f5f9; --c:#0d9488; }
+  *{ box-sizing:border-box }
+  body{ margin:0; background:var(--bg); color:var(--ink);
+        font-family:'Apple SD Gothic Neo','Noto Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+        line-height:1.6; -webkit-font-smoothing:antialiased; }
+  header{ max-width:1000px; margin:0 auto; padding:40px 24px 4px; }
+  header h1{ font-size:26px; margin:0 0 8px; letter-spacing:-.02em; }
+  header p{ font-size:15.5px; color:var(--muted); margin:0; max-width:760px; }
+  .pill{ display:inline-block; font-size:12.5px; font-weight:600; color:#0b7285;
+         background:#d7f0f3; border-radius:999px; padding:3px 11px; margin-bottom:14px; }
+  main{ max-width:1000px; margin:0 auto; padding:14px 24px 70px; }
+  .card{ background:var(--card); border:1px solid var(--line); border-left:5px solid var(--c);
+         border-radius:14px; padding:20px 22px; margin:18px 0;
+         box-shadow:0 1px 2px rgba(15,23,42,.04),0 8px 24px rgba(15,23,42,.05); }
+  .controls{ display:flex; flex-wrap:wrap; gap:12px 18px; align-items:center; margin-bottom:14px;
+             padding:12px 14px; background:var(--soft); border-radius:10px; }
+  button{ font:inherit; font-size:13.5px; font-weight:600; color:#fff; background:var(--c);
+          border:0; border-radius:8px; padding:8px 14px; cursor:pointer; }
+  button.ghost{ background:#fff; color:var(--ink); border:1px solid var(--line); }
+  .toggle{ display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;
+           font-weight:600; user-select:none; padding:4px 8px; border-radius:7px; background:#fff;
+           border:1px solid var(--line); }
+  .ctl{ display:flex; flex-direction:column; gap:2px; font-size:12px; color:var(--muted); }
+  .ctl b{ color:var(--ink); font-family:ui-monospace,Menlo,monospace; }
+  input[type=range]{ width:130px; accent-color:var(--c); }
+  .stage{ display:grid; grid-template-columns:1.2fr 0.8fr; gap:20px; align-items:start; }
+  @media(max-width:780px){ .stage{ grid-template-columns:1fr; } }
+  canvas{ width:100%; background:#fff; border:1px solid var(--line); border-radius:10px; display:block; }
+  .phase{ display:inline-block; font-weight:700; font-size:13px; padding:3px 10px; border-radius:7px;
+          background:#fef3c7; color:#92400e; }
+  .phase.morph{ background:#dcfce7; color:#166534; }
+  table.r{ width:100%; border-collapse:collapse; margin-top:10px; }
+  table.r td{ padding:6px 6px; border-top:1px solid var(--line); font-size:13.5px; }
+  table.r td.v{ text-align:right; font-weight:700; font-family:ui-monospace,Menlo,monospace; color:var(--c); }
+  .legend{ font-size:12.5px; color:var(--muted); margin-top:12px; line-height:1.7; }
+  .sw{ display:inline-block; width:22px; height:4px; border-radius:2px; vertical-align:middle; margin-right:5px; }
+  .step{ font-size:13px; color:#334155; margin:10px 0 0; }
+  code{ background:#eef2f7; padding:1px 6px; border-radius:5px; font-size:12.5px; font-family:ui-monospace,Menlo,monospace; }
+  #err{ display:none; margin:10px 0; padding:10px 14px; background:#fee2e2; color:#b91c1c;
+        border:1px solid #fca5a5; border-radius:9px; font-size:14px; }
+  footer{ max-width:1000px; margin:0 auto; padding:0 24px 60px; color:var(--muted); font-size:13px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="pill">하나의 결합 시뮬레이션 · 모든 메커니즘이 동시에</div>
+  <h1>ECM 형태형성 — 통합 시뮬레이션</h1>
+  <p>따로 노는 데모가 아니라, <b>같은 네트워크 위에서 모든 과정이 함께</b> 돌아갑니다:
+  세포가 콜라겐을 형성하고 → 장력을 가해 → 긴장된 섬유를 강화(리모델링)하고 → 강성을 감지해
+  이동(durotaxis)하며 → 서로 신호(chemotaxis)해 응집합니다. 토글로 각 메커니즘을 켜고 끄면서
+  무엇이 무엇을 만드는지 보세요.</p>
+</header>
+<main>
+  <div id="err"></div>
+  <section class="card">
+    <div class="controls">
+      <button id="play">▶ 재생</button>
+      <button class="ghost" id="reset">↺ 리셋</button>
+      <label class="toggle"><input type="checkbox" id="tSecrete" checked> 형성(분비)</label>
+      <label class="toggle"><input type="checkbox" id="tRemodel" checked> 리모델링</label>
+      <label class="toggle"><input type="checkbox" id="tDuro" checked> durotaxis</label>
+      <label class="toggle"><input type="checkbox" id="tChemo" checked> chemotaxis</label>
+      <label class="ctl">세포 수 <b id="vNc">7</b><input id="sNc" type="range" min="3" max="12" step="1" value="7"></label>
+      <label class="ctl">chemo 세기 <b id="vCw">1.0</b><input id="sCw" type="range" min="0" max="2.5" step="0.1" value="1.0"></label>
+    </div>
+    <div class="stage">
+      <div>
+        <canvas id="sim" height="440"></canvas>
+        <p class="step">단계: <span class="phase" id="phase">형성 중</span></p>
+      </div>
+      <div>
+        <table class="r">
+          <tr><td>섬유 세그먼트</td><td class="v" id="rFib">0</td></tr>
+          <tr><td>크로스링크</td><td class="v" id="rXl">0</td></tr>
+          <tr><td>강화된 섬유 (k&gt;1.5)</td><td class="v" id="rRein">0</td></tr>
+          <tr><td>평균 세포간 거리</td><td class="v" id="rDist">–</td></tr>
+          <tr><td>강화 연결성(최대성분)</td><td class="v" id="rConn">–</td></tr>
+        </table>
+        <div class="legend">
+          <span class="sw" style="background:#cfe0f5"></span>약한 섬유<br>
+          <span class="sw" style="background:#1e3a8a"></span>강화된 섬유(긴장된 inter-cell 다리)<br>
+          <span class="sw" style="background:#f97316;height:10px;width:10px;border-radius:50%"></span>세포<br>
+          <span style="color:#db2777">분홍 선</span> = 세포 이동 궤적
+        </div>
+        <p class="legend">전부 <b>한 네트워크</b>에서 일어납니다. 예: chemotaxis를 끄면 세포가
+        흩어지고(각자 자기 강성만 따라감), 켜면 자기가 강화한 다리를 따라 모입니다. 리모델링을
+        끄면 다리가 강화되지 않아 흐릿하게 남습니다.</p>
+      </div>
+    </div>
+  </section>
+  <footer>이 통합 모델은 Python <code>coupled_sim.py</code>(migration + mechanosensing +
+  mechanochemistry, 3D)의 브라우저판입니다. 레올로지·KS·MCMC는 이 모델의 출력에 적용하는
+  <i>측정/추론</i>이며 별도 페이지(<code>research_interactive.html</code>)에 있습니다.</footer>
+</main>
+<script>
+(function(){
+"use strict";
+function showErr(m){ var e=document.getElementById('err'); e.style.display='block'; e.textContent='오류: '+m; }
+function setup(cv){ var dpr=window.devicePixelRatio||1, w=cv.clientWidth||cv.width, h=cv.getAttribute('height')*1;
+  cv.width=w*dpr; cv.height=h*dpr; var x=cv.getContext('2d'); x.scale(dpr,dpr); cv._w=w; cv._h=h; return x; }
+
+try{
+var cv=document.getElementById('sim'), x=setup(cv), W=cv._w, H=cv._h;
+var NODECAP=720, FORMEND=150;
+var px,py,fx,fib,cells,grid,GS,frame,phase,running=false,raf=null,conn=0;
+var Nc=document.getElementById('sNc'), Cw=document.getElementById('sCw');
+var T={secrete:'tSecrete',remodel:'tRemodel',duro:'tDuro',chemo:'tChemo'};
+function on(name){ return document.getElementById(T[name]).checked; }
+
+function gkey(ix,iy){ return ix+'_'+iy; }
+function ghash(i){ var ix=(px[i]/GS)|0, iy=(py[i]/GS)|0, k=gkey(ix,iy); (grid[k]||(grid[k]=[])).push(i); }
+function rebuildGrid(){ grid={}; for(var i=0;i<px.length;i++) ghash(i); }
+function nearNodes(qx,qy,d){ var ix=(qx/GS)|0, iy=(qy/GS)|0, r=[], d2=d*d;
+  for(var a=-1;a<=1;a++)for(var b=-1;b<=1;b++){ var arr=grid[gkey(ix+a,iy+b)]; if(!arr)continue;
+    for(var k=0;k<arr.length;k++){ var n=arr[k], dx=px[n]-qx, dy=py[n]-qy; if(dx*dx+dy*dy<d2) r.push(n); } }
+  return r; }
+function addNode(nx,ny){ var i=px.length; px.push(nx); py.push(ny);
+  fx.push(nx<6||ny<6||nx>W-6||ny>H-6); return i; }
+function addFiber(i,j,xl){ if(i===j)return; var dx=px[i]-px[j], dy=py[i]-py[j], L0=Math.hypot(dx,dy);
+  if(L0<0.5)return; fib.push({i:i,j:j,L0:L0,k:0.5,xl:!!xl}); }
+
+function reset(){
+  px=[];py=[];fx=[];fib=[];cells=[];grid={};GS=12;frame=0;phase='form';conn=0;
+  var nc=+Nc.value; document.getElementById('vNc').textContent=nc;
+  document.getElementById('vCw').textContent=(+Cw.value).toFixed(1);
+  var cx=W/2, cy=H/2, R=Math.min(W,H)*0.24;
+  for(var c=0;c<nc;c++){ var a=2*Math.PI*c/nc;
+    var cellx=cx+R*Math.cos(a), celly=cy+R*Math.sin(a);
+    var tips=[];
+    for(var t=0;t<3;t++){ var d=2*Math.PI*Math.random();
+      var root=addNode(cellx,celly);
+      tips.push({last:root, x:cellx, y:celly, dx:Math.cos(d), dy:Math.sin(d), life:34+((Math.random()*26)|0)}); }
+    cells.push({x:cellx, y:celly, tx:[cellx], ty:[celly], tips:tips}); }
+  rebuildGrid(); draw(); readout();
+}
+
+function grow(){
+  rebuildGrid();
+  for(var c=0;c<cells.length;c++){ var cell=cells[c], nt=[];
+    for(var t=0;t<cell.tips.length;t++){ var tp=cell.tips[t];
+      var rd=Math.random()*2*Math.PI, ndx=0.82*tp.dx+0.18*Math.cos(rd), ndy=0.82*tp.dy+0.18*Math.sin(rd);
+      var nn=Math.hypot(ndx,ndy)||1; ndx/=nn; ndy/=nn;
+      var nx=px[tp.last]+4.5*ndx, ny=py[tp.last]+4.5*ndy;
+      if(nx<5||ny<5||nx>W-5||ny>H-5||tp.life<=0||px.length>NODECAP) continue;
+      var nj=addNode(nx,ny); addFiber(tp.last,nj,false);
+      var near=nearNodes(nx,ny,6);
+      for(var m=0;m<near.length;m++){ if(near[m]!==nj && near[m]!==tp.last){ addFiber(nj,near[m],true); break; } }
+      tp.last=nj; tp.x=nx; tp.y=ny; tp.dx=ndx; tp.dy=ndy; tp.life--; nt.push(tp);
+      if(Math.random()<0.10 && (nt.length+cell.tips.length)<10){ var ang=Math.atan2(ndy,ndx)+(Math.random()-0.5)*1.4;
+        nt.push({last:nj, x:nx, y:ny, dx:Math.cos(ang), dy:Math.sin(ang), life:18+((Math.random()*16)|0)}); } }
+    cell.tips=nt; }
+}
+
+function pbd(){
+  for(var f=0;f<fib.length;f++){ var o=fib[f], i=o.i, j=o.j;
+    var dx=px[j]-px[i], dy=py[j]-py[i], L=Math.hypot(dx,dy); if(L<1e-4)continue;
+    var s=0.5*Math.min(0.9,0.25+0.22*o.k)*(L-o.L0)/L, cxr=s*dx, cyr=s*dy;
+    if(!fx[i]){ px[i]+=cxr; py[i]+=cyr; }
+    if(!fx[j]){ px[j]-=cxr; py[j]-=cyr; } }
+}
+function traction(){
+  var reach=Math.min(W,H)*0.13, pull=0.05;
+  for(var c=0;c<cells.length;c++){ var cell=cells[c], near=nearNodes(cell.x,cell.y,reach);
+    for(var k=0;k<near.length;k++){ var n=near[k]; if(fx[n])continue;
+      var dx=cell.x-px[n], dy=cell.y-py[n], r=Math.hypot(dx,dy)||1;
+      if(r<8) continue;                         // don't collapse onto the cell
+      var w=pull*(1-r/reach); px[n]+=w*dx/r; py[n]+=w*dy/r; } }
+}
+function remodel(){
+  for(var f=fib.length-1; f>=0; f--){ var o=fib[f];
+    var dx=px[o.j]-px[o.i], dy=py[o.j]-py[o.i], L=Math.hypot(dx,dy);
+    var strain=(L-o.L0)/o.L0;
+    if(strain>0.015) o.k=Math.min(3.2, o.k+0.05);     // tensed -> reinforced
+    else o.k=Math.max(0, o.k-0.018);                  // slack -> degrade
+    if(o.k<0.05 && o.xl) fib.splice(f,1);             // prune degraded crosslinks
+  }
+}
+function nodeStiffness(){
+  var nk=new Float32Array(px.length);
+  for(var f=0;f<fib.length;f++){ nk[fib[f].i]+=fib[f].k; nk[fib[f].j]+=fib[f].k; }
+  return nk;
+}
+function migrate(){
+  rebuildGrid();
+  var nk=nodeStiffness(), sense=Math.min(W,H)*0.14, lam=Math.min(W,H)*0.34;
+  var wc=(on('chemo')? +Cw.value : 0), wd=(on('duro')? 1.0 : 0), speed=Math.min(W,H)*0.006;
+  function S(qx,qy){ var nn=nearNodes(qx,qy,sense), s=0; for(var k=0;k<nn.length;k++) s+=nk[nn[k]]; return s; }
+  var moved=[];
+  for(var c=0;c<cells.length;c++){ var cell=cells[c];
+    var p=sense*0.6;
+    var gx=S(cell.x+p,cell.y)-S(cell.x-p,cell.y), gy=S(cell.x,cell.y+p)-S(cell.x,cell.y-p);
+    var gn=Math.hypot(gx,gy)||1; var dux=gx/gn, duy=gy/gn;
+    var hx=0,hy=0; for(var j=0;j<cells.length;j++){ if(j===c)continue;
+      var ddx=cells[j].x-cell.x, ddy=cells[j].y-cell.y, r=Math.hypot(ddx,ddy)||1;
+      var wgt=Math.exp(-r/lam)/lam; hx+=ddx/r*wgt; hy+=ddy/r*wgt; }
+    var hn=Math.hypot(hx,hy)||1; hx/=hn; hy/=hn;
+    var rng=0.35, ra=Math.random()*6.283;
+    var mx=wd*dux+wc*hx+rng*Math.cos(ra), my=wd*duy+wc*hy+rng*Math.sin(ra);
+    var mn=Math.hypot(mx,my)||1;
+    moved.push([Math.max(10,Math.min(W-10,cell.x+speed*mx/mn)), Math.max(10,Math.min(H-10,cell.y+speed*my/mn))]); }
+  for(var c=0;c<cells.length;c++){ cells[c].x=moved[c][0]; cells[c].y=moved[c][1]; }
+  // resolve cell-cell separation: aggregate into a CLUSTER, not a single point
+  var minSep=26;
+  for(var rp=0;rp<4;rp++){ for(var a=0;a<cells.length;a++)for(var b=a+1;b<cells.length;b++){
+    var dx=cells[b].x-cells[a].x, dy=cells[b].y-cells[a].y, r=Math.hypot(dx,dy)||1;
+    if(r<minSep){ var pu=(minSep-r)/2/r; cells[a].x-=pu*dx; cells[a].y-=pu*dy; cells[b].x+=pu*dx; cells[b].y+=pu*dy; } } }
+  for(var c=0;c<cells.length;c++){ var cl=cells[c];
+    cl.x=Math.max(10,Math.min(W-10,cl.x)); cl.y=Math.max(10,Math.min(H-10,cl.y));
+    cl.tx.push(cl.x); cl.ty.push(cl.y); if(cl.tx.length>150){cl.tx.shift();cl.ty.shift();}
+  }
+}
+
+function connectivity(){
+  var rein=[]; for(var f=0;f<fib.length;f++) if(fib[f].k>1.5) rein.push(fib[f]);
+  if(rein.length<4) return 0;
+  var par={}; function find(a){ while(par[a]!==undefined && par[a]!==a){ a=par[a]; } return a; }
+  function uni(a,b){ par[a]=(par[a]===undefined?a:par[a]); par[b]=(par[b]===undefined?b:par[b]);
+    var ra=find(a), rb=find(b); if(ra!==rb) par[ra]=rb; }
+  var nodesSet={}; for(var i=0;i<rein.length;i++){ uni(rein[i].i, rein[i].j); nodesSet[rein[i].i]=1; nodesSet[rein[i].j]=1; }
+  var cnt={}, tot=0, best=0;
+  for(var key in nodesSet){ var r=find(+key); cnt[r]=(cnt[r]||0)+1; tot++; if(cnt[r]>best)best=cnt[r]; }
+  return tot? best/tot : 0;
+}
+
+function step(){
+  frame++;
+  if(on('secrete') && px.length<NODECAP && phase==='form') grow();
+  if(frame>FORMEND || px.length>=NODECAP) phase='morph';
+  for(var it=0; it<2; it++){ pbd(); traction(); }
+  if(on('remodel') && frame%6===0) remodel();
+  if(phase==='morph' && frame%4===0) migrate();
+  if(frame%30===0) conn=connectivity();
+}
+
+function colFib(k){ var t=Math.min(1,k/3.0);
+  var r=Math.round(0xcf+(0x1e-0xcf)*t), g=Math.round(0xe0+(0x3a-0xe0)*t), b=Math.round(0xf5+(0x8a-0xf5)*t);
+  return 'rgb('+r+','+g+','+b+')'; }
+function draw(){
+  x.clearRect(0,0,W,H); x.fillStyle='#f7fafc'; x.fillRect(0,0,W,H);
+  // fibers, weak first then strong on top
+  for(var pass=0; pass<2; pass++){
+    for(var f=0;f<fib.length;f++){ var o=fib[f]; var strong=o.k>1.5;
+      if((pass===0)===strong) continue;
+      x.strokeStyle=colFib(o.k); x.lineWidth=0.5+Math.min(2.2,o.k*0.7);
+      x.beginPath(); x.moveTo(px[o.i],py[o.i]); x.lineTo(px[o.j],py[o.j]); x.stroke(); } }
+  // cell trails
+  x.strokeStyle='rgba(219,39,119,0.5)'; x.lineWidth=1.4;
+  for(var c=0;c<cells.length;c++){ var cl=cells[c]; x.beginPath();
+    for(var k=0;k<cl.tx.length;k++){ k?x.lineTo(cl.tx[k],cl.ty[k]):x.moveTo(cl.tx[k],cl.ty[k]); } x.stroke(); }
+  // cells
+  for(var c=0;c<cells.length;c++){ var cl=cells[c]; x.fillStyle='#f97316'; x.strokeStyle='#fff'; x.lineWidth=2;
+    x.beginPath(); x.arc(cl.x,cl.y,7,0,7); x.fill(); x.stroke(); }
+}
+function meanDist(){ var d=0,n=0; for(var i=0;i<cells.length;i++)for(var j=i+1;j<cells.length;j++){
+  var dx=cells[i].x-cells[j].x, dy=cells[i].y-cells[j].y; d+=Math.hypot(dx,dy); n++; } return n?d/n:0; }
+function readout(){
+  var xl=0,rein=0; for(var f=0;f<fib.length;f++){ if(fib[f].xl)xl++; if(fib[f].k>1.5)rein++; }
+  document.getElementById('rFib').textContent=fib.length;
+  document.getElementById('rXl').textContent=xl;
+  document.getElementById('rRein').textContent=rein;
+  document.getElementById('rDist').textContent=Math.round(meanDist())+' px';
+  document.getElementById('rConn').textContent=(conn*100).toFixed(0)+'%';
+  var ph=document.getElementById('phase');
+  ph.textContent = phase==='form' ? '형성 중 (세포가 네트워크 생성)' : '형태형성 중 (감지·이동·리모델링·응집)';
+  ph.className = 'phase'+(phase==='morph'?' morph':'');
+}
+function loop(){ if(!running)return; step(); draw(); readout(); raf=requestAnimationFrame(loop); }
+
+document.getElementById('play').onclick=function(){ running=!running;
+  this.textContent=running?'⏸ 일시정지':'▶ 재생'; if(running)loop(); else if(raf)cancelAnimationFrame(raf); };
+document.getElementById('reset').onclick=function(){ running=false; if(raf)cancelAnimationFrame(raf);
+  document.getElementById('play').textContent='▶ 재생'; reset(); };
+Nc.oninput=function(){ document.getElementById('vNc').textContent=Nc.value; };
+Cw.oninput=function(){ document.getElementById('vCw').textContent=(+Cw.value).toFixed(1); };
+reset();
+}catch(e){ showErr(e.message); console.error(e); }
+})();
+</script>
+</body>
+</html>
