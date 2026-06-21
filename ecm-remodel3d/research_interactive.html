@@ -54,11 +54,35 @@
 <header>
   <div class="pill">interactive · 직접 실행해 보세요</div>
   <h1>ECM 연구 업그레이드 — 인터랙티브</h1>
-  <p>네 가지 업그레이드를 브라우저에서 직접 돌려볼 수 있게 만들었습니다. 슬라이더를
-  움직이고, 토글을 켜고, 시뮬레이션을 재생해 보세요 — 모두 이 페이지 안에서 실시간 계산됩니다.</p>
+  <p>맨 위는 모델의 출발점 — 세포가 ECM 네트워크를 형성하는 과정 — 이고, 그 아래는 네 가지
+  연구 업그레이드입니다. 모두 브라우저에서 직접 돌려볼 수 있게 만들었어요. 슬라이더를 움직이고,
+  토글을 켜고, 시뮬레이션을 재생해 보세요 — 전부 이 페이지 안에서 실시간 계산됩니다.</p>
 </header>
 <div id="err"></div>
 <main>
+
+  <!-- Formation -->
+  <section class="card" style="--c:#0d9488">
+    <div class="head"><span class="badge">★</span><div>
+      <h2>ECM 네트워크 형성 — 세포가 직접 생성</h2>
+      <div class="sub">cells secrete &amp; crosslink collagen outward · 실시간 성장</div></div></div>
+    <p class="intro">이게 모델의 출발점입니다. 세포(주황)가 콜라겐 섬유를 <b>바깥으로</b> 뻗고,
+    가까이 만난 섬유끼리 <b>크로스링크</b>되어 연결된 네트워크가 자라납니다 — “자석이 조각을
+    끌어당기는” 게 아니라 세포가 매트릭스를 <b>생성</b>해요. ▶재생을 눌러 형성 과정을 보세요.</p>
+    <div class="controls">
+      <button id="fPlay">▶ 재생</button>
+      <button class="ghost" id="fReset">↺ 리셋</button>
+      <label class="ctl">분기 확률 <b id="fBr">0.10</b><input id="fBrs" type="range" min="0.02" max="0.25" step="0.01" value="0.10"></label>
+      <label class="ctl">세포 수 <b id="fNc">10</b><input id="fNcs" type="range" min="4" max="18" step="1" value="10"></label>
+    </div>
+    <div class="stage">
+      <div><canvas id="fSim" height="360"></canvas></div>
+      <div><div class="readout" id="fRead"></div>
+        <div class="note">파랑=콜라겐 섬유 · 회색 점=크로스링크(연결) · 주황=세포. 섬유들이 서로
+        만나 크로스링크되며 공간을 채우는 연결망이 형성됩니다. (2D 도식 — 실제 모델은 3D이고
+        같은 규칙으로 작동, 정적 GIF로도 보냈어요.)</div></div>
+    </div>
+  </section>
 
   <!-- A -->
   <section class="card" style="--c:var(--blue)">
@@ -178,6 +202,58 @@ function axes(x,w,h,pad){ x.strokeStyle='#cbd5e1'; x.lineWidth=1; x.beginPath();
 function lerp(xs,ys,xq){ if(xq<=xs[0])return ys[0]; if(xq>=xs[xs.length-1])return ys[ys.length-1];
   for(var i=1;i<xs.length;i++){ if(xq<=xs[i]){ var t=(xq-xs[i-1])/(xs[i]-xs[i-1]);
     return ys[i-1]+t*(ys[i]-ys[i-1]); } } return ys[ys.length-1]; }
+
+/* ================= Formation : cells grow the ECM network ================= */
+safe('Formation',function(){
+  var cv=document.getElementById('fSim'); var x=setup(cv); var L=cv._w;
+  var Brs=document.getElementById('fBrs'), Ncs=document.getElementById('fNcs');
+  var tips,fibers,xlinks,grid,GS,cells,nodeCount,running=false,raf=null;
+  function key(ix,iy){ return ix+','+iy; }
+  function addNode(px,py){ var ix=(px/GS)|0,iy=(py/GS)|0,k=key(ix,iy);
+    (grid[k]||(grid[k]=[])).push([px,py]); nodeCount++; }
+  function nearNode(px,py,d){ var ix=(px/GS)|0,iy=(py/GS)|0;
+    for(var a=-1;a<=1;a++)for(var b=-1;b<=1;b++){ var arr=grid[key(ix+a,iy+b)]; if(!arr)continue;
+      for(var n=0;n<arr.length;n++){ var dx=arr[n][0]-px,dy=arr[n][1]-py; if(dx*dx+dy*dy<d*d)return true; } } return false; }
+  function reset(){ var nc=+Ncs.value; document.getElementById('fNc').textContent=nc;
+    document.getElementById('fBr').textContent=(+Brs.value).toFixed(2);
+    tips=[];fibers=[];xlinks=[];nodeCount=0;GS=8;grid={};cells=[];
+    var cx=L/2,cy=L/2,R=L*0.16;
+    for(var i=0;i<nc;i++){ var a=2*Math.PI*i/nc,px=cx+R*Math.cos(a),py=cy+R*Math.sin(a);
+      cells.push({x:px,y:py}); var nt=4+((Math.random()*3)|0);
+      for(var t=0;t<nt;t++){ var d=2*Math.PI*Math.random();
+        tips.push({x:px,y:py,dx:Math.cos(d),dy:Math.sin(d),life:30+((Math.random()*30)|0)}); } }
+    draw(); readout(); }
+  function step(){ var br=+Brs.value,seg=4.5,pers=0.82,nt=[];
+    for(var i=0;i<tips.length;i++){ var tp=tips[i];
+      var rd=Math.random()*2*Math.PI, ndx=pers*tp.dx+(1-pers)*Math.cos(rd), ndy=pers*tp.dy+(1-pers)*Math.sin(rd);
+      var nn=Math.hypot(ndx,ndy)||1; ndx/=nn; ndy/=nn;
+      var nx=tp.x+seg*ndx, ny=tp.y+seg*ndy;
+      if(nx<4||ny<4||nx>L-4||ny>L-4||tp.life<=0||nodeCount>2600) continue;
+      fibers.push([tp.x,tp.y,nx,ny]); if(nearNode(nx,ny,5)) xlinks.push([nx,ny]); addNode(nx,ny);
+      tp.x=nx;tp.y=ny;tp.dx=ndx;tp.dy=ndy;tp.life--; nt.push(tp);
+      if(Math.random()<br && (tips.length+nt.length)<170){ var ang=Math.atan2(ndy,ndx)+(Math.random()-0.5)*1.4;
+        nt.push({x:nx,y:ny,dx:Math.cos(ang),dy:Math.sin(ang),life:20+((Math.random()*20)|0)}); } }
+    tips=nt; }
+  function draw(){ x.clearRect(0,0,L,cv._h); x.fillStyle='#f7fafc'; x.fillRect(0,0,L,cv._h);
+    x.strokeStyle='#3b82f6'; x.lineWidth=1; x.globalAlpha=0.72; x.beginPath();
+    for(var i=0;i<fibers.length;i++){ var f=fibers[i]; x.moveTo(f[0],f[1]); x.lineTo(f[2],f[3]); } x.stroke();
+    x.globalAlpha=1; x.fillStyle='#94a3b8';
+    for(var i=0;i<xlinks.length;i++){ x.beginPath(); x.arc(xlinks[i][0],xlinks[i][1],1.6,0,7); x.fill(); }
+    for(var i=0;i<cells.length;i++){ x.fillStyle='#f97316'; x.strokeStyle='#fff'; x.lineWidth=2;
+      x.beginPath(); x.arc(cells[i].x,cells[i].y,7,0,7); x.fill(); x.stroke(); } }
+  function readout(){ document.getElementById('fRead').innerHTML='섬유 세그먼트: <span class="k">'+fibers.length+
+    '</span> · 크로스링크: <span class="k">'+xlinks.length+'</span> · 활성 팁: <b>'+tips.length+'</b>'+
+    (tips.length===0&&fibers.length>0?' — 형성 완료':''); }
+  function loop(){ if(!running)return; for(var s=0;s<2;s++)step(); draw(); readout();
+    if(tips.length===0){ running=false; document.getElementById('fPlay').textContent='▶ 재생'; return; }
+    raf=requestAnimationFrame(loop); }
+  document.getElementById('fPlay').onclick=function(){ if(tips.length===0)reset(); running=!running;
+    this.textContent=running?'⏸ 일시정지':'▶ 재생'; if(running)loop(); else if(raf)cancelAnimationFrame(raf); };
+  document.getElementById('fReset').onclick=function(){ running=false; if(raf)cancelAnimationFrame(raf);
+    document.getElementById('fPlay').textContent='▶ 재생'; reset(); };
+  Brs.oninput=function(){ document.getElementById('fBr').textContent=(+Brs.value).toFixed(2); };
+  Ncs.oninput=reset; reset();
+});
 
 /* ================= A : fiber + solver ================= */
 safe('A',function(){
