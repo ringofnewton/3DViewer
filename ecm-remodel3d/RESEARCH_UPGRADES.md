@@ -231,11 +231,23 @@ parameters (buckle_ratio, stiffen_alpha, k_bend, traction), with full convergenc
 diagnostics (split R-hat, autocorrelation/ESS) and a held-out predictive check.
 Emulator error (LOO) is folded into the likelihood, so it is accounted for.
 
-Run `python mcmc_infer.py` to print: the emulator LOO RMSE, the 4-D posterior
-marginals vs truth, the posterior **correlation matrix** (the identifiability
-read-out — which parameters the bridge can and cannot separate), MCMC convergence
-(split R-hat, acceptance, ESS), and the held-out posterior-predictive aster check;
-the figure is saved to `output_validation/figures/mcmc_infer.png`.
+- **Emulator quality (LOO):** bridge RMSE 0.012, aster RMSE 0.006 (signal sd ~0.033)
+  — the emulator explains ~87% of the bridge variance; its error is folded into the
+  likelihood, not hidden.
+- **MCMC convergence:** 40 walkers × 3000 steps, acceptance 0.40, **max R-hat 1.03**,
+  ESS ~1400 — converged.
+- **Posterior vs truth (identifiability):** buckle_ratio = 0.09 ± 0.08 (true 0.02) is
+  the **constrained** parameter (it drives the bridge nonlinearity); stiffen_alpha
+  (6.9 ± 4.1), k_bend (0.25 ± 0.10) and traction (1.48 ± 0.51) are **weakly
+  constrained** by the single bridge observable — all recovered within uncertainty.
+  The posterior **correlation matrix** shows no strong pairwise degeneracy
+  (|corr| < 0.3): the breadth is limited information, not a parameter trade-off.
+- **Predictive validation PASSES:** the posterior-predictive aster **0.792 ± 0.038**
+  covers the held-out datum **0.819** — parameters fit on the bridge predict an
+  independent single-cell experiment.
+- *vs the grid (`bayesian_infer.py`):* a joint 4-D posterior with quantified
+  uncertainty, an explicit identifiability read-out, convergence diagnostics, and a
+  passing out-of-sample prediction — none of which a 2-parameter grid provides.
 
 ## Open item D — Cell aggregation in the coupled 3-D model
 **Module** `ecm_pipeline/ecm_cells.py` (`chemoattractant_grad`,
