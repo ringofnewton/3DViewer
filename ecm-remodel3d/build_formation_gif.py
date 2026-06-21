@@ -22,10 +22,10 @@ OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 
 
 def main():
-    p = net.NetworkParams(domain=150.0, n_cells=20, steps=92, n_frames=34,
-                          seg_length=2.8, branch_prob=0.09, crosslink_dist=5.0,
-                          max_tips=420, max_nodes=14000, persistence=0.80,
-                          align_radius=24.0, traction_pull=0.08, seed=5)
+    p = net.NetworkParams(domain=140.0, n_cells=24, steps=96, n_frames=36,
+                          seg_length=2.6, branch_prob=0.12, crosslink_dist=5.2,
+                          max_tips=520, max_nodes=20000, persistence=0.78,
+                          tip_lifetime=18, align_radius=24.0, traction_pull=0.08, seed=5)
     frames = net.simulate_network(p)[0]
     D = p.domain
 
@@ -47,8 +47,8 @@ def main():
                 segs.append([(nodes[a, 0], nodes[a, 1]), (nodes[b, 0], nodes[b, 1])])
                 cols.append("#94a3b8" if st == "crosslink" else "#2563eb")
             lc = LineCollection(segs, colors=cols,
-                                linewidths=[0.6 if c == "#94a3b8" else 1.0 for c in cols],
-                                alpha=0.8)
+                                linewidths=[0.5 if c == "#94a3b8" else 0.8 for c in cols],
+                                alpha=0.72)
             ax.add_collection(lc)
         cells = fr["cells"]
         cx = [c["x"] for c in cells]; cy = [c["y"] for c in cells]
