@@ -39,6 +39,70 @@ class CellParams:
     base_traction: float = 1.2      # traction at reference stiffness
     rigidity_gain: float = 0.8      # extra traction per unit local stiffness (sensing)
     planar: bool = True
+    # cell-cell communication (closes the aggregation gap of pure durotaxis):
+    chemotaxis: float = 0.0         # weight on the chemoattractant-gradient direction
+    chemo_decay: float = 45.0       # attractant decay length lambda (um)
+    mechano_guidance: float = 0.0   # weight on inter-cell matrix-tension direction
+
+
+def chemoattractant_grad(cells, idx, p: "CellParams"):
+    """Unit direction up the chemoattractant gradient sensed by cell `idx`.
+
+    Migrating cells secrete and sense a diffusible factor (e.g. a chemokine /
+    growth factor). At steady state a point source gives a screened field
+    c(r) ~ exp(-r/lambda); the field of all OTHER cells is
+
+        c_i(x) = sum_{j != i} exp(-|x - x_j| / lambda),
+
+    and its gradient points toward the neighbours — so each cell climbs toward the
+    others. This is the cell-cell coupling that pure durotaxis lacks (each cell
+    otherwise climbs only its OWN self-built stiffness and they disperse).
+    """
+    cells = np.asarray(cells, float)
+    x = cells[idx]
+    grad = np.zeros(3)
+    for j in range(len(cells)):
+        if j == idx:
+            continue
+        dv = cells[j] - x
+        r = np.linalg.norm(dv)
+        if r < 1e-9:
+            continue
+        grad += (dv / r) * np.exp(-r / p.chemo_decay) / p.chemo_decay
+    n = np.linalg.norm(grad)
+    return grad / n if n > 1e-12 else np.zeros(3)
+
+
+def mechano_intercell_dir(net: "mech.FiberNetwork", cells, idx, p: "CellParams"):
+    """Unit direction along the stiffest/most-tensed matrix toward a neighbour.
+
+    Cells feel one another through the matrix: a contracting neighbour lays down a
+    tensed, stiffened track, and a cell biased to migrate along that track moves
+    toward the neighbour. We take the neighbour-ward direction weighted by the
+    reinforcement (k_scale) sampled along the connecting segment — matrix-mediated
+    guidance that needs no diffusible field.
+    """
+    cells = np.asarray(cells, float)
+    x = cells[idx]
+    mid = 0.5 * (net.nodes[net.edges[:, 0]] + net.nodes[net.edges[:, 1]])
+    acc = np.zeros(3)
+    for j in range(len(cells)):
+        if j == idx:
+            continue
+        dv = cells[j] - x
+        r = np.linalg.norm(dv)
+        if r < 1e-9:
+            continue
+        u = dv / r
+        # reinforcement sampled in a tube around the x->cell_j segment
+        t = np.clip((mid - x) @ u, 0.0, r)
+        proj = x + t[:, None] * u
+        dperp = np.linalg.norm(mid - proj, axis=1)
+        m = dperp < p.sense_radius
+        w = float(np.sum(net.k_scale[m])) if np.any(m) else 0.0
+        acc += w * u
+    n = np.linalg.norm(acc)
+    return acc / n if n > 1e-12 else np.zeros(3)
 
 
 def _stiffness_proxy(net: mech.FiberNetwork, pts, p: CellParams):
@@ -114,6 +178,11 @@ def migrate(net: mech.FiberNetwork, cells0, p_cell: CellParams | None = None,
                 ax_dir = -ax_dir
 
             move = p_cell.durotaxis * dvec + p_cell.guidance * ax_dir
+            # cell-cell coupling: chemotaxis and/or matrix-mediated guidance
+            if p_cell.chemotaxis:
+                move = move + p_cell.chemotaxis * chemoattractant_grad(cells, ci, p_cell)
+            if p_cell.mechano_guidance:
+                move = move + p_cell.mechano_guidance * mechano_intercell_dir(net, cells, ci, p_cell)
             mnorm = np.linalg.norm(move)
             if mnorm > 1e-9:
                 new[ci] = x + p_cell.speed * move / mnorm

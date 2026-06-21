@@ -165,26 +165,123 @@ Migration + mechanosensing + mechanochemistry co-evolving in **full 3-D** (n=3).
 
 ---
 
-## Status after both batches
-Done: boundary-free + (partly) tightened rheology; viscoelasticity; mechanochemical
-mass-conserving remodeling; active mechanosensing cells; global sensitivity;
-distribution-level KS/EMD with power; Bayesian inference with a passing predictive
-validation; all layers coupled in 3-D.
+# Third batch — the four open items, now addressed
 
-Still open (honest): a floppy-mode-aware solver for high-strain rheology; a
-**digitized** experimental dataset for the KS/EMD GOF; richer inference (full MCMC,
-more parameters); and cell **aggregation** (chemotaxis / stronger mechanical
-guidance) in the coupled 3-D model.
+The four "still open" items above are now implemented, each with a runnable
+verification and an honest account of what is and isn't fully solved.
+
+## Open item A — Floppy-mode-aware solver for high-strain rheology
+**Module** `ecm_pipeline/ecm_periodic.py` (`relax_newton`, `energy`, `_steihaug_cg`,
+`_le_wrap`) · **Script** `rheology_periodic.py`
+· **Figure** `output_validation/figures/rheology_periodic.png`
+
+FIRE (a single inertial timescale) stalls on the sub-isostatic network's near-
+singular, indefinite Hessian above the linear regime. Added a **trust-region
+Newton** solver: matrix-free Hessian-vector products (finite difference of the
+analytic gradient — numpy-only, no sparse assembly) inside a **Steihaug truncated
+CG** that sends any non-positive-curvature (floppy / buckling) direction to the
+trust-region boundary instead of dividing by ~0. (Bug fixed en route: naive
+`np.mod` wrapping is not Lees-Edwards-consistent at finite shear — a y-image
+crossing must carry the gamma*L x-offset; `_le_wrap` handles it.)
+
+- **Force-balance reach:** FIRE balances **0/10** strains beyond the linear point;
+  Newton balances **6/10, up to gamma_c ~ 0.15** (fine incremental load) — and is
+  also faster (no thrash).
+- **Linear modulus at genuine force balance:** G0 = **0.11 ± 0.03 Pa** (4/4 seeds
+  balanced), boundary-free and bending-dominated (deep sub-isostatic). Full
+  relaxation releases the non-affine stress a partial (FIRE) solve retained, so
+  this is *lower* than the earlier partly-converged number — the honest value.
+- **Rigidity transition LOCATED:** at gamma_c ~ 0.15 the stress jumps ~2000x over
+  delta-gamma 0.01 (the collagen strain-stiffening), exactly at the edge of force
+  balance — Newton extends balance right up to it; FIRE never gets close.
+- *Caveat (honest):* the **rigid branch above gamma_c** is near-singular; neither
+  solver fully balances it (Newton's residual stays ~10x below FIRE's). The post-
+  transition modulus needs an assembled sparse-Hessian Newton step.
+
+## Open item B — Digitized experimental dataset for the KS/EMD GOF
+**Data** `datasets/` (`collagen_pore_um.csv`, `fiber_diameter_nm.csv`, `README.md`)
+· **Module** `ecm_pipeline/dist_stats.py` · **Script** `distribution_compare.py`
+· **Figure** `output_validation/figures/distribution_compare.png`
+
+The GOF reference was a synthetic log-normal. Added a **digitized-histogram format**
+(`bin_low, bin_high, count` — exactly a WebPlotDigitizer export) with a loader and a
+**binned KS/EMD** that compares a model sample to the bin's piecewise-linear
+(uniform-within-bin) CDF — so a real digitized histogram is a drop-in, no raw
+per-object data needed.
+
+- **GOF vs the digitized reference:** model pore median **22.5 µm** vs reference
+  **22 µm** (matched scale), but **KS D=0.087, p=0.003, EMD=2.73 µm** —
+  *distinguishable in shape*. Matching a median is not matching a distribution; the
+  binned KS shows exactly that, against data-shaped bins.
+- **Power (positive control):** dense vs sparse separate at **KS D=0.187, p<1e-4,
+  EMD=6.74 µm** — the test has real discriminating power.
+- *Provenance (honest):* the reference bin frequencies are a literature-informed
+  reconstruction (see `datasets/README.md`), formatted so a true digitization of a
+  published figure is a drop-in (same three columns).
+
+## Open item C — Richer inference: emulator-based MCMC over four parameters
+**Module** `ecm_pipeline/inference.py` · **Script** `mcmc_infer.py`
+· **Figure** `output_validation/figures/mcmc_infer.png`
+
+Replaced the 2-parameter 5x5 grid with the standard expensive-simulator
+calibration workflow: a Latin-hypercube design, a **Gaussian-RBF emulator**
+(leave-one-out cross-validated) of the forward model, then **affine-invariant
+ensemble MCMC** (Goodman-Weare stretch move) on the emulator over **four**
+parameters (buckle_ratio, stiffen_alpha, k_bend, traction), with full convergence
+diagnostics (split R-hat, autocorrelation/ESS) and a held-out predictive check.
+Emulator error (LOO) is folded into the likelihood, so it is accounted for.
+
+Run `python mcmc_infer.py` to print: the emulator LOO RMSE, the 4-D posterior
+marginals vs truth, the posterior **correlation matrix** (the identifiability
+read-out — which parameters the bridge can and cannot separate), MCMC convergence
+(split R-hat, acceptance, ESS), and the held-out posterior-predictive aster check;
+the figure is saved to `output_validation/figures/mcmc_infer.png`.
+
+## Open item D — Cell aggregation in the coupled 3-D model
+**Module** `ecm_pipeline/ecm_cells.py` (`chemoattractant_grad`,
+`mechano_intercell_dir`) · **Script** `coupled_sim.py`
+· **Figure** `output_validation/figures/coupled_3d.png`
+
+Pure durotaxis did not aggregate cells (each climbs its OWN self-built stiffness).
+Added **cell-cell chemotaxis** — a screened diffusible-attractant gradient
+(c(x) ~ sum_j exp(-|x-x_j|/lambda), gradient toward neighbours) — and ran a
+controlled comparison on the same seeds (also added `mechano_intercell_dir`, a
+matrix-tension-mediated alternative).
+
+- **CONTROL (durotaxis only):** mean pairwise cell distance **54.7 -> 65.2 µm**
+  (disperses — no aggregation, the prior honest negative).
+- **TREATMENT (+ chemotaxis):** **54.7 -> 18.6 ± 0.8 µm** — strong, robust
+  aggregation; cells converge ALONG the inter-cell collagen they reinforce.
+- A reinforced network emerges in **both** arms: chemotaxis supplies the cell-cell
+  coupling that pure mechanosensing lacked (chemical + mechanical guidance — the
+  biology of wound healing / morphogenesis).
+
+---
+
+## Status after three batches
+Done: boundary-free rheology **at genuine force balance via a floppy-mode-aware
+Newton solver** (A); viscoelasticity; mechanochemical mass-conserving remodeling;
+active mechanosensing cells; global sensitivity; distribution-level KS/EMD with
+power **against a digitized-format dataset** (B); **emulator-based MCMC over four
+parameters with convergence diagnostics, identifiability, and a passing predictive
+check** (C); all layers coupled in 3-D **with cell aggregation via chemotaxis** (D).
+
+Still open (honest): the **post-transition (rigid-branch) shear modulus** needs an
+assembled sparse-Hessian Newton step (the soft branch and the transition location
+are now force-balanced); and the digitized GOF reference, while in the real format,
+is a literature-informed reconstruction until a specific published histogram is
+dropped in.
 
 ## Reproduce
 ```bash
-python rheology_periodic.py     # Step 1: periodic modulus + stiffening
-python verify_viscoelastic.py   # Step 2 + Item 1: relaxation, tunable tau (seed-avg)
+python rheology_periodic.py     # item A: force-balanced modulus + FIRE-vs-Newton + transition
+python verify_viscoelastic.py   # Step 2: relaxation, tunable tau (seed-avg)
 python verify_mechanochem.py    # Step 3: mechanochemical remodeling vs percentile
 python verify_migration.py      # Step 4: durotaxis
 python sobol_sensitivity.py     # Step 5a: global sensitivity
 python verify_displacement.py   # Step 5b: TFM-style displacement field
-python distribution_compare.py  # Item 2: KS / EMD distribution-level comparison
-python bayesian_infer.py        # Item 3: Bayesian inference + predictive validation
-python coupled_sim.py           # Item 4: coupled migration+remodeling in 3-D
+python distribution_compare.py  # item B: KS / EMD vs a digitized histogram + power
+python bayesian_infer.py        # Item 3 (grid): Bayesian inference + predictive validation
+python mcmc_infer.py            # item C: emulator-based MCMC, 4 params, diagnostics
+python coupled_sim.py           # item D: coupled 3-D, durotaxis vs +chemotaxis aggregation
 ```

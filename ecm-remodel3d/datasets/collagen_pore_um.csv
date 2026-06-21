@@ -1,0 +1,33 @@
+# Reference pore-size distribution for a fibrillar collagen / reticular network.
+#
+# FORMAT (digitized-histogram convention, e.g. WebPlotDigitizer export):
+#   bin_low_um , bin_high_um , count
+# One row per histogram bar. `count` is the number of measured pores in that bin;
+# the total count sets the statistical power of a KS test against it.
+#
+# PROVENANCE / HONESTY: these bin frequencies are a LITERATURE-INFORMED
+# RECONSTRUCTION, chosen to reproduce the central tendency (median ~22 um) and the
+# right-skew reported for loose fibrillar collagen / reticular networks by
+# confocal-reconstruction microstructure studies (pore sizes O(1-80 um),
+# log-normal-like with a long tail). They are NOT pixel-digitized from one
+# specific figure. To turn panel (A) of distribution_compare.py into a true
+# data-vs-model validation, replace the rows below with a real digitization of a
+# published histogram (same three columns) — nothing else changes.
+bin_low_um,bin_high_um,count
+0,5,8
+5,10,34
+10,15,70
+15,20,78
+20,25,70
+25,30,55
+30,35,42
+35,40,30
+40,45,22
+45,50,15
+50,55,10
+55,60,7
+60,65,5
+65,70,3
+70,75,2
+75,80,1
+80,85,1

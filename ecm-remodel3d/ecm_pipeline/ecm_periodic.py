@@ -69,6 +69,22 @@ def _le_min_image(d, L, gamma):
     return d
 
 
+def _le_wrap(nodes, L, gamma):
+    """Lees-Edwards-consistent wrap into the box.
+
+    A y-image crossing must carry the shear offset gamma*L in x (plain np.mod does
+    not), otherwise wrapping a node injects a spurious ~gamma*L bond stretch — the
+    forces are *not* invariant under naive wrapping at finite shear.
+    """
+    n = nodes.copy()
+    ny = np.floor(n[:, 1] / L)
+    n[:, 1] -= ny * L
+    n[:, 0] -= ny * gamma * L
+    n[:, 0] = np.mod(n[:, 0], L)
+    n[:, 2] = np.mod(n[:, 2], L)
+    return n
+
+
 def build_periodic_network(L=120.0, n_fibers=300, fiber_len=70.0, seg_len=6.0,
                            crosslink_dist=4.5, seed=0):
     """Fully periodic 3D Mikado network. Bonds store a fixed integer image offset
@@ -208,6 +224,185 @@ def relax(net: PeriodicNetwork, gamma, p: mech.MechParams | None = None):
     return net, dict(iters=it + 1, converged=fmax < p.ftol, final_max_force=fmax)
 
 
+# --------------------------------------------------------------------------- #
+# Floppy-mode-aware solver: trust-region Newton (Steihaug truncated-CG)
+#
+# Sub-isostatic fiber networks have *floppy modes* (zero-stiffness collective
+# motions) plus, under shear, strongly stiffening tension modes. That stiffness
+# spread (a near-singular, indefinite Hessian) is what makes FIRE — a single
+# inertial timescale — oscillate and stall at high strain. The fix used here is
+# the textbook robust second-order method for exactly this Hessian:
+#
+#   * matrix-free Hessian-vector products by finite difference of the analytic
+#     gradient g = -F (no sparse Hessian assembled — numpy-only), and
+#   * a Steihaug-Toint truncated CG that, the moment it meets a direction of
+#     non-positive curvature dᵀHd <= 0 (a floppy / buckling mode), stops dividing
+#     by ~0 and steps to the trust-region boundary along that direction.
+#
+# That single branch is the "floppy-mode awareness": the zero-stiffness modes are
+# handled by the trust region rather than blowing the step up.
+# --------------------------------------------------------------------------- #
+_GL_X, _GL_W = np.polynomial.legendre.leggauss(8)
+_GL_U = 0.5 * (_GL_X + 1.0)          # Gauss-Legendre nodes on [0,1]
+_GL_WU = 0.5 * _GL_W                 # ... and weights
+
+
+def energy(net: PeriodicNetwork, gamma, p: mech.MechParams):
+    """Total elastic energy (nonlinear axial + bending) at shear `gamma`.
+
+    Consistent with `_forces`: F = -dE/dx exactly (the bond tension is the
+    derivative of the per-bond axial energy, integrated here by 8-pt Gauss-
+    Legendre over strain so the strain-stiffening / buckling law is honoured).
+    This is the merit function for the trust-region ratio.
+    """
+    nodes, L = net.nodes, net.L
+    i, j = net.edges[:, 0], net.edges[:, 1]
+    raw = nodes[j] + net.edge_off * L - nodes[i]
+    d = _le_min_image(raw, L, gamma)
+    Lij = np.maximum(np.linalg.norm(d, axis=1), 1e-9)
+    strain = (Lij - net.rest_length) / net.rest_length
+    # U_axial = sum_bonds L0^2 * strain^2 * ∫_0^1 k_axial(strain*u) * u du
+    sq = strain[:, None] * _GL_U[None, :]                 # (E, nq) strain samples
+    kq = mech._axial_stiffness(sq, p) * net.k_scale[:, None]
+    integ = np.sum(_GL_WU[None, :] * kq * _GL_U[None, :], axis=1)
+    U_ax = float(np.sum(net.rest_length ** 2 * strain ** 2 * integ))
+    U_bend = 0.0
+    if len(net.bends):
+        a, c, b = net.bends[:, 0], net.bends[:, 1], net.bends[:, 2]
+        da = _le_min_image(nodes[a] - nodes[c], L, gamma)
+        db = _le_min_image(nodes[b] - nodes[c], L, gamma)
+        lap = da + db
+        U_bend = 0.25 * p.k_bend * float(np.sum(lap * lap))
+    return U_ax + U_bend
+
+
+def _to_boundary(pvec, d, Delta):
+    """Largest tau >= 0 with ||pvec + tau d|| = Delta (trust-region boundary)."""
+    a = float(d @ d)
+    b = 2.0 * float(pvec @ d)
+    c = float(pvec @ pvec) - Delta * Delta
+    disc = max(b * b - 4.0 * a * c, 0.0)
+    return (-b + np.sqrt(disc)) / (2.0 * a) if a > 1e-30 else 0.0
+
+
+def _steihaug_cg(g, hess_vec, Delta, tol, max_cg=120):
+    """Truncated CG for  min_p  g·p + ½ p·H·p   s.t. ||p|| <= Delta.
+
+    Returns (p, hit_boundary). Negative/zero-curvature directions (floppy modes)
+    are taken to the trust-region boundary — this is what FIRE cannot do.
+    """
+    n = len(g)
+    p = np.zeros(n)
+    r = g.copy()                       # residual g + H p at p=0
+    d = -r
+    rr = float(r @ r)
+    if np.sqrt(rr) <= tol:
+        return p, False
+    for _ in range(min(n, max_cg)):
+        Hd = hess_vec(d)
+        dHd = float(d @ Hd)
+        if dHd <= 1e-12 * float(d @ d):        # floppy / negative-curvature mode
+            return p + _to_boundary(p, d, Delta) * d, True
+        alpha = rr / dHd
+        p_next = p + alpha * d
+        if np.linalg.norm(p_next) >= Delta:    # crossed the trust boundary
+            return p + _to_boundary(p, d, Delta) * d, True
+        r_next = r + alpha * Hd
+        rr_next = float(r_next @ r_next)
+        if np.sqrt(rr_next) <= tol:
+            return p_next, False
+        d = -r_next + (rr_next / rr) * d
+        p, r, rr = p_next, r_next, rr_next
+    return p, False
+
+
+def relax_newton(net: PeriodicNetwork, gamma, p: mech.MechParams | None = None,
+                 tol=None, max_outer=150, fire_warm=2500, max_cg=120, verbose=False):
+    """Floppy-mode-aware trust-region Newton relaxation at fixed shear `gamma`.
+
+    A short FIRE pre-relaxation drops into the basin cheaply; Newton then polishes
+    to a tight force balance where FIRE stalls (high strain). Returns
+    (relaxed_net, info) with the same info keys as `relax`, plus method.
+    """
+    p = p or mech.MechParams()
+    tol = tol if tol is not None else p.ftol
+    work = net.copy()
+
+    if fire_warm:
+        pw = mech.MechParams(**dict(p.__dict__))
+        pw.max_iter, pw.ftol = fire_warm, tol
+        work, _ = relax(work, gamma, pw)
+
+    x = work.nodes.astype(float).copy()
+    shape = x.shape
+
+    def force_at(xx):
+        work.nodes = xx
+        return _forces(work, gamma, p)[0]
+
+    def grad_at(xx):
+        return -force_at(xx).reshape(-1)
+
+    def energy_at(xx):
+        work.nodes = xx
+        return energy(work, gamma, p)
+
+    g = grad_at(x)
+    U = energy_at(x)
+    fmax = float(np.max(np.linalg.norm(force_at(x), axis=1)))
+    # trust radius capped near the rest-length scale: larger steps overshoot a
+    # stiff network and make the radius oscillate.
+    Delta, Dmax = 0.3, 1.5
+    best_x, best_fmax = x.copy(), fmax       # the iterate need not be monotone in fmax
+    outer = 0
+    for outer in range(max_outer):
+        if fmax < tol:
+            break
+        gloc = g
+
+        def hess_vec(v):
+            nv = np.linalg.norm(v)
+            if nv < 1e-30:
+                return np.zeros_like(v)
+            h = 1e-6 / nv                       # probe displacement ~1e-6 um
+            return (grad_at(x + h * v.reshape(shape)) - gloc) / h
+
+        gnorm = float(np.linalg.norm(gloc))
+        cg_tol = min(0.5, np.sqrt(max(gnorm, 1e-30))) * gnorm   # inexact-Newton forcing
+        step, hit = _steihaug_cg(gloc, hess_vec, Delta, cg_tol, max_cg)
+
+        x_trial = x + step.reshape(shape)
+        U_trial = energy_at(x_trial)
+        Hp = hess_vec(step)
+        pred = -(float(gloc @ step) + 0.5 * float(step @ Hp))
+        actual = U - U_trial
+        rho = actual / pred if pred > 1e-30 else (1.0 if actual > 0 else -1.0)
+
+        if rho < 0.25:
+            Delta *= 0.25
+        elif rho > 0.75 and hit:
+            Delta = min(2.0 * Delta, Dmax)
+        accept = rho > 0.1 and actual > 0
+        if accept:                             # accept
+            x = x_trial
+            g = grad_at(x)
+            U = U_trial
+            fmax = float(np.max(np.linalg.norm(force_at(x), axis=1)))
+            if fmax < best_fmax:
+                best_fmax, best_x = fmax, x.copy()
+        if verbose:
+            print(f"   nt{outer:3d} D={Delta:8.4f} |s|={np.linalg.norm(step):8.4f} "
+                  f"hit={int(hit)} pred={pred:+.2e} act={actual:+.2e} rho={rho:+.2f} "
+                  f"fmax={fmax:.4f} best={best_fmax:.4f} {'ACC' if accept else 'rej'}")
+        if Delta < 1e-10:
+            break
+
+    work.nodes = _le_wrap(best_x, work.L, gamma)
+    fmax = float(np.max(np.linalg.norm(_forces(work, gamma, p)[0], axis=1)))
+    return work, dict(iters=outer + 1, converged=fmax < tol,
+                      final_max_force=fmax, method="newton-tr")
+
+
 def virial_shear_stress(net: PeriodicNetwork, gamma, p: mech.MechParams):
     """sigma_xy from the bond virial at the current configuration."""
     F, tension, dirv, Lij, _ = _forces(net, gamma, p)
@@ -226,10 +421,14 @@ def shear_modulus(net: PeriodicNetwork, gamma=0.02, p: mech.MechParams | None = 
     return sigma / gamma, sigma, info
 
 
-def shear_sweep(net: PeriodicNetwork, gammas, p: mech.MechParams | None = None):
+def shear_sweep(net: PeriodicNetwork, gammas, p: mech.MechParams | None = None,
+                solver="fire"):
     """Quasi-static incremental shear: relax at each gamma starting from the
     previous strained configuration (physical loading path, monotonic, and far
     easier to converge than re-relaxing from the undeformed state each time).
+
+    `solver`: "fire" (inertial, fast) or "newton" (floppy-mode-aware trust-region
+    Newton — converges where FIRE stalls at high strain).
 
     Returns dict(gamma, sigma, fmax, converged) arrays.
     """
@@ -239,11 +438,12 @@ def shear_sweep(net: PeriodicNetwork, gammas, p: mech.MechParams | None = None):
     prev_g = 0.0
     for g in gammas:
         # affine pre-shift for the strain increment: a near-equilibrium starting
-        # guess that lets FIRE converge in far fewer iterations (standard for
-        # Lees-Edwards stepping).
+        # guess that lets the solver converge in far fewer iterations (standard
+        # for Lees-Edwards stepping).
         cur.nodes[:, 0] = np.mod(cur.nodes[:, 0] + (g - prev_g) * cur.nodes[:, 1], cur.L)
         prev_g = g
-        cur, info = relax(cur, g, p)
+        cur, info = (relax_newton(cur, g, p) if solver == "newton"
+                     else relax(cur, g, p))
         sig.append(virial_shear_stress(cur, g, p))
         fm.append(info["final_max_force"]); cv.append(info["converged"])
     return dict(gamma=np.asarray(gammas, float), sigma=np.array(sig),
