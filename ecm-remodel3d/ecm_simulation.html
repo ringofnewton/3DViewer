@@ -54,9 +54,10 @@
   <div class="pill">하나의 결합 시뮬레이션 · 모든 메커니즘이 동시에</div>
   <h1>ECM 형태형성 — 통합 시뮬레이션</h1>
   <p>따로 노는 데모가 아니라, <b>같은 네트워크 위에서 모든 과정이 함께</b> 돌아갑니다:
-  세포가 콜라겐을 형성하고 → 장력을 가해 → 긴장된 섬유를 강화(리모델링)하고 → 강성을 감지해
-  이동(durotaxis)하며 → 서로 신호(chemotaxis)해 응집합니다. 토글로 각 메커니즘을 켜고 끄면서
-  무엇이 무엇을 만드는지 보세요.</p>
+  세포가 콜라겐을 <b>지속적으로 분비</b>하고(한 번에 끝나는 게 아니라 계속) → 장력을 가해 →
+  긴장된 섬유는 강화·느슨한 섬유는 분해되는 <b>연속 turnover</b>(Hill 합성 + 장력보호 MMP 분해)를
+  거치며 → 강성을 감지해 이동(durotaxis)하고 → 서로 신호(chemotaxis)해 응집합니다. 매트릭스는
+  멈추지 않고 <b>동적 평형</b>으로 끊임없이 재생됩니다.</p>
 </header>
 <main>
   <div id="err"></div>
@@ -64,8 +65,8 @@
     <div class="controls">
       <button id="play">▶ 재생</button>
       <button class="ghost" id="reset">↺ 리셋</button>
-      <label class="toggle"><input type="checkbox" id="tSecrete" checked> 형성(분비)</label>
-      <label class="toggle"><input type="checkbox" id="tRemodel" checked> 리모델링</label>
+      <label class="toggle"><input type="checkbox" id="tSecrete" checked> 분비(합성)</label>
+      <label class="toggle"><input type="checkbox" id="tRemodel" checked> turnover(합성·분해)</label>
       <label class="toggle"><input type="checkbox" id="tDuro" checked> durotaxis</label>
       <label class="toggle"><input type="checkbox" id="tChemo" checked> chemotaxis</label>
       <label class="ctl">세포 수 <b id="vNc">7</b><input id="sNc" type="range" min="3" max="12" step="1" value="7"></label>
@@ -74,7 +75,7 @@
     <div class="stage">
       <div>
         <canvas id="sim" height="440"></canvas>
-        <p class="step">단계: <span class="phase" id="phase">형성 중</span></p>
+        <p class="step">상태: <span class="phase morph" id="phase">지속적 turnover</span></p>
       </div>
       <div>
         <table class="r">
@@ -90,9 +91,10 @@
           <span class="sw" style="background:#f97316;height:10px;width:10px;border-radius:50%"></span>세포<br>
           <span style="color:#db2777">분홍 선</span> = 세포 이동 궤적
         </div>
-        <p class="legend">전부 <b>한 네트워크</b>에서 일어납니다. 예: chemotaxis를 끄면 세포가
-        흩어지고(각자 자기 강성만 따라감), 켜면 자기가 강화한 다리를 따라 모입니다. 리모델링을
-        끄면 다리가 강화되지 않아 흐릿하게 남습니다.</p>
+        <p class="legend">전부 <b>한 네트워크</b>에서 일어납니다. 예: <b>분비를 끄면</b> 새 콜라겐이
+        안 만들어져 매트릭스가 분해로 서서히 사라집니다(turnover). <b>chemotaxis를 끄면</b> 세포가
+        흩어지고, 켜면 자기가 강화한 다리를 따라 모입니다. <b>turnover를 끄면</b> 합성·분해가 멈춰
+        네트워크가 그대로 굳습니다.</p>
       </div>
     </div>
   </section>
@@ -109,8 +111,8 @@ function setup(cv){ var dpr=window.devicePixelRatio||1, w=cv.clientWidth||cv.wid
 
 try{
 var cv=document.getElementById('sim'), x=setup(cv), W=cv._w, H=cv._h;
-var NODECAP=720, FORMEND=150;
-var px,py,fx,fib,cells,grid,GS,frame,phase,running=false,raf=null,conn=0;
+var NODECAP=1800, FIBCAP=1100;
+var px,py,fx,fib,cells,grid,GS,frame,running=false,raf=null,conn=0;
 var Nc=document.getElementById('sNc'), Cw=document.getElementById('sCw');
 var T={secrete:'tSecrete',remodel:'tRemodel',duro:'tDuro',chemo:'tChemo'};
 function on(name){ return document.getElementById(T[name]).checked; }
@@ -128,35 +130,32 @@ function addFiber(i,j,xl){ if(i===j)return; var dx=px[i]-px[j], dy=py[i]-py[j], 
   if(L0<0.5)return; fib.push({i:i,j:j,L0:L0,k:0.5,xl:!!xl}); }
 
 function reset(){
-  px=[];py=[];fx=[];fib=[];cells=[];grid={};GS=12;frame=0;phase='form';conn=0;
+  px=[];py=[];fx=[];fib=[];cells=[];grid={};GS=12;frame=0;conn=0;
   var nc=+Nc.value; document.getElementById('vNc').textContent=nc;
   document.getElementById('vCw').textContent=(+Cw.value).toFixed(1);
   var cx=W/2, cy=H/2, R=Math.min(W,H)*0.24;
-  for(var c=0;c<nc;c++){ var a=2*Math.PI*c/nc;
-    var cellx=cx+R*Math.cos(a), celly=cy+R*Math.sin(a);
-    var tips=[];
-    for(var t=0;t<3;t++){ var d=2*Math.PI*Math.random();
-      var root=addNode(cellx,celly);
-      tips.push({last:root, x:cellx, y:celly, dx:Math.cos(d), dy:Math.sin(d), life:34+((Math.random()*26)|0)}); }
-    cells.push({x:cellx, y:celly, tx:[cellx], ty:[celly], tips:tips}); }
+  for(var c=0;c<nc;c++){ var a=2*Math.PI*c/nc, ex=cx+R*Math.cos(a), ey=cy+R*Math.sin(a);
+    cells.push({x:ex, y:ey, tx:[ex], ty:[ey]}); }
   rebuildGrid(); draw(); readout();
 }
 
-function grow(){
-  rebuildGrid();
-  for(var c=0;c<cells.length;c++){ var cell=cells[c], nt=[];
-    for(var t=0;t<cell.tips.length;t++){ var tp=cell.tips[t];
-      var rd=Math.random()*2*Math.PI, ndx=0.82*tp.dx+0.18*Math.cos(rd), ndy=0.82*tp.dy+0.18*Math.sin(rd);
-      var nn=Math.hypot(ndx,ndy)||1; ndx/=nn; ndy/=nn;
-      var nx=px[tp.last]+4.5*ndx, ny=py[tp.last]+4.5*ndy;
-      if(nx<5||ny<5||nx>W-5||ny>H-5||tp.life<=0||px.length>NODECAP) continue;
-      var nj=addNode(nx,ny); addFiber(tp.last,nj,false);
-      var near=nearNodes(nx,ny,6);
-      for(var m=0;m<near.length;m++){ if(near[m]!==nj && near[m]!==tp.last){ addFiber(nj,near[m],true); break; } }
-      tp.last=nj; tp.x=nx; tp.y=ny; tp.dx=ndx; tp.dy=ndy; tp.life--; nt.push(tp);
-      if(Math.random()<0.10 && (nt.length+cell.tips.length)<10){ var ang=Math.atan2(ndy,ndx)+(Math.random()-0.5)*1.4;
-        nt.push({last:nj, x:nx, y:ny, dx:Math.cos(ang), dy:Math.sin(ang), life:18+((Math.random()*16)|0)}); } }
-    cell.tips=nt; }
+// continuous, kinetic ECM SYNTHESIS: cells keep secreting collagen near
+// themselves every frame (rate tapers toward a soft cap), so the matrix is
+// PRODUCED THROUGHOUT — not in a one-shot burst. As cells migrate, deposition
+// follows them, laying matrix along their paths.
+function synthesize(){
+  var rate=0.9*(1-fib.length/FIBCAP); if(rate<=0 || px.length>NODECAP) return;
+  var reach=Math.min(W,H)*0.10, seg=5;
+  for(var c=0;c<cells.length;c++){ if(Math.random()>rate) continue; var cell=cells[c];
+    var nn=nearNodes(cell.x,cell.y,reach), from;
+    if(nn.length) from=nn[(Math.random()*nn.length)|0];
+    else from=addNode(cell.x+(Math.random()-0.5)*5, cell.y+(Math.random()-0.5)*5);
+    var ang=Math.random()*2*Math.PI, nx=px[from]+seg*Math.cos(ang), ny=py[from]+seg*Math.sin(ang);
+    if(nx<5||ny<5||nx>W-5||ny>H-5) continue;
+    var nj=addNode(nx,ny); addFiber(from,nj,false);
+    var near2=nearNodes(nx,ny,6);
+    for(var m=0;m<near2.length;m++){ if(near2[m]!==nj && near2[m]!==from){ addFiber(nj,near2[m],true); break; } }
+  }
 }
 
 function pbd(){
@@ -174,14 +173,28 @@ function traction(){
       if(r<8) continue;                         // don't collapse onto the cell
       var w=pull*(1-r/reach); px[n]+=w*dx/r; py[n]+=w*dy/r; } }
 }
-function remodel(){
+// mechanochemical TURNOVER (continuous): tension-saturating (Hill) synthesis on
+// loaded fibers + strain-PROTECTED MMP degradation — slack fibers lose mass and
+// are cleaved, tensed fibers are protected and mature. Runs every few frames so
+// the network sits in a DYNAMIC STEADY STATE, not frozen.
+function remodelKinetics(){
+  var k_syn=0.10, F_syn=0.02, k_deg=0.06, F_prot=0.03;
   for(var f=fib.length-1; f>=0; f--){ var o=fib[f];
     var dx=px[o.j]-px[o.i], dy=py[o.j]-py[o.i], L=Math.hypot(dx,dy);
-    var strain=(L-o.L0)/o.L0;
-    if(strain>0.015) o.k=Math.min(3.2, o.k+0.05);     // tensed -> reinforced
-    else o.k=Math.max(0, o.k-0.018);                  // slack -> degrade
-    if(o.k<0.05 && o.xl) fib.splice(f,1);             // prune degraded crosslinks
+    var tens=Math.max((L-o.L0)/o.L0, 0);
+    o.k += k_syn*tens/(F_syn+tens) - k_deg*Math.exp(-tens/F_prot)*o.k;
+    if(o.k>3.5) o.k=3.5; if(o.k<0) o.k=0;
+    if(o.k<0.04) fib.splice(f,1);                     // fully degraded -> cleaved
   }
+}
+// garbage-collect orphan nodes (freed by degradation) and remap fiber indices,
+// so continuous turnover stays bounded.
+function compact(){
+  var used={}; for(var f=0;f<fib.length;f++){ used[fib[f].i]=1; used[fib[f].j]=1; }
+  var map={}, nx=[],ny=[],nf=[], c=0;
+  for(var i=0;i<px.length;i++){ if(used[i]){ map[i]=c++; nx.push(px[i]); ny.push(py[i]); nf.push(fx[i]); } }
+  for(var f=0;f<fib.length;f++){ fib[f].i=map[fib[f].i]; fib[f].j=map[fib[f].j]; }
+  px=nx; py=ny; fx=nf;
 }
 function nodeStiffness(){
   var nk=new Float32Array(px.length);
@@ -232,12 +245,12 @@ function connectivity(){
 
 function step(){
   frame++;
-  if(on('secrete') && px.length<NODECAP && phase==='form') grow();
-  if(frame>FORMEND || px.length>=NODECAP) phase='morph';
+  rebuildGrid();
+  if(on('secrete')) synthesize();                  // continuous secretion
   for(var it=0; it<2; it++){ pbd(); traction(); }
-  if(on('remodel') && frame%6===0) remodel();
-  if(phase==='morph' && frame%4===0) migrate();
-  if(frame%30===0) conn=connectivity();
+  if(on('remodel') && frame%3===0) remodelKinetics();   // continuous turnover
+  if(frame%4===0) migrate();
+  if(frame%24===0){ compact(); conn=connectivity(); }
 }
 
 function colFib(k){ var t=Math.min(1,k/3.0);
@@ -269,8 +282,8 @@ function readout(){
   document.getElementById('rDist').textContent=Math.round(meanDist())+' px';
   document.getElementById('rConn').textContent=(conn*100).toFixed(0)+'%';
   var ph=document.getElementById('phase');
-  ph.textContent = phase==='form' ? '형성 중 (세포가 네트워크 생성)' : '형태형성 중 (감지·이동·리모델링·응집)';
-  ph.className = 'phase'+(phase==='morph'?' morph':'');
+  ph.textContent='지속적 turnover — 분비 ⇄ 장력보호 분해 (동적 평형)';
+  ph.className='phase morph';
 }
 function loop(){ if(!running)return; step(); draw(); readout(); raf=requestAnimationFrame(loop); }
 

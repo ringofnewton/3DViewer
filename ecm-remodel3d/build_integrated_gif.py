@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""GIF of the INTEGRATED ECM morphogenesis sim (same coupled model, one network).
+"""GIF of the INTEGRATED ECM morphogenesis sim with CONTINUOUS kinetics.
 
-Formation (cells secrete + crosslink) -> mechanics (traction) -> remodeling
-(tensed fibers reinforced) -> migration (durotaxis + chemotaxis) -> aggregation,
-ALL on one evolving network. Mirrors ecm_simulation.html. Mobile-viewable.
+Same coupled model on one network, with realistic turnover (not one-shot
+secretion): cells CONTINUOUSLY synthesize collagen, the matrix undergoes
+tension-saturating (Hill) synthesis + strain-PROTECTED MMP degradation (dynamic
+steady state), while cells sense (durotaxis), signal (chemotaxis), migrate and
+aggregate, reinforcing the inter-cell bridges. Mobile-viewable.
 
     python build_integrated_gif.py
 """
@@ -18,10 +20,10 @@ from matplotlib.animation import FuncAnimation, PillowWriter
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                    "output_validation", "figures", "ecm_integrated.gif")
 W = H = 440.0
-NODECAP, FORMEND, NCELL = 720, 150, 7
+NODECAP, FIBCAP, NCELL = 1800, 1000, 7
 random.seed(7)
 
-px, py, fx, fib, cells, grid, GS, frame, phase = [], [], [], [], [], {}, 12, 0, "form"
+px, py, fx, fib, cells, grid, GS, frame = [], [], [], [], [], {}, 12, 0
 
 
 def gkey(a, b): return (a, b)
@@ -48,51 +50,41 @@ def add_fiber(i, j, xl):
 
 
 def reset():
-    global frame, phase
-    px.clear(); py.clear(); fx.clear(); fib.clear(); cells.clear(); grid.clear()
-    frame = 0; phase = "form"
+    global frame
+    px.clear(); py.clear(); fx.clear(); fib.clear(); cells.clear(); grid.clear(); frame = 0
     cx, cy, R = W/2, H/2, min(W, H)*0.24
     for c in range(NCELL):
-        a = 2*math.pi*c/NCELL; ex, ey = cx+R*math.cos(a), cy+R*math.sin(a)
-        tips = []
-        for _ in range(3):
-            d = 2*math.pi*random.random(); root = add_node(ex, ey)
-            tips.append({"last": root, "dx": math.cos(d), "dy": math.sin(d),
-                         "life": 34+int(random.random()*26)})
-        cells.append({"x": ex, "y": ey, "tx": [ex], "ty": [ey], "tips": tips})
+        a = 2*math.pi*c/NCELL
+        cells.append({"x": cx+R*math.cos(a), "y": cy+R*math.sin(a),
+                      "tx": [cx+R*math.cos(a)], "ty": [cy+R*math.sin(a)]})
     rebuild()
 
 
-def grow():
-    rebuild()
+def synthesize():
+    rate = 0.9*(1 - len(fib)/FIBCAP)
+    if rate <= 0 or len(px) > NODECAP: return
+    reach, seg = min(W, H)*0.10, 5.0
     for cell in cells:
-        nt = []
-        for tp in cell["tips"]:
-            rd = random.random()*2*math.pi
-            ndx = 0.82*tp["dx"]+0.18*math.cos(rd); ndy = 0.82*tp["dy"]+0.18*math.sin(rd)
-            nn = math.hypot(ndx, ndy) or 1; ndx /= nn; ndy /= nn
-            nx = px[tp["last"]]+4.5*ndx; ny = py[tp["last"]]+4.5*ndy
-            if nx < 5 or ny < 5 or nx > W-5 or ny > H-5 or tp["life"] <= 0 or len(px) > NODECAP:
-                continue
-            nj = add_node(nx, ny); add_fiber(tp["last"], nj, False)
-            for m in near(nx, ny, 6):
-                if m != nj and m != tp["last"]:
-                    add_fiber(nj, m, True); break
-            tp["last"] = nj; tp["dx"] = ndx; tp["dy"] = ndy; tp["life"] -= 1; nt.append(tp)
-            if random.random() < 0.10 and len(nt)+len(cell["tips"]) < 10:
-                ang = math.atan2(ndy, ndx)+(random.random()-0.5)*1.4
-                nt.append({"last": nj, "dx": math.cos(ang), "dy": math.sin(ang),
-                           "life": 18+int(random.random()*16)})
-        cell["tips"] = nt
+        if random.random() > rate: continue
+        nn = near(cell["x"], cell["y"], reach)
+        frm = nn[int(random.random()*len(nn))] if nn else \
+            add_node(cell["x"]+(random.random()-0.5)*5, cell["y"]+(random.random()-0.5)*5)
+        ang = random.random()*2*math.pi
+        nx, ny = px[frm]+seg*math.cos(ang), py[frm]+seg*math.sin(ang)
+        if nx < 5 or ny < 5 or nx > W-5 or ny > H-5: continue
+        nj = add_node(nx, ny); add_fiber(frm, nj, False)
+        for m in near(nx, ny, 6):
+            if m != nj and m != frm:
+                add_fiber(nj, m, True); break
 
 
 def pbd():
     for o in fib:
         i, j = o["i"], o["j"]; dx = px[j]-px[i]; dy = py[j]-py[i]; L = math.hypot(dx, dy)
         if L < 1e-4: continue
-        s = 0.5*min(0.9, 0.25+0.22*o["k"])*(L-o["L0"])/L; cx = s*dx; cy = s*dy
-        if not fx[i]: px[i] += cx; py[i] += cy
-        if not fx[j]: px[j] -= cx; py[j] -= cy
+        s = 0.5*min(0.9, 0.25+0.22*o["k"])*(L-o["L0"])/L
+        if not fx[i]: px[i] += s*dx; py[i] += s*dy
+        if not fx[j]: px[j] -= s*dx; py[j] -= s*dy
 def traction():
     reach, pull = min(W, H)*0.13, 0.05
     for cell in cells:
@@ -101,19 +93,29 @@ def traction():
             dx = cell["x"]-px[n]; dy = cell["y"]-py[n]; r = math.hypot(dx, dy) or 1
             if r < 8: continue
             w = pull*(1-r/reach); px[n] += w*dx/r; py[n] += w*dy/r
-def remodel():
+def kinetics():
+    ks, Fs, kd, Fp = 0.10, 0.02, 0.06, 0.03
     for f in range(len(fib)-1, -1, -1):
         o = fib[f]; L = math.hypot(px[o["j"]]-px[o["i"]], py[o["j"]]-py[o["i"]])
-        strain = (L-o["L0"])/o["L0"]
-        o["k"] = min(3.2, o["k"]+0.05) if strain > 0.015 else max(0, o["k"]-0.018)
-        if o["k"] < 0.05 and o["xl"]: fib.pop(f)
+        t = max((L-o["L0"])/o["L0"], 0.0)
+        o["k"] += ks*t/(Fs+t) - kd*math.exp(-t/Fp)*o["k"]
+        o["k"] = min(3.5, max(0.0, o["k"]))
+        if o["k"] < 0.04: fib.pop(f)
+def compact():
+    used = set()
+    for o in fib: used.add(o["i"]); used.add(o["j"])
+    mp = {}; nx = []; ny = []; nf = []
+    for i in range(len(px)):
+        if i in used:
+            mp[i] = len(nx); nx.append(px[i]); ny.append(py[i]); nf.append(fx[i])
+    for o in fib: o["i"] = mp[o["i"]]; o["j"] = mp[o["j"]]
+    px[:] = nx; py[:] = ny; fx[:] = nf
 def node_stiff():
     nk = [0.0]*len(px)
     for o in fib: nk[o["i"]] += o["k"]; nk[o["j"]] += o["k"]
     return nk
 def migrate(chemo_w):
-    rebuild(); nk = node_stiff(); sense = min(W, H)*0.14; lam = min(W, H)*0.34
-    speed = min(W, H)*0.006
+    rebuild(); nk = node_stiff(); sense = min(W, H)*0.14; lam = min(W, H)*0.34; speed = min(W, H)*0.006
     def S(qx, qy): return sum(nk[n] for n in near(qx, qy, sense))
     moved = []
     for c, cell in enumerate(cells):
@@ -125,50 +127,47 @@ def migrate(chemo_w):
         for j, oc in enumerate(cells):
             if j == c: continue
             ddx = oc["x"]-cell["x"]; ddy = oc["y"]-cell["y"]; r = math.hypot(ddx, ddy) or 1
-            wgt = math.exp(-r/lam)/lam; hx += ddx/r*wgt; hy += ddy/r*wgt
+            wg = math.exp(-r/lam)/lam; hx += ddx/r*wg; hy += ddy/r*wg
         hn = math.hypot(hx, hy) or 1; hx /= hn; hy /= hn
-        ra = random.random()*6.283; rng = 0.35
-        mx = dux+chemo_w*hx+rng*math.cos(ra); my = duy+chemo_w*hy+rng*math.sin(ra)
+        ra = random.random()*6.283
+        mx = dux+chemo_w*hx+0.35*math.cos(ra); my = duy+chemo_w*hy+0.35*math.sin(ra)
         mn = math.hypot(mx, my) or 1
         moved.append((max(10, min(W-10, cell["x"]+speed*mx/mn)),
                       max(10, min(H-10, cell["y"]+speed*my/mn))))
     for c, cell in enumerate(cells): cell["x"], cell["y"] = moved[c]
-    minSep = 26
+    ms = 26
     for _ in range(4):
         for a in range(len(cells)):
             for b in range(a+1, len(cells)):
-                dx = cells[b]["x"]-cells[a]["x"]; dy = cells[b]["y"]-cells[a]["y"]
-                r = math.hypot(dx, dy) or 1
-                if r < minSep:
-                    pu = (minSep-r)/2/r
+                dx = cells[b]["x"]-cells[a]["x"]; dy = cells[b]["y"]-cells[a]["y"]; r = math.hypot(dx, dy) or 1
+                if r < ms:
+                    pu = (ms-r)/2/r
                     cells[a]["x"] -= pu*dx; cells[a]["y"] -= pu*dy
                     cells[b]["x"] += pu*dx; cells[b]["y"] += pu*dy
-    for cell in cells:
-        cell["tx"].append(cell["x"]); cell["ty"].append(cell["y"])
+    for cell in cells: cell["tx"].append(cell["x"]); cell["ty"].append(cell["y"])
 
 
 def step(chemo_w=1.4):
-    global frame, phase
+    global frame
     frame += 1
-    if len(px) < NODECAP and phase == "form": grow()
-    if frame > FORMEND or len(px) >= NODECAP: phase = "morph"
+    rebuild(); synthesize()
     for _ in range(2): pbd(); traction()
-    if frame % 6 == 0: remodel()
-    if phase == "morph" and frame % 4 == 0: migrate(chemo_w)
+    if frame % 3 == 0: kinetics()
+    if frame % 4 == 0: migrate(chemo_w)
+    if frame % 24 == 0: compact()
 
 
 def main():
     reset()
     fig, ax = plt.subplots(figsize=(6, 6)); fig.patch.set_facecolor("white")
-    capture = []
-    nsteps = 430
+    capture = []; nsteps = 540
     for s in range(nsteps):
         step()
-        if s % 10 == 0 or s == nsteps-1:
+        if s % 12 == 0 or s == nsteps-1:
             capture.append(([(px[o["i"]], py[o["i"]], px[o["j"]], py[o["j"]], o["k"]) for o in fib],
                             [(c["x"], c["y"]) for c in cells],
                             [(list(c["tx"]), list(c["ty"])) for c in cells],
-                            phase, len(fib), sum(1 for o in fib if o["k"] > 1.5)))
+                            len(fib), sum(1 for o in fib if o["k"] > 1.5)))
 
     def col(k):
         t = min(1, k/3.0)
@@ -178,22 +177,21 @@ def main():
     def draw(fi):
         ax.clear(); ax.set_xlim(0, W); ax.set_ylim(0, H); ax.set_aspect("equal")
         ax.set_xticks([]); ax.set_yticks([]); ax.set_facecolor("#f7fafc")
-        segs, cols, lws = [], [], []
-        fibers, cpos, trails, ph, nf, nr = capture[fi]
-        for (x1, y1, x2, y2, k) in fibers:
-            segs.append([(x1, y1), (x2, y2)]); cols.append(col(k)); lws.append(0.5+min(2.2, k*0.7))
-        ax.add_collection(LineCollection(segs, colors=cols, linewidths=lws))
+        fibers, cpos, trails, nf, nr = capture[fi]
+        segs = [[(x1, y1), (x2, y2)] for (x1, y1, x2, y2, k) in fibers]
+        ax.add_collection(LineCollection(segs, colors=[col(k) for *_, k in fibers],
+                                         linewidths=[0.5+min(2.2, k*0.7) for *_, k in fibers]))
         for (tx, ty) in trails:
             ax.plot(tx, ty, color="#db2777", lw=1.2, alpha=0.55)
         for (cx, cy) in cpos:
             ax.scatter(cx, cy, s=110, c="#f97316", edgecolors="white", linewidths=1.6, zorder=5)
-        lab = "FORMATION: cells build the network" if ph == "form" else \
-              "MORPHOGENESIS: sense · migrate · remodel · aggregate"
-        ax.set_title(f"{lab}\nfibers {nf} · reinforced bridges {nr}", fontsize=12, color="#1f2933")
+        ax.set_title("Continuous turnover: secretion ⇄ strain-protected degradation\n"
+                     f"fibers {nf} (dynamic steady state) · reinforced bridges {nr}",
+                     fontsize=12, color="#1f2933")
 
-    anim = FuncAnimation(fig, draw, frames=len(capture), interval=160, blit=False)
+    anim = FuncAnimation(fig, draw, frames=len(capture), interval=150, blit=False)
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    anim.save(OUT, writer=PillowWriter(fps=6))
+    anim.save(OUT, writer=PillowWriter(fps=7))
     print("wrote", OUT, f"({os.path.getsize(OUT)/1024:.0f} KB, {len(capture)} frames)")
 
 

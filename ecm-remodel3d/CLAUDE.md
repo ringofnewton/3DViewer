@@ -9,14 +9,22 @@ demos.**
 The reference implementation is the *one coupled simulation* where every
 mechanism runs on the **same evolving network, together**:
 
-1. **Formation** — cells secrete & crosslink collagen outward (a connected
-   network grows from the cells).
+1. **Continuous secretion (NOT one-shot)** — cells keep synthesizing collagen
+   every step at a kinetic rate (tapering toward a soft cap); deposition follows
+   the cells as they migrate. Do NOT secrete everything up front and then stop —
+   that was a modeling bug the user flagged.
 2. **Mechanics** — cells apply traction; the network relaxes (force balance / PBD).
-3. **Remodeling** — tensed fibers are reinforced (k↑), slack fibers degrade.
+3. **Mechanochemical turnover** — tension-saturating (Hill) synthesis on loaded
+   fibers + strain-PROTECTED MMP degradation (slack fibers lose mass and are
+   cleaved). Runs continuously → the matrix is a DYNAMIC STEADY STATE, constantly
+   renewed; stop synthesis and the matrix decays. Mirrors `ecm_mechanochem.py`.
 4. **Migration** — cells sense stiffness (durotaxis) and signal each other
    (chemotaxis) to move.
 5. **Aggregation** — cells cluster along the reinforced inter-cell bridges they
    build (cell–cell separation keeps them a cluster, not a collapsed point).
+
+Realism rule: ECM kinetics must be CONTINUOUS (ongoing synthesis ⇄ degradation,
+dynamic equilibrium), never a single burst followed by a frozen network.
 
 Implementations of this canonical design:
 - `ecm_simulation.html` — the live, interactive browser version (the one the user
