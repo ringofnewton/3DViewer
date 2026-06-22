@@ -58,10 +58,11 @@
   긴장된 섬유는 강화·느슨한 섬유는 분해되는 <b>연속 turnover</b>(Hill 합성 + 장력보호 MMP 분해)를
   거치며 → 강성을 감지해 이동(durotaxis)하고 → 서로 신호(chemotaxis)해 응집합니다. 매트릭스는
   멈추지 않고 <b>동적 평형</b>으로 끊임없이 재생됩니다.
-  <br><b>패턴(GelMA 광경화):</b> '패턴'에서 단단한 <b>광경화 거점</b>(청록)을 삼각형·사각형·오각형·hub로
-  배치하면, GelMA에 균일 분산된 세포(주황)가 강성을 감지해 거점으로 <b>durotaxis</b>로 이동·집결하고
-  이웃 거점 사이에 강화 <b>strut</b>을 만들어 설계 토폴로지(점선)가 emergent하게 나옵니다 — 즉
-  <b>어디를 광경화할지로</b> 네트워크를 설계합니다.</p>
+  <br><b>패턴(GelMA 광경화):</b> '패턴'에서 원하는 <b>윤곽</b>(별·나선·물결… 또는 <b>✎직접 그리기</b>)을
+  고르면, 그 윤곽을 따라 GelMA를 <b>연속 광경화(가이드)</b>하고, 균일 분산된 세포(주황)가 그 단단한
+  가이드로 <b>durotaxis</b>해 붙어 <b>윤곽을 따라 ECM을 deposit</b>합니다 → 매트릭스가 설계한 모양을
+  추적합니다. (직접 그리기: 아래 캔버스에 마우스로 윤곽을 그린 뒤 ▶재생.) 즉
+  <b>어디를 광경화할지로</b> 네트워크 모양을 설계합니다.</p>
 </header>
 <main>
   <div id="err"></div>
@@ -69,15 +70,20 @@
     <div class="controls">
       <button id="play">▶ 재생</button>
       <button class="ghost" id="reset">↺ 리셋</button>
-      <label class="ctl">패턴(세포 배치)
+      <label class="ctl">패턴(설계 윤곽)
         <select id="sPat" style="font:inherit;padding:5px 8px;border:1px solid var(--line);border-radius:7px;">
           <option value="free">자유 (응집)</option>
-          <option value="tri">삼각형 (3 foci)</option>
-          <option value="sq">사각형 (4 foci)</option>
-          <option value="pent" selected>오각형 (5 foci)</option>
+          <option value="tri">삼각형</option>
+          <option value="sq">사각형</option>
+          <option value="pent" selected>오각형</option>
           <option value="hub">hub + 5 spokes</option>
+          <option value="star">별 (오목)</option>
+          <option value="spiral">나선</option>
+          <option value="wave">물결</option>
+          <option value="draw">✎ 직접 그리기</option>
         </select></label>
-      <label class="toggle"><input type="checkbox" id="tTarget" checked> 설계 토폴로지 표시</label>
+      <button class="ghost" id="clearPath" style="display:none">✎ 윤곽 지우기</button>
+      <label class="toggle"><input type="checkbox" id="tTarget" checked> 설계 윤곽 표시</label>
       <label class="toggle"><input type="checkbox" id="tSecrete" checked> 분비(합성)</label>
       <label class="toggle"><input type="checkbox" id="tRemodel" checked> turnover(합성·분해)</label>
       <label class="toggle"><input type="checkbox" id="tDuro" checked> durotaxis</label>
@@ -126,7 +132,7 @@ try{
 var cv=document.getElementById('sim'), x=setup(cv), W=cv._w, H=cv._h;
 var NODECAP=3000, FIBCAP=2000;
 var px,py,fx,cured,fib,cells,grid,GS,frame,running=false,raf=null,conn=0;
-var pat='pent', foci=null, targetEdges=null;
+var pat='pent', guideSegs=[], guidePts=[], drawnPath=[], drawing=false;
 var Nc=document.getElementById('sNc'), Cw=document.getElementById('sCw');
 var T={secrete:'tSecrete',remodel:'tRemodel',duro:'tDuro',chemo:'tChemo'};
 function on(name){ return document.getElementById(T[name]).checked; }
@@ -143,19 +149,34 @@ function addNode(nx,ny){ var i=px.length; px.push(nx); py.push(ny);
 function addFiber(i,j,xl){ if(i===j)return; var dx=px[i]-px[j], dy=py[i]-py[j], L0=Math.hypot(dx,dy);
   if(L0<0.5)return; fib.push({i:i,j:j,L0:L0,r0:L0,k:0.5,xl:!!xl}); }
 
-// designed cell-foci layouts (the user-chosen TARGET topology)
-function patternFoci(p){
-  var cx=W/2, cy=H/2, R=Math.min(W,H)*0.32, f=[], e=[];
-  function ring(n,off){ for(var i=0;i<n;i++){ var a=-Math.PI/2+2*Math.PI*i/n+off;
-    f.push({x:cx+R*Math.cos(a), y:cy+R*Math.sin(a)}); } }
-  if(p==='tri'){ ring(3,0); e=[[0,1],[1,2],[2,0]]; }
-  else if(p==='sq'){ ring(4,Math.PI/4); e=[[0,1],[1,2],[2,3],[3,0]]; }
-  else if(p==='pent'){ ring(5,0); e=[[0,1],[1,2],[2,3],[3,4],[4,0]]; }
-  else if(p==='hub'){ f.push({x:cx,y:cy});
-    for(var i=0;i<5;i++){ var a=-Math.PI/2+2*Math.PI*i/5; f.push({x:cx+R*Math.cos(a), y:cy+R*Math.sin(a)}); }
-    e=[[0,1],[0,2],[0,3],[0,4],[0,5],[1,2],[2,3],[3,4],[4,5],[5,1]]; }
-  return {foci:f, edges:e};
+// designed OUTLINE for the chosen pattern — a list of polylines (the guide the
+// cells will trace). The desired shape is photo-cured as a continuous guide.
+function patternGuide(p){
+  var cx=W/2, cy=H/2, R=Math.min(W,H)*0.32, segs=[];
+  function poly(n,off,close){ var v=[]; for(var i=0;i<n;i++){ var a=-Math.PI/2+2*Math.PI*i/n+off;
+    v.push([cx+R*Math.cos(a), cy+R*Math.sin(a)]); } if(close)v.push(v[0].slice()); return v; }
+  if(p==='tri') segs=[poly(3,0,true)];
+  else if(p==='sq') segs=[poly(4,Math.PI/4,true)];
+  else if(p==='pent') segs=[poly(5,0,true)];
+  else if(p==='hub'){ var ring=poly(5,0,false); for(var i=0;i<5;i++) segs.push([[cx,cy], ring[i]]);
+    var r2=ring.slice(); r2.push(ring[0].slice()); segs.push(r2); }
+  else if(p==='star'){ var v=[], ro=R, ri=R*0.42;
+    for(var i=0;i<=10;i++){ var a=-Math.PI/2+Math.PI*i/5, r=(i%2===0)?ro:ri; v.push([cx+r*Math.cos(a), cy+r*Math.sin(a)]); } segs=[v]; }
+  else if(p==='spiral'){ var v=[], t=0; while(t<3.2*Math.PI){ var r=22+17*t; v.push([cx+r*Math.cos(t), cy+r*Math.sin(t)]); t+=0.12; } segs=[v]; }
+  else if(p==='wave'){ var v=[]; for(var xx=0;xx<=330;xx+=8) v.push([55+xx, cy+95*Math.sin(2*Math.PI*xx/210)]); segs=[v]; }
+  else if(p==='draw') segs = drawnPath.length>1 ? [drawnPath.slice()] : [];
+  return segs;
 }
+function densifyGuide(segs,step){ var pts=[];
+  for(var s=0;s<segs.length;s++){ var v=segs[s];
+    for(var k=0;k<v.length-1;k++){ var ax=v[k][0],ay=v[k][1],bx=v[k+1][0],by=v[k+1][1],
+      d=Math.hypot(bx-ax,by-ay), n=Math.max(1,(d/step)|0);
+      for(var q=0;q<n;q++) pts.push([ax+(bx-ax)*q/n, ay+(by-ay)*q/n]); }
+    if(v.length) pts.push(v[v.length-1].slice()); }
+  return pts; }
+function distToGuide(qx,qy){ var best=1e18;
+  for(var i=0;i<guidePts.length;i++){ var dx=guidePts[i][0]-qx, dy=guidePts[i][1]-qy, d=dx*dx+dy*dy; if(d<best)best=d; }
+  return Math.sqrt(best); }
 // a spanning background matrix (so struts can reinforce as BRIDGES between foci,
 // exactly the inverse-design rule); unloaded background stays soft, loaded
 // inter-foci paths reinforce into struts.
@@ -173,44 +194,54 @@ function reset(){
   var nc=+Nc.value; document.getElementById('vNc').textContent=nc;
   document.getElementById('vCw').textContent=(+Cw.value).toFixed(1);
   if(pat==='free'){
-    foci=null; targetEdges=null;
+    guideSegs=[]; guidePts=[];
     var cx=W/2, cy=H/2, R=Math.min(W,H)*0.30;
     for(var c=0;c<nc;c++){ var a=2*Math.PI*c/nc+(Math.random()-0.5)*0.6, rr=R*(0.7+0.5*Math.random());
       var ex=cx+rr*Math.cos(a), ey=cy+rr*Math.sin(a); cells.push({x:ex, y:ey, tx:[ex], ty:[ey]}); }
     rebuildGrid();
   } else {
-    // GelMA + photopatterning: uniform gel, RIGID photo-cured anchors at foci,
-    // cell suspension that durotaxes to the anchors and bridges them.
-    var pf=patternFoci(pat); foci=pf.foci; targetEdges=pf.edges;
-    seedBackground(170);                                  // uniform GelMA matrix
-    for(var i=0;i<px.length;i++) fx[i]=false;             // gel anchored only at cured foci
-    var Rc=18;
-    for(var i=0;i<px.length;i++){ for(var q=0;q<foci.length;q++){
-      if((px[i]-foci[q].x)*(px[i]-foci[q].x)+(py[i]-foci[q].y)*(py[i]-foci[q].y)<Rc*Rc){ fx[i]=true; cured[i]=true; } } }
-    for(var ff=0;ff<fib.length;ff++){ if(cured[fib[ff].i]&&cured[fib[ff].j]) fib[ff].k=3.0; }  // cured = stiff
-    var nsus=nc*7;                                        // cell suspension (uniform)
-    for(var c=0;c<nsus;c++){ var ex=8+Math.random()*(W-16), ey=8+Math.random()*(H-16);
-      cells.push({x:ex, y:ey, tx:[ex], ty:[ey]}); }
+    // GelMA photopatterning: photo-cure the desired OUTLINE as a continuous guide;
+    // a cell suspension homes to it (durotaxis) and DEPOSITS ECM along it, so the
+    // matrix TRACES the designed shape (no bulk contraction -> no blob).
+    guideSegs=patternGuide(pat); guidePts=densifyGuide(guideSegs,9);
+    seedBackground(190);                                  // uniform GelMA matrix
+    if(guidePts.length){
+      for(var i=0;i<px.length;i++){ if(distToGuide(px[i],py[i])<9) cured[i]=true; }  // cure along the guide
+      for(var ff=0;ff<fib.length;ff++){ if(cured[fib[ff].i]&&cured[fib[ff].j]) fib[ff].k=3.0; }
+      var nsus=nc*9;                                      // cell suspension (uniform)
+      for(var c=0;c<nsus;c++){ var ex=8+Math.random()*(W-16), ey=8+Math.random()*(H-16);
+        cells.push({x:ex, y:ey, tx:[ex], ty:[ey]}); }
+    }
     rebuildGrid();
   }
   draw(); readout();
 }
-// pattern mode: cell suspension DUROTAXES to the rigid photo-cured anchors
-// (long-range rigidity sensing), then bridges adjacent anchors.
-function migratePattern(){
-  var nk=nodeStiffness(), sense=Math.min(W,H)*0.16, sp=Math.min(W,H)*0.007, lam=85;
+// pattern mode: cell suspension DUROTAXES to the cured guide (long-range rigidity
+// sensing toward the cured outline), homing onto the designed shape.
+function migrateGuide(){
+  var nk=nodeStiffness(), sense=Math.min(W,H)*0.16, sp=Math.min(W,H)*0.007, lam=55;
   function S(qx,qy){ var s=0, nn=nearNodes(qx,qy,sense);
     for(var k=0;k<nn.length;k++) s+=0.1*nk[nn[k]];
-    for(var q=0;q<foci.length;q++){ var dx=qx-foci[q].x, dy=qy-foci[q].y;
-      s+=200/(1+(dx*dx+dy*dy)/(lam*lam)); }       // long-range pull toward rigid anchors
+    for(var g=0;g<guidePts.length;g++){ var dx=qx-guidePts[g][0], dy=qy-guidePts[g][1];
+      s+=80/(1+(dx*dx+dy*dy)/(lam*lam)); }          // long-range pull toward the cured guide
     return s; }
   for(var c=0;c<cells.length;c++){ var cell=cells[c], p=sense*0.6;
     var gx=S(cell.x+p,cell.y)-S(cell.x-p,cell.y), gy=S(cell.x,cell.y+p)-S(cell.x,cell.y-p), gn=Math.hypot(gx,gy);
-    var ra=Math.random()*6.283, rnd=0.18, mx, my;
-    if(gn>1e-6){ mx=gx/gn+rnd*Math.cos(ra); my=gy/gn+rnd*Math.sin(ra); } else { mx=Math.cos(ra); my=Math.sin(ra); }
+    var ra=Math.random()*6.283, mx, my;
+    if(gn>1e-6){ mx=gx/gn+0.15*Math.cos(ra); my=gy/gn+0.15*Math.sin(ra); } else { mx=Math.cos(ra); my=Math.sin(ra); }
     var mn=Math.hypot(mx,my)||1;
     cell.x=Math.max(6,Math.min(W-6,cell.x+sp*mx/mn)); cell.y=Math.max(6,Math.min(H-6,cell.y+sp*my/mn));
-    cell.tx.push(cell.x); cell.ty.push(cell.y); if(cell.tx.length>50){cell.tx.shift();cell.ty.shift();} }
+    cell.tx.push(cell.x); cell.ty.push(cell.y); if(cell.tx.length>40){cell.tx.shift();cell.ty.shift();} }
+}
+// cells DEPOSIT ECM locally (reinforce fibers they sit on); elsewhere ECM slowly
+// clears. With cells homed onto the guide, the reinforced ECM traces the shape.
+// (No bulk contraction — that was what collapsed everything into a blob.)
+function deposit(){
+  var mark=new Uint8Array(px.length);
+  for(var c=0;c<cells.length;c++){ var nn=nearNodes(cells[c].x,cells[c].y,14);
+    for(var k=0;k<nn.length;k++) mark[nn[k]]=1; }
+  for(var f=0;f<fib.length;f++){ var o=fib[f]; if(cured[o.i]&&cured[o.j]) continue;
+    if(mark[o.i]||mark[o.j]) o.k=Math.min(3.0,o.k+0.10); else o.k=Math.max(0.0,o.k-0.01); }
 }
 
 // continuous, kinetic ECM SYNTHESIS: cells keep secreting collagen near
@@ -324,11 +355,18 @@ function connectivity(){
 function step(){
   frame++;
   rebuildGrid();
-  if(on('secrete')) synthesize();                  // continuous secretion
-  for(var it=0; it<2; it++){ pbd(); traction(); }
-  if(on('remodel') && frame%3===0) remodelKinetics();   // continuous turnover
-  if(frame%4===0){ if(pat==='free') migrate(); else migratePattern(); }
-  if(frame%24===0){ compact(); conn=connectivity(); }
+  if(pat==='free'){
+    if(on('secrete')) synthesize();                       // continuous secretion
+    for(var it=0; it<2; it++){ pbd(); traction(); }
+    if(on('remodel') && frame%3===0) remodelKinetics();   // continuous turnover
+    if(frame%4===0) migrate();
+    if(frame%24===0){ compact(); conn=connectivity(); }
+  } else if(guidePts.length){
+    // GUIDE-TRACING: cells home to the cured outline + deposit ECM (no bulk
+    // contraction). The reinforced ECM traces the designed shape.
+    migrateGuide(); deposit();
+    if(frame%30===0) conn=connectivity();
+  }
 }
 
 function colFib(k){ var t=Math.min(1,k/3.0);
@@ -342,25 +380,26 @@ function draw(){
       if((pass===0)===strong) continue;
       x.strokeStyle=colFib(o.k); x.lineWidth=0.5+Math.min(2.2,o.k*0.7);
       x.beginPath(); x.moveTo(px[o.i],py[o.i]); x.lineTo(px[o.j],py[o.j]); x.stroke(); } }
-  // designed target topology (dashed) — the layout the foci are meant to build
-  if(targetEdges && foci && document.getElementById('tTarget').checked){
+  // designed outline (dashed) — the photo-cured guide the cells trace
+  if(pat!=='free' && guideSegs.length && document.getElementById('tTarget').checked){
     x.strokeStyle='#e0a000'; x.lineWidth=2; x.setLineDash([7,6]);
-    for(var t=0;t<targetEdges.length;t++){ var e=targetEdges[t];
-      x.beginPath(); x.moveTo(foci[e[0]].x,foci[e[0]].y); x.lineTo(foci[e[1]].x,foci[e[1]].y); x.stroke(); }
+    for(var s=0;s<guideSegs.length;s++){ var v=guideSegs[s]; x.beginPath();
+      for(var k=0;k<v.length;k++){ k?x.lineTo(v[k][0],v[k][1]):x.moveTo(v[k][0],v[k][1]); } x.stroke(); }
     x.setLineDash([]);
   }
-  // cell trails
-  x.strokeStyle='rgba(219,39,119,0.5)'; x.lineWidth=1.4;
-  for(var c=0;c<cells.length;c++){ var cl=cells[c]; x.beginPath();
-    for(var k=0;k<cl.tx.length;k++){ k?x.lineTo(cl.tx[k],cl.ty[k]):x.moveTo(cl.tx[k],cl.ty[k]); } x.stroke(); }
+  // in-progress drawn outline (draw mode)
+  if(pat==='draw' && drawnPath.length){
+    x.strokeStyle='#0d9488'; x.lineWidth=2.5; x.beginPath();
+    for(var k=0;k<drawnPath.length;k++){ k?x.lineTo(drawnPath[k][0],drawnPath[k][1]):x.moveTo(drawnPath[k][0],drawnPath[k][1]); } x.stroke();
+  }
+  // cell trails (free mode only)
+  if(pat==='free'){ x.strokeStyle='rgba(219,39,119,0.5)'; x.lineWidth=1.4;
+    for(var c=0;c<cells.length;c++){ var cl=cells[c]; x.beginPath();
+      for(var k=0;k<cl.tx.length;k++){ k?x.lineTo(cl.tx[k],cl.ty[k]):x.moveTo(cl.tx[k],cl.ty[k]); } x.stroke(); } }
   // cells (smaller in pattern mode — many suspension cells)
-  var cr=(pat==='free')?7:3.2, clw=(pat==='free')?2:0.8;
+  var cr=(pat==='free')?7:3.0, clw=(pat==='free')?2:0.7;
   for(var c=0;c<cells.length;c++){ var cl=cells[c]; x.fillStyle='#f97316'; x.strokeStyle='#fff'; x.lineWidth=clw;
     x.beginPath(); x.arc(cl.x,cl.y,cr,0,7); x.fill(); x.stroke(); }
-  // photo-cured RIGID anchors (the designed 거점)
-  if(foci && pat!=='free'){
-    for(var q=0;q<foci.length;q++){ x.fillStyle='#155e63'; x.strokeStyle='#e0a000'; x.lineWidth=2.5;
-      x.beginPath(); x.arc(foci[q].x,foci[q].y,11,0,7); x.fill(); x.stroke(); } }
 }
 function meanDist(){ var d=0,n=0; for(var i=0;i<cells.length;i++)for(var j=i+1;j<cells.length;j++){
   var dx=cells[i].x-cells[j].x, dy=cells[i].y-cells[j].y; d+=Math.hypot(dx,dy); n++; } return n?d/n:0; }
@@ -372,20 +411,36 @@ function readout(){
   document.getElementById('rDist').textContent=Math.round(meanDist())+' px';
   document.getElementById('rConn').textContent=(conn*100).toFixed(0)+'%';
   var ph=document.getElementById('phase');
-  ph.textContent='지속적 turnover — 분비 ⇄ 장력보호 분해 (동적 평형)';
-  ph.className='phase morph';
+  if(pat==='free'){ ph.textContent='지속적 turnover — 분비 ⇄ 장력보호 분해 (동적 평형)'; ph.className='phase morph'; }
+  else if(pat==='draw' && !guidePts.length){ ph.textContent='✎ 캔버스에 마우스로 윤곽을 그린 뒤 ▶재생'; ph.className='phase'; }
+  else { ph.textContent='가이드 추적 — 세포가 광경화 윤곽을 따라 ECM deposit'; ph.className='phase morph'; }
 }
 function loop(){ if(!running)return; step(); draw(); readout(); raf=requestAnimationFrame(loop); }
 
-document.getElementById('play').onclick=function(){ running=!running;
-  this.textContent=running?'⏸ 일시정지':'▶ 재생'; if(running)loop(); else if(raf)cancelAnimationFrame(raf); };
+function setPlay(t){ document.getElementById('play').textContent=t; }
+document.getElementById('play').onclick=function(){
+  if(pat==='draw' && frame===0) reset();      // build the cured guide from the drawn outline
+  running=!running; setPlay(running?'⏸ 일시정지':'▶ 재생'); if(running)loop(); else if(raf)cancelAnimationFrame(raf); };
 document.getElementById('reset').onclick=function(){ running=false; if(raf)cancelAnimationFrame(raf);
-  document.getElementById('play').textContent='▶ 재생'; reset(); };
+  setPlay('▶ 재생'); reset(); };
 Nc.oninput=function(){ document.getElementById('vNc').textContent=Nc.value; };
 Cw.oninput=function(){ document.getElementById('vCw').textContent=(+Cw.value).toFixed(1); };
-document.getElementById('sPat').onchange=function(){ running=false; if(raf)cancelAnimationFrame(raf);
-  document.getElementById('play').textContent='▶ 재생'; reset(); };
-document.getElementById('tTarget').onchange=function(){ draw(); };
+document.getElementById('sPat').onchange=function(){ running=false; if(raf)cancelAnimationFrame(raf); setPlay('▶ 재생');
+  pat=this.value;
+  document.getElementById('clearPath').style.display=(pat==='draw')?'':'none';
+  if(pat==='draw') drawnPath=[];
+  reset(); };
+document.getElementById('tTarget').onchange=function(){ if(!running) draw(); };
+document.getElementById('clearPath').onclick=function(){ running=false; if(raf)cancelAnimationFrame(raf);
+  setPlay('▶ 재생'); drawnPath=[]; reset(); };
+// draw-your-own outline: click/drag on the canvas to lay the photo-cure guide
+function addDrawPt(e){ if(pat!=='draw')return; var rect=cv.getBoundingClientRect();
+  var xx=(e.clientX-rect.left)*(cv._w/rect.width), yy=(e.clientY-rect.top)*(cv._h/rect.height);
+  if(xx<0||yy<0||xx>W||yy>H)return; var last=drawnPath[drawnPath.length-1];
+  if(!last || Math.hypot(xx-last[0],yy-last[1])>7){ drawnPath.push([xx,yy]); if(!running) draw(); } }
+cv.addEventListener('mousedown', function(e){ if(pat!=='draw')return; drawing=true; addDrawPt(e); });
+cv.addEventListener('mousemove', function(e){ if(drawing) addDrawPt(e); });
+window.addEventListener('mouseup', function(){ drawing=false; });
 reset();
 }catch(e){ showErr(e.message); console.error(e); }
 })();

@@ -79,6 +79,13 @@ of the outline), with cells following & reinforcing it — NOT from sparse-ancho
 self-organization. Do not claim a figure "follows the shape" without checking the
 on-target fraction and looking at the image.
 
+The interactive `ecm_simulation.html` pattern mode now implements THIS guide-
+tracing mechanism (superseding the old discrete-anchor version): pick an outline
+(triangle/square/pentagon/hub/star/spiral/wave) or **✎ draw your own** on the
+canvas; the outline is cured as a continuous guide, cells durotaxis to it and
+deposit ECM along it (no bulk contraction). Verified: valid JS + runs clean under
+a DOM mock for presets and draw mode.
+
 Implementations of this canonical design:
 - `ecm_simulation.html` — the live, interactive browser version (the one the user
   approved as "가장 좋고 자연스럽다").
