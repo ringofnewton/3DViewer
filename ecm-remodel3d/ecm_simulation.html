@@ -133,8 +133,9 @@ function reset(){
   px=[];py=[];fx=[];fib=[];cells=[];grid={};GS=12;frame=0;conn=0;
   var nc=+Nc.value; document.getElementById('vNc').textContent=nc;
   document.getElementById('vCw').textContent=(+Cw.value).toFixed(1);
-  var cx=W/2, cy=H/2, R=Math.min(W,H)*0.24;
-  for(var c=0;c<nc;c++){ var a=2*Math.PI*c/nc, ex=cx+R*Math.cos(a), ey=cy+R*Math.sin(a);
+  var cx=W/2, cy=H/2, R=Math.min(W,H)*0.30;
+  for(var c=0;c<nc;c++){ var a=2*Math.PI*c/nc+(Math.random()-0.5)*0.6, rr=R*(0.7+0.5*Math.random());
+    var ex=cx+rr*Math.cos(a), ey=cy+rr*Math.sin(a);
     cells.push({x:ex, y:ey, tx:[ex], ty:[ey]}); }
   rebuildGrid(); draw(); readout();
 }
@@ -145,7 +146,7 @@ function reset(){
 // follows them, laying matrix along their paths.
 function synthesize(){
   var rate=0.9*(1-fib.length/FIBCAP); if(rate<=0 || px.length>NODECAP) return;
-  var reach=Math.min(W,H)*0.10, seg=5;
+  var reach=Math.min(W,H)*0.12, seg=5;
   for(var c=0;c<cells.length;c++){ if(Math.random()>rate) continue; var cell=cells[c];
     var nn=nearNodes(cell.x,cell.y,reach), from;
     if(nn.length) from=nn[(Math.random()*nn.length)|0];
@@ -173,18 +174,20 @@ function traction(){
       if(r<8) continue;                         // don't collapse onto the cell
       var w=pull*(1-r/reach); px[n]+=w*dx/r; py[n]+=w*dy/r; } }
 }
-// mechanochemical TURNOVER (continuous): tension-saturating (Hill) synthesis on
-// loaded fibers + strain-PROTECTED MMP degradation — slack fibers lose mass and
-// are cleaved, tensed fibers are protected and mature. Runs every few frames so
-// the network sits in a DYNAMIC STEADY STATE, not frozen.
+// mechanochemical TURNOVER (continuous) with a STRUCTURAL BASELINE: tension-
+// saturating (Hill) synthesis on loaded fibers + strain-protected MMP degradation
+// that relaxes a fiber toward a baseline k_base (it does NOT dissolve the network
+// — the matrix the cells build PERSISTS and stays visible). Loaded fibers mature
+// well above baseline (bright bridges); only a few unloaded fibers are slowly
+// turned over.
 function remodelKinetics(){
-  var k_syn=0.10, F_syn=0.02, k_deg=0.06, F_prot=0.03;
+  var k_syn=0.10, F_syn=0.02, k_deg=0.025, F_prot=0.03, k_base=0.30;
   for(var f=fib.length-1; f>=0; f--){ var o=fib[f];
     var dx=px[o.j]-px[o.i], dy=py[o.j]-py[o.i], L=Math.hypot(dx,dy);
     var tens=Math.max((L-o.L0)/o.L0, 0);
-    o.k += k_syn*tens/(F_syn+tens) - k_deg*Math.exp(-tens/F_prot)*o.k;
+    o.k += k_syn*tens/(F_syn+tens) - k_deg*Math.max(o.k-k_base,0)*Math.exp(-tens/F_prot);
     if(o.k>3.5) o.k=3.5; if(o.k<0) o.k=0;
-    if(o.k<0.04) fib.splice(f,1);                     // fully degraded -> cleaved
+    if(o.k<0.4 && Math.random()<0.0015) fib.splice(f,1);   // slow turnover of unloaded fibers
   }
 }
 // garbage-collect orphan nodes (freed by degradation) and remap fiber indices,

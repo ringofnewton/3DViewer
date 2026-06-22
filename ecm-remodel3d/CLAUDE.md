@@ -14,10 +14,14 @@ mechanism runs on the **same evolving network, together**:
    the cells as they migrate. Do NOT secrete everything up front and then stop —
    that was a modeling bug the user flagged.
 2. **Mechanics** — cells apply traction; the network relaxes (force balance / PBD).
-3. **Mechanochemical turnover** — tension-saturating (Hill) synthesis on loaded
-   fibers + strain-PROTECTED MMP degradation (slack fibers lose mass and are
-   cleaved). Runs continuously → the matrix is a DYNAMIC STEADY STATE, constantly
-   renewed; stop synthesis and the matrix decays. Mirrors `ecm_mechanochem.py`.
+3. **Mechanochemical turnover (with a structural baseline)** — tension-saturating
+   (Hill) synthesis on loaded fibers + strain-protected MMP degradation that
+   relaxes a fiber toward a **baseline k_base (~0.3), NOT to zero**. The network
+   the cells build PERSISTS and stays visible; loaded fibers mature into bright
+   bridges; only a few unloaded fibers are slowly turned over. Do NOT degrade
+   unloaded fibers to nothing — that made the whole network vanish (user flagged
+   "다 분해된다"). Turnover is a slow modulation on a persistent structure, not
+   dissolution. Mirrors `ecm_mechanochem.py`.
 4. **Migration** — cells sense stiffness (durotaxis) and signal each other
    (chemotaxis) to move.
 5. **Aggregation** — cells cluster along the reinforced inter-cell bridges they

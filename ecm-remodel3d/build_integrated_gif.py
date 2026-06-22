@@ -52,18 +52,18 @@ def add_fiber(i, j, xl):
 def reset():
     global frame
     px.clear(); py.clear(); fx.clear(); fib.clear(); cells.clear(); grid.clear(); frame = 0
-    cx, cy, R = W/2, H/2, min(W, H)*0.24
+    cx, cy, R = W/2, H/2, min(W, H)*0.30
     for c in range(NCELL):
-        a = 2*math.pi*c/NCELL
-        cells.append({"x": cx+R*math.cos(a), "y": cy+R*math.sin(a),
-                      "tx": [cx+R*math.cos(a)], "ty": [cy+R*math.sin(a)]})
+        a = 2*math.pi*c/NCELL + (random.random()-0.5)*0.6; rr = R*(0.7+0.5*random.random())
+        ex, ey = cx+rr*math.cos(a), cy+rr*math.sin(a)
+        cells.append({"x": ex, "y": ey, "tx": [ex], "ty": [ey]})
     rebuild()
 
 
 def synthesize():
     rate = 0.9*(1 - len(fib)/FIBCAP)
     if rate <= 0 or len(px) > NODECAP: return
-    reach, seg = min(W, H)*0.10, 5.0
+    reach, seg = min(W, H)*0.12, 5.0
     for cell in cells:
         if random.random() > rate: continue
         nn = near(cell["x"], cell["y"], reach)
@@ -94,13 +94,13 @@ def traction():
             if r < 8: continue
             w = pull*(1-r/reach); px[n] += w*dx/r; py[n] += w*dy/r
 def kinetics():
-    ks, Fs, kd, Fp = 0.10, 0.02, 0.06, 0.03
+    ks, Fs, kd, Fp, kb = 0.10, 0.02, 0.025, 0.03, 0.30
     for f in range(len(fib)-1, -1, -1):
         o = fib[f]; L = math.hypot(px[o["j"]]-px[o["i"]], py[o["j"]]-py[o["i"]])
         t = max((L-o["L0"])/o["L0"], 0.0)
-        o["k"] += ks*t/(Fs+t) - kd*math.exp(-t/Fp)*o["k"]
+        o["k"] += ks*t/(Fs+t) - kd*max(o["k"]-kb, 0.0)*math.exp(-t/Fp)  # relax to baseline (persists)
         o["k"] = min(3.5, max(0.0, o["k"]))
-        if o["k"] < 0.04: fib.pop(f)
+        if o["k"] < 0.4 and random.random() < 0.0015: fib.pop(f)        # slow turnover, network stays
 def compact():
     used = set()
     for o in fib: used.add(o["i"]); used.add(o["j"])
@@ -147,7 +147,7 @@ def migrate(chemo_w):
     for cell in cells: cell["tx"].append(cell["x"]); cell["ty"].append(cell["y"])
 
 
-def step(chemo_w=1.4):
+def step(chemo_w=1.0):
     global frame
     frame += 1
     rebuild(); synthesize()
