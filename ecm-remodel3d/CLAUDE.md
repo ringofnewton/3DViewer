@@ -60,6 +60,25 @@ everywhere (no pattern) — the anchor-directed durotaxis is essential. Strut-vs
 target selectivity is moderate (radial bursts at anchors + bridges), matching the
 reference image's character. Keep the current design/visuals; develop this further.
 
+### Arbitrary designed shapes — what actually works (corrected after a mistake)
+
+I twice overclaimed that sparse point-anchors trace arbitrary shapes — they do
+NOT. Two empirically-verified facts:
+- **Sparse point anchors + bulk contraction/proximity reinforcement → a tangled
+  proximity-graph BLOB** that does not follow non-convex outlines (chords cut
+  across). This was wrong to present as shape-following.
+- **What DOES trace an arbitrary outline** (`build_arbitrary_fig.py`, verified):
+  photo-cure the outline as a CONTINUOUS guide; cells home to it (durotaxis) and
+  DEPOSIT ECM LOCALLY along it, with **NO bulk contraction** (bulk contraction is
+  what caused the blob). Result: star 81% / spiral 100% / wave 97% of reinforced
+  ECM on the designed outline. This is contact-guidance / durotaxis on a patterned
+  scaffold — a real mechanism.
+
+Rule of thumb: arbitrary shapes come from the CURED GUIDE (continuous photopattern
+of the outline), with cells following & reinforcing it — NOT from sparse-anchor
+self-organization. Do not claim a figure "follows the shape" without checking the
+on-target fraction and looking at the image.
+
 Implementations of this canonical design:
 - `ecm_simulation.html` — the live, interactive browser version (the one the user
   approved as "가장 좋고 자연스럽다").
