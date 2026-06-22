@@ -58,9 +58,10 @@
   긴장된 섬유는 강화·느슨한 섬유는 분해되는 <b>연속 turnover</b>(Hill 합성 + 장력보호 MMP 분해)를
   거치며 → 강성을 감지해 이동(durotaxis)하고 → 서로 신호(chemotaxis)해 응집합니다. 매트릭스는
   멈추지 않고 <b>동적 평형</b>으로 끊임없이 재생됩니다.
-  <br><b>패턴(inverse design):</b> 위 '패턴'에서 세포 foci를 삼각형·사각형·오각형·hub로 배치하면,
-  매트릭스가 그 사이를 강화 <b>strut</b>으로 연결해 설계한 토폴로지(점선)가 emergent하게 나옵니다 —
-  즉 <b>어디에 세포를 둘지로 네트워크를 설계</b>합니다.</p>
+  <br><b>패턴(GelMA 광경화):</b> '패턴'에서 단단한 <b>광경화 거점</b>(청록)을 삼각형·사각형·오각형·hub로
+  배치하면, GelMA에 균일 분산된 세포(주황)가 강성을 감지해 거점으로 <b>durotaxis</b>로 이동·집결하고
+  이웃 거점 사이에 강화 <b>strut</b>을 만들어 설계 토폴로지(점선)가 emergent하게 나옵니다 — 즉
+  <b>어디를 광경화할지로</b> 네트워크를 설계합니다.</p>
 </header>
 <main>
   <div id="err"></div>
@@ -124,7 +125,7 @@ function setup(cv){ var dpr=window.devicePixelRatio||1, w=cv.clientWidth||cv.wid
 try{
 var cv=document.getElementById('sim'), x=setup(cv), W=cv._w, H=cv._h;
 var NODECAP=3000, FIBCAP=2000;
-var px,py,fx,fib,cells,grid,GS,frame,running=false,raf=null,conn=0;
+var px,py,fx,cured,fib,cells,grid,GS,frame,running=false,raf=null,conn=0;
 var pat='pent', foci=null, targetEdges=null;
 var Nc=document.getElementById('sNc'), Cw=document.getElementById('sCw');
 var T={secrete:'tSecrete',remodel:'tRemodel',duro:'tDuro',chemo:'tChemo'};
@@ -138,7 +139,7 @@ function nearNodes(qx,qy,d){ var ix=(qx/GS)|0, iy=(qy/GS)|0, r=[], d2=d*d;
     for(var k=0;k<arr.length;k++){ var n=arr[k], dx=px[n]-qx, dy=py[n]-qy; if(dx*dx+dy*dy<d2) r.push(n); } }
   return r; }
 function addNode(nx,ny){ var i=px.length; px.push(nx); py.push(ny);
-  fx.push(nx<6||ny<6||nx>W-6||ny>H-6); return i; }
+  fx.push(nx<6||ny<6||nx>W-6||ny>H-6); cured.push(false); return i; }
 function addFiber(i,j,xl){ if(i===j)return; var dx=px[i]-px[j], dy=py[i]-py[j], L0=Math.hypot(dx,dy);
   if(L0<0.5)return; fib.push({i:i,j:j,L0:L0,r0:L0,k:0.5,xl:!!xl}); }
 
@@ -167,7 +168,7 @@ function seedBackground(nf){
   for(var i=0;i<px.length;i++){ var nn=nearNodes(px[i],py[i],5); for(var q=0;q<nn.length;q++){ if(nn[q]>i) addFiber(i,nn[q],true); } }
 }
 function reset(){
-  px=[];py=[];fx=[];fib=[];cells=[];grid={};GS=12;frame=0;conn=0;
+  px=[];py=[];fx=[];cured=[];fib=[];cells=[];grid={};GS=12;frame=0;conn=0;
   pat=document.getElementById('sPat').value;
   var nc=+Nc.value; document.getElementById('vNc').textContent=nc;
   document.getElementById('vCw').textContent=(+Cw.value).toFixed(1);
@@ -178,22 +179,38 @@ function reset(){
       var ex=cx+rr*Math.cos(a), ey=cy+rr*Math.sin(a); cells.push({x:ex, y:ey, tx:[ex], ty:[ey]}); }
     rebuildGrid();
   } else {
+    // GelMA + photopatterning: uniform gel, RIGID photo-cured anchors at foci,
+    // cell suspension that durotaxes to the anchors and bridges them.
     var pf=patternFoci(pat); foci=pf.foci; targetEdges=pf.edges;
-    seedBackground(150);                                  // spanning matrix to reinforce
-    for(var i=0;i<foci.length;i++){ for(var c=0;c<5;c++){ var a=Math.random()*2*Math.PI, rr=Math.random()*10;
-      var ex=foci[i].x+rr*Math.cos(a), ey=foci[i].y+rr*Math.sin(a);
-      cells.push({x:ex, y:ey, home:i, tx:[ex], ty:[ey]}); } }
+    seedBackground(170);                                  // uniform GelMA matrix
+    for(var i=0;i<px.length;i++) fx[i]=false;             // gel anchored only at cured foci
+    var Rc=18;
+    for(var i=0;i<px.length;i++){ for(var q=0;q<foci.length;q++){
+      if((px[i]-foci[q].x)*(px[i]-foci[q].x)+(py[i]-foci[q].y)*(py[i]-foci[q].y)<Rc*Rc){ fx[i]=true; cured[i]=true; } } }
+    for(var ff=0;ff<fib.length;ff++){ if(cured[fib[ff].i]&&cured[fib[ff].j]) fib[ff].k=3.0; }  // cured = stiff
+    var nsus=nc*7;                                        // cell suspension (uniform)
+    for(var c=0;c<nsus;c++){ var ex=8+Math.random()*(W-16), ey=8+Math.random()*(H-16);
+      cells.push({x:ex, y:ey, tx:[ex], ty:[ey]}); }
     rebuildGrid();
   }
   draw(); readout();
 }
-// pattern mode: cells stay at their focus (cohesion), so multiple foci persist
-// and the matrix between them reinforces into the designed struts.
-function cohere(){
-  for(var c=0;c<cells.length;c++){ var cell=cells[c], f=foci[cell.home];
-    cell.x += 0.10*(f.x-cell.x)+(Math.random()-0.5)*0.5;
-    cell.y += 0.10*(f.y-cell.y)+(Math.random()-0.5)*0.5;
-    cell.tx.push(cell.x); cell.ty.push(cell.y); if(cell.tx.length>40){cell.tx.shift();cell.ty.shift();} }
+// pattern mode: cell suspension DUROTAXES to the rigid photo-cured anchors
+// (long-range rigidity sensing), then bridges adjacent anchors.
+function migratePattern(){
+  var nk=nodeStiffness(), sense=Math.min(W,H)*0.16, sp=Math.min(W,H)*0.007, lam=85;
+  function S(qx,qy){ var s=0, nn=nearNodes(qx,qy,sense);
+    for(var k=0;k<nn.length;k++) s+=0.1*nk[nn[k]];
+    for(var q=0;q<foci.length;q++){ var dx=qx-foci[q].x, dy=qy-foci[q].y;
+      s+=200/(1+(dx*dx+dy*dy)/(lam*lam)); }       // long-range pull toward rigid anchors
+    return s; }
+  for(var c=0;c<cells.length;c++){ var cell=cells[c], p=sense*0.6;
+    var gx=S(cell.x+p,cell.y)-S(cell.x-p,cell.y), gy=S(cell.x,cell.y+p)-S(cell.x,cell.y-p), gn=Math.hypot(gx,gy);
+    var ra=Math.random()*6.283, rnd=0.18, mx, my;
+    if(gn>1e-6){ mx=gx/gn+rnd*Math.cos(ra); my=gy/gn+rnd*Math.sin(ra); } else { mx=Math.cos(ra); my=Math.sin(ra); }
+    var mn=Math.hypot(mx,my)||1;
+    cell.x=Math.max(6,Math.min(W-6,cell.x+sp*mx/mn)); cell.y=Math.max(6,Math.min(H-6,cell.y+sp*my/mn));
+    cell.tx.push(cell.x); cell.ty.push(cell.y); if(cell.tx.length>50){cell.tx.shift();cell.ty.shift();} }
 }
 
 // continuous, kinetic ECM SYNTHESIS: cells keep secreting collagen near
@@ -239,6 +256,7 @@ function traction(){
 function remodelKinetics(){
   var k_syn=0.10, F_syn=0.04, k_deg=0.025, F_prot=0.03, k_base=0.30;
   for(var f=fib.length-1; f>=0; f--){ var o=fib[f];
+    if(cured[o.i] && cured[o.j]) continue;                  // cured anchors don't turn over
     var dx=px[o.j]-px[o.i], dy=py[o.j]-py[o.i], L=Math.hypot(dx,dy);
     var tens=Math.max((L-o.L0)/o.L0, 0);
     o.k += k_syn*tens/(F_syn+tens) - k_deg*Math.max(o.k-k_base,0)*Math.exp(-tens/F_prot);
@@ -251,10 +269,10 @@ function remodelKinetics(){
 // so continuous turnover stays bounded.
 function compact(){
   var used={}; for(var f=0;f<fib.length;f++){ used[fib[f].i]=1; used[fib[f].j]=1; }
-  var map={}, nx=[],ny=[],nf=[], c=0;
-  for(var i=0;i<px.length;i++){ if(used[i]){ map[i]=c++; nx.push(px[i]); ny.push(py[i]); nf.push(fx[i]); } }
+  var map={}, nx=[],ny=[],nf=[],ncu=[], c=0;
+  for(var i=0;i<px.length;i++){ if(used[i]){ map[i]=c++; nx.push(px[i]); ny.push(py[i]); nf.push(fx[i]); ncu.push(cured[i]); } }
   for(var f=0;f<fib.length;f++){ fib[f].i=map[fib[f].i]; fib[f].j=map[fib[f].j]; }
-  px=nx; py=ny; fx=nf;
+  px=nx; py=ny; fx=nf; cured=ncu;
 }
 function nodeStiffness(){
   var nk=new Float32Array(px.length);
@@ -309,7 +327,7 @@ function step(){
   if(on('secrete')) synthesize();                  // continuous secretion
   for(var it=0; it<2; it++){ pbd(); traction(); }
   if(on('remodel') && frame%3===0) remodelKinetics();   // continuous turnover
-  if(frame%4===0){ if(pat==='free') migrate(); else cohere(); }
+  if(frame%4===0){ if(pat==='free') migrate(); else migratePattern(); }
   if(frame%24===0){ compact(); conn=connectivity(); }
 }
 
@@ -335,9 +353,14 @@ function draw(){
   x.strokeStyle='rgba(219,39,119,0.5)'; x.lineWidth=1.4;
   for(var c=0;c<cells.length;c++){ var cl=cells[c]; x.beginPath();
     for(var k=0;k<cl.tx.length;k++){ k?x.lineTo(cl.tx[k],cl.ty[k]):x.moveTo(cl.tx[k],cl.ty[k]); } x.stroke(); }
-  // cells
-  for(var c=0;c<cells.length;c++){ var cl=cells[c]; x.fillStyle='#f97316'; x.strokeStyle='#fff'; x.lineWidth=2;
-    x.beginPath(); x.arc(cl.x,cl.y,7,0,7); x.fill(); x.stroke(); }
+  // cells (smaller in pattern mode — many suspension cells)
+  var cr=(pat==='free')?7:3.2, clw=(pat==='free')?2:0.8;
+  for(var c=0;c<cells.length;c++){ var cl=cells[c]; x.fillStyle='#f97316'; x.strokeStyle='#fff'; x.lineWidth=clw;
+    x.beginPath(); x.arc(cl.x,cl.y,cr,0,7); x.fill(); x.stroke(); }
+  // photo-cured RIGID anchors (the designed 거점)
+  if(foci && pat!=='free'){
+    for(var q=0;q<foci.length;q++){ x.fillStyle='#155e63'; x.strokeStyle='#e0a000'; x.lineWidth=2.5;
+      x.beginPath(); x.arc(foci[q].x,foci[q].y,11,0,7); x.fill(); x.stroke(); } }
 }
 function meanDist(){ var d=0,n=0; for(var i=0;i<cells.length;i++)for(var j=i+1;j<cells.length;j++){
   var dx=cells[i].x-cells[j].x, dy=cells[i].y-cells[j].y; d+=Math.hypot(dx,dy); n++; } return n?d/n:0; }

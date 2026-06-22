@@ -30,23 +30,35 @@ mechanism runs on the **same evolving network, together**:
 Realism rule: ECM kinetics must be CONTINUOUS (ongoing synthesis ⇄ degradation,
 dynamic equilibrium), never a single burst followed by a frozen network.
 
-### Inverse-design / pattern mode (a core desired capability — the original idea)
+### NOT a substrate-attached model
+Bulk matrix model (cells embedded in / contracting a fiber network), NOT cells
+crawling on a dish bottom (2D substrate culture). Keep it that way.
 
-The headline scientific idea (from `run_inverse.py`): you DESIGN the ECM topology
-by **where you place cell foci**. Struts form as BRIDGES between foci; pores stay
-where there are no cells. The integrated sim supports this as a "pattern" mode
-(`ecm_simulation.html`: triangle / square / pentagon / hub+spokes), and
-`build_patterns_fig.py` renders the 4-panel figure in the reference style
-(soft→strut coolwarm, dashed target topology, teal foci).
+### Pattern mode = GelMA photopatterning (the real experiment & chosen mechanism)
 
-Mechanics that make struts CLEAN (match the reference image, not over-reinforced):
-- a spanning background matrix (so tension can bridge between foci),
-- cells stay at their foci (cohesion), multiple foci persist (no global aggregation),
-- selective reinforcement (Hill with F_syn ~0.04 so only high-tension inter-foci
-  bridges reinforce; background stays soft/blue),
-- **compaction**: reinforced struts shorten their rest length and pull taut
-  (positive feedback → condensed struts), as in `ecm_remodel`.
-This is the original direction to keep developing; keep the current design/visuals.
+Fabrication idea: cell suspension in GelMA precursor, then PHOTO-CURE only chosen
+foci → rigid anchor points (거점); the desired structure emerges between them.
+**User's confirmed mechanism: cells DUROTAXIS to the rigid photo-cured anchors
+(long-range rigidity sensing) and bridge adjacent anchors into reinforced struts.**
+So you DESIGN the topology by WHERE YOU PHOTO-CURE.
+
+Pattern mode in `ecm_simulation.html` (triangle/square/pentagon/hub+spokes):
+- uniform GelMA background anchored ONLY at the cured foci (box edges left free),
+- cured foci = pinned + stiff (k=3) rigid anchors, excluded from turnover,
+- a uniform CELL SUSPENSION (NOT seeded at foci),
+- cells durotaxis up a stiffness field that includes a LONG-RANGE anchor term
+  (~200/(1+r²/λ²)) so they home to distant rigid anchors (validated: mean
+  cell→nearest-anchor 80→28 px), then traction + compaction build struts between
+  adjacent anchors.
+`build_durotaxis_gif.py` → `ecm_durotaxis.gif` shows it. The "cells seeded AT foci"
+variant (`build_patterns_fig.py` / `run_inverse.py`) is a DIFFERENT fabrication
+(cell patterning, not photopatterning) — keep both, but the photopatterning +
+durotaxis version is the one matching the real experiment.
+
+Honest caveats: uniform cells WITHOUT anchor-homing just condense the gel
+everywhere (no pattern) — the anchor-directed durotaxis is essential. Strut-vs-
+target selectivity is moderate (radial bursts at anchors + bridges), matching the
+reference image's character. Keep the current design/visuals; develop this further.
 
 Implementations of this canonical design:
 - `ecm_simulation.html` — the live, interactive browser version (the one the user
