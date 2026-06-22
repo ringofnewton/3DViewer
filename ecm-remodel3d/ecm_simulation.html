@@ -57,7 +57,10 @@
   세포가 콜라겐을 <b>지속적으로 분비</b>하고(한 번에 끝나는 게 아니라 계속) → 장력을 가해 →
   긴장된 섬유는 강화·느슨한 섬유는 분해되는 <b>연속 turnover</b>(Hill 합성 + 장력보호 MMP 분해)를
   거치며 → 강성을 감지해 이동(durotaxis)하고 → 서로 신호(chemotaxis)해 응집합니다. 매트릭스는
-  멈추지 않고 <b>동적 평형</b>으로 끊임없이 재생됩니다.</p>
+  멈추지 않고 <b>동적 평형</b>으로 끊임없이 재생됩니다.
+  <br><b>패턴(inverse design):</b> 위 '패턴'에서 세포 foci를 삼각형·사각형·오각형·hub로 배치하면,
+  매트릭스가 그 사이를 강화 <b>strut</b>으로 연결해 설계한 토폴로지(점선)가 emergent하게 나옵니다 —
+  즉 <b>어디에 세포를 둘지로 네트워크를 설계</b>합니다.</p>
 </header>
 <main>
   <div id="err"></div>
@@ -65,6 +68,15 @@
     <div class="controls">
       <button id="play">▶ 재생</button>
       <button class="ghost" id="reset">↺ 리셋</button>
+      <label class="ctl">패턴(세포 배치)
+        <select id="sPat" style="font:inherit;padding:5px 8px;border:1px solid var(--line);border-radius:7px;">
+          <option value="free">자유 (응집)</option>
+          <option value="tri">삼각형 (3 foci)</option>
+          <option value="sq">사각형 (4 foci)</option>
+          <option value="pent" selected>오각형 (5 foci)</option>
+          <option value="hub">hub + 5 spokes</option>
+        </select></label>
+      <label class="toggle"><input type="checkbox" id="tTarget" checked> 설계 토폴로지 표시</label>
       <label class="toggle"><input type="checkbox" id="tSecrete" checked> 분비(합성)</label>
       <label class="toggle"><input type="checkbox" id="tRemodel" checked> turnover(합성·분해)</label>
       <label class="toggle"><input type="checkbox" id="tDuro" checked> durotaxis</label>
@@ -111,8 +123,9 @@ function setup(cv){ var dpr=window.devicePixelRatio||1, w=cv.clientWidth||cv.wid
 
 try{
 var cv=document.getElementById('sim'), x=setup(cv), W=cv._w, H=cv._h;
-var NODECAP=1800, FIBCAP=1100;
+var NODECAP=3000, FIBCAP=2000;
 var px,py,fx,fib,cells,grid,GS,frame,running=false,raf=null,conn=0;
+var pat='pent', foci=null, targetEdges=null;
 var Nc=document.getElementById('sNc'), Cw=document.getElementById('sCw');
 var T={secrete:'tSecrete',remodel:'tRemodel',duro:'tDuro',chemo:'tChemo'};
 function on(name){ return document.getElementById(T[name]).checked; }
@@ -127,17 +140,60 @@ function nearNodes(qx,qy,d){ var ix=(qx/GS)|0, iy=(qy/GS)|0, r=[], d2=d*d;
 function addNode(nx,ny){ var i=px.length; px.push(nx); py.push(ny);
   fx.push(nx<6||ny<6||nx>W-6||ny>H-6); return i; }
 function addFiber(i,j,xl){ if(i===j)return; var dx=px[i]-px[j], dy=py[i]-py[j], L0=Math.hypot(dx,dy);
-  if(L0<0.5)return; fib.push({i:i,j:j,L0:L0,k:0.5,xl:!!xl}); }
+  if(L0<0.5)return; fib.push({i:i,j:j,L0:L0,r0:L0,k:0.5,xl:!!xl}); }
 
+// designed cell-foci layouts (the user-chosen TARGET topology)
+function patternFoci(p){
+  var cx=W/2, cy=H/2, R=Math.min(W,H)*0.32, f=[], e=[];
+  function ring(n,off){ for(var i=0;i<n;i++){ var a=-Math.PI/2+2*Math.PI*i/n+off;
+    f.push({x:cx+R*Math.cos(a), y:cy+R*Math.sin(a)}); } }
+  if(p==='tri'){ ring(3,0); e=[[0,1],[1,2],[2,0]]; }
+  else if(p==='sq'){ ring(4,Math.PI/4); e=[[0,1],[1,2],[2,3],[3,0]]; }
+  else if(p==='pent'){ ring(5,0); e=[[0,1],[1,2],[2,3],[3,4],[4,0]]; }
+  else if(p==='hub'){ f.push({x:cx,y:cy});
+    for(var i=0;i<5;i++){ var a=-Math.PI/2+2*Math.PI*i/5; f.push({x:cx+R*Math.cos(a), y:cy+R*Math.sin(a)}); }
+    e=[[0,1],[0,2],[0,3],[0,4],[0,5],[1,2],[2,3],[3,4],[4,5],[5,1]]; }
+  return {foci:f, edges:e};
+}
+// a spanning background matrix (so struts can reinforce as BRIDGES between foci,
+// exactly the inverse-design rule); unloaded background stays soft, loaded
+// inter-foci paths reinforce into struts.
+function seedBackground(nf){
+  for(var k=0;k<nf;k++){ var x0=10+Math.random()*(W-20), y0=10+Math.random()*(H-20),
+    ang=Math.random()*2*Math.PI, len=40+Math.random()*55, sn=Math.max(3,(len/6)|0), prev=addNode(x0,y0);
+    for(var s=1;s<=sn;s++){ var nx=Math.max(4,Math.min(W-4,x0+len*s/sn*Math.cos(ang))),
+      ny=Math.max(4,Math.min(H-4,y0+len*s/sn*Math.sin(ang))); var nj=addNode(nx,ny); addFiber(prev,nj,false); prev=nj; } }
+  rebuildGrid();
+  for(var i=0;i<px.length;i++){ var nn=nearNodes(px[i],py[i],5); for(var q=0;q<nn.length;q++){ if(nn[q]>i) addFiber(i,nn[q],true); } }
+}
 function reset(){
   px=[];py=[];fx=[];fib=[];cells=[];grid={};GS=12;frame=0;conn=0;
+  pat=document.getElementById('sPat').value;
   var nc=+Nc.value; document.getElementById('vNc').textContent=nc;
   document.getElementById('vCw').textContent=(+Cw.value).toFixed(1);
-  var cx=W/2, cy=H/2, R=Math.min(W,H)*0.30;
-  for(var c=0;c<nc;c++){ var a=2*Math.PI*c/nc+(Math.random()-0.5)*0.6, rr=R*(0.7+0.5*Math.random());
-    var ex=cx+rr*Math.cos(a), ey=cy+rr*Math.sin(a);
-    cells.push({x:ex, y:ey, tx:[ex], ty:[ey]}); }
-  rebuildGrid(); draw(); readout();
+  if(pat==='free'){
+    foci=null; targetEdges=null;
+    var cx=W/2, cy=H/2, R=Math.min(W,H)*0.30;
+    for(var c=0;c<nc;c++){ var a=2*Math.PI*c/nc+(Math.random()-0.5)*0.6, rr=R*(0.7+0.5*Math.random());
+      var ex=cx+rr*Math.cos(a), ey=cy+rr*Math.sin(a); cells.push({x:ex, y:ey, tx:[ex], ty:[ey]}); }
+    rebuildGrid();
+  } else {
+    var pf=patternFoci(pat); foci=pf.foci; targetEdges=pf.edges;
+    seedBackground(150);                                  // spanning matrix to reinforce
+    for(var i=0;i<foci.length;i++){ for(var c=0;c<5;c++){ var a=Math.random()*2*Math.PI, rr=Math.random()*10;
+      var ex=foci[i].x+rr*Math.cos(a), ey=foci[i].y+rr*Math.sin(a);
+      cells.push({x:ex, y:ey, home:i, tx:[ex], ty:[ey]}); } }
+    rebuildGrid();
+  }
+  draw(); readout();
+}
+// pattern mode: cells stay at their focus (cohesion), so multiple foci persist
+// and the matrix between them reinforces into the designed struts.
+function cohere(){
+  for(var c=0;c<cells.length;c++){ var cell=cells[c], f=foci[cell.home];
+    cell.x += 0.10*(f.x-cell.x)+(Math.random()-0.5)*0.5;
+    cell.y += 0.10*(f.y-cell.y)+(Math.random()-0.5)*0.5;
+    cell.tx.push(cell.x); cell.ty.push(cell.y); if(cell.tx.length>40){cell.tx.shift();cell.ty.shift();} }
 }
 
 // continuous, kinetic ECM SYNTHESIS: cells keep secreting collagen near
@@ -167,7 +223,7 @@ function pbd(){
     if(!fx[j]){ px[j]-=cxr; py[j]-=cyr; } }
 }
 function traction(){
-  var reach=Math.min(W,H)*0.13, pull=0.05;
+  var reach=Math.min(W,H)*(pat==='free'?0.13:0.18), pull=(pat==='free'?0.05:0.06);
   for(var c=0;c<cells.length;c++){ var cell=cells[c], near=nearNodes(cell.x,cell.y,reach);
     for(var k=0;k<near.length;k++){ var n=near[k]; if(fx[n])continue;
       var dx=cell.x-px[n], dy=cell.y-py[n], r=Math.hypot(dx,dy)||1;
@@ -181,12 +237,13 @@ function traction(){
 // well above baseline (bright bridges); only a few unloaded fibers are slowly
 // turned over.
 function remodelKinetics(){
-  var k_syn=0.10, F_syn=0.02, k_deg=0.025, F_prot=0.03, k_base=0.30;
+  var k_syn=0.10, F_syn=0.04, k_deg=0.025, F_prot=0.03, k_base=0.30;
   for(var f=fib.length-1; f>=0; f--){ var o=fib[f];
     var dx=px[o.j]-px[o.i], dy=py[o.j]-py[o.i], L=Math.hypot(dx,dy);
     var tens=Math.max((L-o.L0)/o.L0, 0);
     o.k += k_syn*tens/(F_syn+tens) - k_deg*Math.max(o.k-k_base,0)*Math.exp(-tens/F_prot);
     if(o.k>3.5) o.k=3.5; if(o.k<0) o.k=0;
+    if(o.k>1.8) o.L0=Math.max(0.62*o.r0, o.L0*0.992);      // compaction: true struts pull taut
     if(o.k<0.4 && Math.random()<0.0015) fib.splice(f,1);   // slow turnover of unloaded fibers
   }
 }
@@ -252,7 +309,7 @@ function step(){
   if(on('secrete')) synthesize();                  // continuous secretion
   for(var it=0; it<2; it++){ pbd(); traction(); }
   if(on('remodel') && frame%3===0) remodelKinetics();   // continuous turnover
-  if(frame%4===0) migrate();
+  if(frame%4===0){ if(pat==='free') migrate(); else cohere(); }
   if(frame%24===0){ compact(); conn=connectivity(); }
 }
 
@@ -267,6 +324,13 @@ function draw(){
       if((pass===0)===strong) continue;
       x.strokeStyle=colFib(o.k); x.lineWidth=0.5+Math.min(2.2,o.k*0.7);
       x.beginPath(); x.moveTo(px[o.i],py[o.i]); x.lineTo(px[o.j],py[o.j]); x.stroke(); } }
+  // designed target topology (dashed) — the layout the foci are meant to build
+  if(targetEdges && foci && document.getElementById('tTarget').checked){
+    x.strokeStyle='#e0a000'; x.lineWidth=2; x.setLineDash([7,6]);
+    for(var t=0;t<targetEdges.length;t++){ var e=targetEdges[t];
+      x.beginPath(); x.moveTo(foci[e[0]].x,foci[e[0]].y); x.lineTo(foci[e[1]].x,foci[e[1]].y); x.stroke(); }
+    x.setLineDash([]);
+  }
   // cell trails
   x.strokeStyle='rgba(219,39,119,0.5)'; x.lineWidth=1.4;
   for(var c=0;c<cells.length;c++){ var cl=cells[c]; x.beginPath();
@@ -296,6 +360,9 @@ document.getElementById('reset').onclick=function(){ running=false; if(raf)cance
   document.getElementById('play').textContent='▶ 재생'; reset(); };
 Nc.oninput=function(){ document.getElementById('vNc').textContent=Nc.value; };
 Cw.oninput=function(){ document.getElementById('vCw').textContent=(+Cw.value).toFixed(1); };
+document.getElementById('sPat').onchange=function(){ running=false; if(raf)cancelAnimationFrame(raf);
+  document.getElementById('play').textContent='▶ 재생'; reset(); };
+document.getElementById('tTarget').onchange=function(){ draw(); };
 reset();
 }catch(e){ showErr(e.message); console.error(e); }
 })();

@@ -30,6 +30,24 @@ mechanism runs on the **same evolving network, together**:
 Realism rule: ECM kinetics must be CONTINUOUS (ongoing synthesis ⇄ degradation,
 dynamic equilibrium), never a single burst followed by a frozen network.
 
+### Inverse-design / pattern mode (a core desired capability — the original idea)
+
+The headline scientific idea (from `run_inverse.py`): you DESIGN the ECM topology
+by **where you place cell foci**. Struts form as BRIDGES between foci; pores stay
+where there are no cells. The integrated sim supports this as a "pattern" mode
+(`ecm_simulation.html`: triangle / square / pentagon / hub+spokes), and
+`build_patterns_fig.py` renders the 4-panel figure in the reference style
+(soft→strut coolwarm, dashed target topology, teal foci).
+
+Mechanics that make struts CLEAN (match the reference image, not over-reinforced):
+- a spanning background matrix (so tension can bridge between foci),
+- cells stay at their foci (cohesion), multiple foci persist (no global aggregation),
+- selective reinforcement (Hill with F_syn ~0.04 so only high-tension inter-foci
+  bridges reinforce; background stays soft/blue),
+- **compaction**: reinforced struts shorten their rest length and pull taut
+  (positive feedback → condensed struts), as in `ecm_remodel`.
+This is the original direction to keep developing; keep the current design/visuals.
+
 Implementations of this canonical design:
 - `ecm_simulation.html` — the live, interactive browser version (the one the user
   approved as "가장 좋고 자연스럽다").
