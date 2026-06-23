@@ -3,123 +3,98 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ECM 형태형성 — 통합 시뮬레이션</title>
+<title>ECM 네트워크 디자인 — GelMA 광경화</title>
 <style>
-  :root{ --bg:#eef1f6; --card:#fff; --ink:#1f2933; --muted:#5b6776; --line:#e2e8f0;
-         --soft:#f1f5f9; --c:#0d9488; }
+  :root{ --bg:#eef1f6; --card:#fff; --ink:#1f2933; --muted:#5b6776; --line:#e2e8f0; --c:#2c6fbb; }
   *{ box-sizing:border-box }
   body{ margin:0; background:var(--bg); color:var(--ink);
         font-family:'Apple SD Gothic Neo','Noto Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
         line-height:1.6; -webkit-font-smoothing:antialiased; }
-  header{ max-width:1000px; margin:0 auto; padding:40px 24px 4px; }
+  header{ max-width:980px; margin:0 auto; padding:42px 24px 4px; }
   header h1{ font-size:26px; margin:0 0 8px; letter-spacing:-.02em; }
-  header p{ font-size:15.5px; color:var(--muted); margin:0; max-width:760px; }
-  .pill{ display:inline-block; font-size:12.5px; font-weight:600; color:#0b7285;
-         background:#d7f0f3; border-radius:999px; padding:3px 11px; margin-bottom:14px; }
-  main{ max-width:1000px; margin:0 auto; padding:14px 24px 70px; }
+  header p{ font-size:15px; color:var(--muted); margin:0; max-width:760px; }
+  .pill{ display:inline-block; font-size:12.5px; font-weight:600; color:#0b56a4;
+         background:#dcebfb; border-radius:999px; padding:3px 11px; margin-bottom:14px; }
+  main{ max-width:980px; margin:0 auto; padding:14px 24px 70px; }
   .card{ background:var(--card); border:1px solid var(--line); border-left:5px solid var(--c);
-         border-radius:14px; padding:20px 22px; margin:18px 0;
-         box-shadow:0 1px 2px rgba(15,23,42,.04),0 8px 24px rgba(15,23,42,.05); }
-  .controls{ display:flex; flex-wrap:wrap; gap:12px 18px; align-items:center; margin-bottom:14px;
-             padding:12px 14px; background:var(--soft); border-radius:10px; }
+         border-radius:14px; padding:20px 22px; box-shadow:0 1px 2px rgba(15,23,42,.04),0 8px 24px rgba(15,23,42,.05); }
+  .controls{ display:flex; flex-wrap:wrap; gap:12px 16px; align-items:center; margin-bottom:14px;
+             padding:12px 14px; background:#f1f5f9; border-radius:10px; }
   button{ font:inherit; font-size:13.5px; font-weight:600; color:#fff; background:var(--c);
           border:0; border-radius:8px; padding:8px 14px; cursor:pointer; }
   button.ghost{ background:#fff; color:var(--ink); border:1px solid var(--line); }
-  .toggle{ display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;
-           font-weight:600; user-select:none; padding:4px 8px; border-radius:7px; background:#fff;
-           border:1px solid var(--line); }
+  select{ font:inherit; padding:6px 9px; border:1px solid var(--line); border-radius:8px; }
   .ctl{ display:flex; flex-direction:column; gap:2px; font-size:12px; color:var(--muted); }
   .ctl b{ color:var(--ink); font-family:ui-monospace,Menlo,monospace; }
   input[type=range]{ width:130px; accent-color:var(--c); }
-  .stage{ display:grid; grid-template-columns:1.2fr 0.8fr; gap:20px; align-items:start; }
-  @media(max-width:780px){ .stage{ grid-template-columns:1fr; } }
-  canvas{ width:100%; background:#fff; border:1px solid var(--line); border-radius:10px; display:block; }
-  .phase{ display:inline-block; font-weight:700; font-size:13px; padding:3px 10px; border-radius:7px;
-          background:#fef3c7; color:#92400e; }
-  .phase.morph{ background:#dcfce7; color:#166534; }
-  table.r{ width:100%; border-collapse:collapse; margin-top:10px; }
+  .stage{ display:grid; grid-template-columns:1.25fr 0.75fr; gap:20px; align-items:start; }
+  @media(max-width:760px){ .stage{ grid-template-columns:1fr; } }
+  canvas{ width:100%; background:#fff; border:1px solid var(--line); border-radius:10px; display:block; cursor:crosshair; }
+  table.r{ width:100%; border-collapse:collapse; margin-top:6px; }
   table.r td{ padding:6px 6px; border-top:1px solid var(--line); font-size:13.5px; }
   table.r td.v{ text-align:right; font-weight:700; font-family:ui-monospace,Menlo,monospace; color:var(--c); }
-  .legend{ font-size:12.5px; color:var(--muted); margin-top:12px; line-height:1.7; }
-  .sw{ display:inline-block; width:22px; height:4px; border-radius:2px; vertical-align:middle; margin-right:5px; }
+  .legend{ font-size:12.5px; color:var(--muted); margin-top:12px; line-height:1.8; }
+  .sw{ display:inline-block; width:22px; height:5px; border-radius:2px; vertical-align:middle; margin-right:6px; }
   .step{ font-size:13px; color:#334155; margin:10px 0 0; }
   code{ background:#eef2f7; padding:1px 6px; border-radius:5px; font-size:12.5px; font-family:ui-monospace,Menlo,monospace; }
   #err{ display:none; margin:10px 0; padding:10px 14px; background:#fee2e2; color:#b91c1c;
         border:1px solid #fca5a5; border-radius:9px; font-size:14px; }
-  footer{ max-width:1000px; margin:0 auto; padding:0 24px 60px; color:var(--muted); font-size:13px; }
+  footer{ max-width:980px; margin:0 auto; padding:0 24px 60px; color:var(--muted); font-size:13px; }
 </style>
 </head>
 <body>
 <header>
-  <div class="pill">하나의 결합 시뮬레이션 · 모든 메커니즘이 동시에</div>
-  <h1>ECM 형태형성 — 통합 시뮬레이션</h1>
-  <p>따로 노는 데모가 아니라, <b>같은 네트워크 위에서 모든 과정이 함께</b> 돌아갑니다:
-  세포가 콜라겐을 <b>지속적으로 분비</b>하고(한 번에 끝나는 게 아니라 계속) → 장력을 가해 →
-  긴장된 섬유는 강화·느슨한 섬유는 분해되는 <b>연속 turnover</b>(Hill 합성 + 장력보호 MMP 분해)를
-  거치며 → 강성을 감지해 이동(durotaxis)하고 → 서로 신호(chemotaxis)해 응집합니다. 매트릭스는
-  멈추지 않고 <b>동적 평형</b>으로 끊임없이 재생됩니다.
-  <br><b>패턴(GelMA 광경화):</b> '패턴'에서 원하는 <b>윤곽</b>(별·나선·물결… 또는 <b>✎직접 그리기</b>)을
-  고르면, 그 윤곽을 따라 GelMA를 <b>연속 광경화(가이드)</b>하고, 균일 분산된 세포(주황)가 그 단단한
-  가이드로 <b>durotaxis</b>해 붙어 <b>윤곽을 따라 ECM을 deposit</b>합니다 → 매트릭스가 설계한 모양을
-  추적합니다. (직접 그리기: 아래 캔버스에 마우스로 윤곽을 그린 뒤 ▶재생.) 즉
-  <b>어디를 광경화할지로</b> 네트워크 모양을 설계합니다.</p>
+  <div class="pill">ECM 네트워크 디자인 · GelMA 광경화</div>
+  <h1>원하는 ECM 네트워크를 설계한다</h1>
+  <p>세포가 섞인 GelMA 하이드로젤에서, 원하는 <b>디자인을 빛으로 광경화</b>하면 그 영역이 가교되어
+  조밀한 <b>ECM 섬유 네트워크</b>가 됩니다. 배양하면 세포가 그 구조 위에서 <b>국소적으로</b> 콜라겐을
+  더 깔아 디자인을 성숙시킵니다. (장거리 이동·세포 응집·chemotaxis 같은 비현실 요소는 넣지 않았습니다 —
+  순수하게 “어디를 광경화할지 = 어떤 ECM 구조를 만들지”에 집중.)</p>
 </header>
 <main>
   <div id="err"></div>
   <section class="card">
     <div class="controls">
-      <button id="play">▶ 재생</button>
-      <button class="ghost" id="reset">↺ 리셋</button>
-      <label class="ctl">패턴(설계 윤곽)
-        <select id="sPat" style="font:inherit;padding:5px 8px;border:1px solid var(--line);border-radius:7px;">
-          <option value="free">자유 (응집)</option>
-          <option value="tri">삼각형</option>
-          <option value="sq">사각형</option>
-          <option value="pent" selected>오각형</option>
-          <option value="hub">hub + 5 spokes</option>
-          <option value="star">별 (오목)</option>
+      <label class="ctl">디자인
+        <select id="design">
+          <option value="line">선</option>
+          <option value="ring" selected>고리</option>
+          <option value="branch">Y 분기</option>
+          <option value="grid">격자</option>
+          <option value="star">별</option>
           <option value="spiral">나선</option>
-          <option value="wave">물결</option>
           <option value="draw">✎ 직접 그리기</option>
         </select></label>
+      <button id="cure">⚡ 광경화 (디자인 적용)</button>
+      <button class="ghost" id="play">▶ 배양</button>
+      <button class="ghost" id="reset">↺ 새 젤</button>
       <button class="ghost" id="clearPath" style="display:none">✎ 윤곽 지우기</button>
-      <label class="toggle"><input type="checkbox" id="tTarget" checked> 설계 윤곽 표시</label>
-      <label class="toggle"><input type="checkbox" id="tSecrete" checked> 분비(합성)</label>
-      <label class="toggle"><input type="checkbox" id="tRemodel" checked> turnover(합성·분해)</label>
-      <label class="toggle"><input type="checkbox" id="tDuro" checked> durotaxis</label>
-      <label class="toggle"><input type="checkbox" id="tChemo" checked> chemotaxis</label>
-      <label class="ctl">세포 수 <b id="vNc">7</b><input id="sNc" type="range" min="3" max="12" step="1" value="7"></label>
-      <label class="ctl">chemo 세기 <b id="vCw">1.0</b><input id="sCw" type="range" min="0" max="2.5" step="0.1" value="1.0"></label>
+      <label class="ctl">세포 밀도 <b id="vNc">120</b><input id="sNc" type="range" min="0" max="300" step="20" value="120"></label>
     </div>
     <div class="stage">
       <div>
-        <canvas id="sim" height="440"></canvas>
-        <p class="step">상태: <span class="phase morph" id="phase">지속적 turnover</span></p>
+        <canvas id="sim" height="430"></canvas>
+        <p class="step" id="status">고리 디자인 — ⚡광경화를 누르세요</p>
       </div>
       <div>
         <table class="r">
-          <tr><td>섬유 세그먼트</td><td class="v" id="rFib">0</td></tr>
-          <tr><td>크로스링크</td><td class="v" id="rXl">0</td></tr>
-          <tr><td>강화된 섬유 (k&gt;1.5)</td><td class="v" id="rRein">0</td></tr>
-          <tr><td>평균 세포간 거리</td><td class="v" id="rDist">–</td></tr>
-          <tr><td>강화 연결성(최대성분)</td><td class="v" id="rConn">–</td></tr>
+          <tr><td>전체 섬유</td><td class="v" id="rFib">0</td></tr>
+          <tr><td>디자인 ECM (가교 섬유)</td><td class="v" id="rCure">0</td></tr>
+          <tr><td>디자인 성숙도 (평균 굵기)</td><td class="v" id="rMat">–</td></tr>
         </table>
         <div class="legend">
-          <span class="sw" style="background:#cfe0f5"></span>약한 섬유<br>
-          <span class="sw" style="background:#1e3a8a"></span>강화된 섬유(긴장된 inter-cell 다리)<br>
-          <span class="sw" style="background:#f97316;height:10px;width:10px;border-radius:50%"></span>세포<br>
-          <span style="color:#db2777">분홍 선</span> = 세포 이동 궤적
+          <span class="sw" style="background:#cfe0f5"></span>GelMA 배경 (연한 젤)<br>
+          <span class="sw" style="background:#1e3a8a"></span>광경화된 디자인 ECM<br>
+          <span class="sw" style="background:#f97316;height:9px;width:9px;border-radius:50%"></span>세포
         </div>
-        <p class="legend">전부 <b>한 네트워크</b>에서 일어납니다. 예: <b>분비를 끄면</b> 새 콜라겐이
-        안 만들어져 매트릭스가 분해로 서서히 사라집니다(turnover). <b>chemotaxis를 끄면</b> 세포가
-        흩어지고, 켜면 자기가 강화한 다리를 따라 모입니다. <b>turnover를 끄면</b> 합성·분해가 멈춰
-        네트워크가 그대로 굳습니다.</p>
+        <p class="legend">사용법: 디자인 선택(또는 ✎그리기) → <b>⚡광경화</b> → <b>▶배양</b>으로
+        세포가 그 구조를 성숙(굵게)시키는 과정을 봅니다. 세포는 자기 주변 구조만 따라 ECM을 깔며,
+        멀리 이동하거나 뭉치지 않습니다.</p>
       </div>
     </div>
   </section>
-  <footer>이 통합 모델은 Python <code>coupled_sim.py</code>(migration + mechanosensing +
-  mechanochemistry, 3D)의 브라우저판입니다. 레올로지·KS·MCMC는 이 모델의 출력에 적용하는
-  <i>측정/추론</i>이며 별도 페이지(<code>research_interactive.html</code>)에 있습니다.</footer>
+  <footer>광경화 = 디자인을 빛으로 GelMA에 새기는 것. 우리 모델에서는 디자인 영역의 섬유가
+  가교되어 단단·조밀해지고(=ECM 구조), 배양 중 세포가 그 구조 위에 콜라겐을 더 깔아 성숙시킵니다.</footer>
 </main>
 <script>
 (function(){
@@ -127,321 +102,134 @@
 function showErr(m){ var e=document.getElementById('err'); e.style.display='block'; e.textContent='오류: '+m; }
 function setup(cv){ var dpr=window.devicePixelRatio||1, w=cv.clientWidth||cv.width, h=cv.getAttribute('height')*1;
   cv.width=w*dpr; cv.height=h*dpr; var x=cv.getContext('2d'); x.scale(dpr,dpr); cv._w=w; cv._h=h; return x; }
-
 try{
 var cv=document.getElementById('sim'), x=setup(cv), W=cv._w, H=cv._h;
-var NODECAP=3000, FIBCAP=2000;
-var px,py,fx,cured,fib,cells,grid,GS,frame,running=false,raf=null,conn=0;
-var pat='pent', guideSegs=[], guidePts=[], drawnPath=[], drawing=false;
-var Nc=document.getElementById('sNc'), Cw=document.getElementById('sCw');
-var T={secrete:'tSecrete',remodel:'tRemodel',duro:'tDuro',chemo:'tChemo'};
-function on(name){ return document.getElementById(T[name]).checked; }
+var px=[],py=[],fib=[],cured=[],cells=[],grid={},GS=12;
+var design='ring', guide=[], drawnPath=[], drawing=false, running=false, raf=null, matured=false;
+var Nc=document.getElementById('sNc');
 
-function gkey(ix,iy){ return ix+'_'+iy; }
-function ghash(i){ var ix=(px[i]/GS)|0, iy=(py[i]/GS)|0, k=gkey(ix,iy); (grid[k]||(grid[k]=[])).push(i); }
-function rebuildGrid(){ grid={}; for(var i=0;i<px.length;i++) ghash(i); }
-function nearNodes(qx,qy,d){ var ix=(qx/GS)|0, iy=(qy/GS)|0, r=[], d2=d*d;
-  for(var a=-1;a<=1;a++)for(var b=-1;b<=1;b++){ var arr=grid[gkey(ix+a,iy+b)]; if(!arr)continue;
-    for(var k=0;k<arr.length;k++){ var n=arr[k], dx=px[n]-qx, dy=py[n]-qy; if(dx*dx+dy*dy<d2) r.push(n); } }
-  return r; }
-function addNode(nx,ny){ var i=px.length; px.push(nx); py.push(ny);
-  fx.push(nx<6||ny<6||nx>W-6||ny>H-6); cured.push(false); return i; }
-function addFiber(i,j,xl){ if(i===j)return; var dx=px[i]-px[j], dy=py[i]-py[j], L0=Math.hypot(dx,dy);
-  if(L0<0.5)return; fib.push({i:i,j:j,L0:L0,r0:L0,k:0.5,xl:!!xl}); }
+function gk(a,b){ return a+'_'+b; }
+function rebuild(){ grid={}; for(var i=0;i<px.length;i++){ var k=gk((px[i]/GS)|0,(py[i]/GS)|0); (grid[k]||(grid[k]=[])).push(i); } }
+function near(qx,qy,d){ var ix=(qx/GS)|0, iy=(qy/GS)|0, r=[], d2=d*d;
+  for(var a=-1;a<=1;a++)for(var b=-1;b<=1;b++){ var arr=grid[gk(ix+a,iy+b)]; if(!arr)continue;
+    for(var k=0;k<arr.length;k++){ var n=arr[k]; if((px[n]-qx)*(px[n]-qx)+(py[n]-qy)*(py[n]-qy)<d2) r.push(n); } } return r; }
+function addN(nx,ny){ px.push(nx); py.push(ny); return px.length-1; }
+function addF(i,j){ if(i===j)return; if(Math.hypot(px[i]-px[j],py[i]-py[j])<0.5)return;
+  fib.push({i:i,j:j,k:0.4}); }
 
-// designed OUTLINE for the chosen pattern — a list of polylines (the guide the
-// cells will trace). The desired shape is photo-cured as a continuous guide.
-function patternGuide(p){
-  var cx=W/2, cy=H/2, R=Math.min(W,H)*0.32, segs=[];
-  function poly(n,off,close){ var v=[]; for(var i=0;i<n;i++){ var a=-Math.PI/2+2*Math.PI*i/n+off;
-    v.push([cx+R*Math.cos(a), cy+R*Math.sin(a)]); } if(close)v.push(v[0].slice()); return v; }
-  if(p==='tri') segs=[poly(3,0,true)];
-  else if(p==='sq') segs=[poly(4,Math.PI/4,true)];
-  else if(p==='pent') segs=[poly(5,0,true)];
-  else if(p==='hub'){ var ring=poly(5,0,false); for(var i=0;i<5;i++) segs.push([[cx,cy], ring[i]]);
-    var r2=ring.slice(); r2.push(ring[0].slice()); segs.push(r2); }
-  else if(p==='star'){ var v=[], ro=R, ri=R*0.42;
-    for(var i=0;i<=10;i++){ var a=-Math.PI/2+Math.PI*i/5, r=(i%2===0)?ro:ri; v.push([cx+r*Math.cos(a), cy+r*Math.sin(a)]); } segs=[v]; }
-  else if(p==='spiral'){ var v=[], t=0; while(t<3.2*Math.PI){ var r=22+17*t; v.push([cx+r*Math.cos(t), cy+r*Math.sin(t)]); t+=0.12; } segs=[v]; }
-  else if(p==='wave'){ var v=[]; for(var xx=0;xx<=330;xx+=8) v.push([55+xx, cy+95*Math.sin(2*Math.PI*xx/210)]); segs=[v]; }
-  else if(p==='draw') segs = drawnPath.length>1 ? [drawnPath.slice()] : [];
+// uniform GelMA fiber network
+function seedGel(nf){
+  for(var t=0;t<nf;t++){ var x0=8+Math.random()*(W-16), y0=8+Math.random()*(H-16),
+    a=Math.random()*2*Math.PI, ln=26+Math.random()*40, sn=Math.max(2,(ln/7)|0), prev=addN(x0,y0);
+    for(var s=1;s<=sn;s++){ var nx=Math.max(4,Math.min(W-4,x0+ln*s/sn*Math.cos(a))),
+      ny=Math.max(4,Math.min(H-4,y0+ln*s/sn*Math.sin(a))); var nj=addN(nx,ny); addF(prev,nj); prev=nj; } }
+  rebuild();
+  for(var i=0;i<px.length;i++){ var nn=near(px[i],py[i],5); for(var q=0;q<nn.length;q++){ if(nn[q]>i) addF(i,nn[q]); } }
+}
+
+// design outlines (the photopattern); list of polylines
+function designGuide(d){
+  var cx=W/2, cy=H/2, R=Math.min(W,H)*0.30, segs=[];
+  if(d==='line') segs=[[[W*0.18,cy],[W*0.82,cy]]];
+  else if(d==='ring'){ var v=[]; for(var i=0;i<=48;i++){ var a=2*Math.PI*i/48; v.push([cx+R*Math.cos(a),cy+R*Math.sin(a)]); } segs=[v]; }
+  else if(d==='branch'){ segs=[[[cx,H*0.85],[cx,cy]],[[cx,cy],[cx-R,H*0.18]],[[cx,cy],[cx+R,H*0.18]]]; }
+  else if(d==='grid'){ for(var gx2=0.25;gx2<=0.75;gx2+=0.25) segs.push([[W*gx2,H*0.2],[W*gx2,H*0.8]]);
+    for(var gy2=0.25;gy2<=0.75;gy2+=0.25) segs.push([[W*0.2,H*gy2],[W*0.8,H*gy2]]); }
+  else if(d==='star'){ var v=[],ro=R,ri=R*0.42; for(var i=0;i<=10;i++){ var a=-Math.PI/2+Math.PI*i/5, r=(i%2===0)?ro:ri; v.push([cx+r*Math.cos(a),cy+r*Math.sin(a)]); } segs=[v]; }
+  else if(d==='spiral'){ var v=[],t=0; while(t<3.0*Math.PI){ var r=18+15*t; v.push([cx+r*Math.cos(t),cy+r*Math.sin(t)]); t+=0.13; } segs=[v]; }
+  else if(d==='draw') segs = drawnPath.length>1 ? [drawnPath.slice()] : [];
   return segs;
 }
-function densifyGuide(segs,step){ var pts=[];
-  for(var s=0;s<segs.length;s++){ var v=segs[s];
-    for(var k=0;k<v.length-1;k++){ var ax=v[k][0],ay=v[k][1],bx=v[k+1][0],by=v[k+1][1],
-      d=Math.hypot(bx-ax,by-ay), n=Math.max(1,(d/step)|0);
-      for(var q=0;q<n;q++) pts.push([ax+(bx-ax)*q/n, ay+(by-ay)*q/n]); }
-    if(v.length) pts.push(v[v.length-1].slice()); }
-  return pts; }
-function distToGuide(qx,qy){ var best=1e18;
-  for(var i=0;i<guidePts.length;i++){ var dx=guidePts[i][0]-qx, dy=guidePts[i][1]-qy, d=dx*dx+dy*dy; if(d<best)best=d; }
-  return Math.sqrt(best); }
-// a spanning background matrix (so struts can reinforce as BRIDGES between foci,
-// exactly the inverse-design rule); unloaded background stays soft, loaded
-// inter-foci paths reinforce into struts.
-function seedBackground(nf){
-  for(var k=0;k<nf;k++){ var x0=10+Math.random()*(W-20), y0=10+Math.random()*(H-20),
-    ang=Math.random()*2*Math.PI, len=40+Math.random()*55, sn=Math.max(3,(len/6)|0), prev=addNode(x0,y0);
-    for(var s=1;s<=sn;s++){ var nx=Math.max(4,Math.min(W-4,x0+len*s/sn*Math.cos(ang))),
-      ny=Math.max(4,Math.min(H-4,y0+len*s/sn*Math.sin(ang))); var nj=addNode(nx,ny); addFiber(prev,nj,false); prev=nj; } }
-  rebuildGrid();
-  for(var i=0;i<px.length;i++){ var nn=nearNodes(px[i],py[i],5); for(var q=0;q<nn.length;q++){ if(nn[q]>i) addFiber(i,nn[q],true); } }
-}
-function reset(){
-  px=[];py=[];fx=[];cured=[];fib=[];cells=[];grid={};GS=12;frame=0;conn=0;
-  pat=document.getElementById('sPat').value;
+function guidePoints(segs,step){ var pts=[]; for(var s=0;s<segs.length;s++){ var v=segs[s];
+  for(var k=0;k<v.length-1;k++){ var ax=v[k][0],ay=v[k][1],bx=v[k+1][0],by=v[k+1][1],d=Math.hypot(bx-ax,by-ay),n=Math.max(1,(d/step)|0);
+    for(var q=0;q<n;q++) pts.push([ax+(bx-ax)*q/n,ay+(by-ay)*q/n]); } if(v.length)pts.push(v[v.length-1].slice()); } return pts; }
+function distGuide(qx,qy,pts){ var best=1e18; for(var i=0;i<pts.length;i++){ var dx=pts[i][0]-qx,dy=pts[i][1]-qy,dd=dx*dx+dy*dy; if(dd<best)best=dd; } return Math.sqrt(best); }
+
+function newGel(){
+  running=false; if(raf)cancelAnimationFrame(raf); document.getElementById('play').textContent='▶ 배양';
+  px=[];py=[];fib=[];cured=[];cells=[];grid={}; matured=false;
+  seedGel(150);
+  for(var f=0;f<fib.length;f++) cured.push(false);
   var nc=+Nc.value; document.getElementById('vNc').textContent=nc;
-  document.getElementById('vCw').textContent=(+Cw.value).toFixed(1);
-  if(pat==='free'){
-    guideSegs=[]; guidePts=[];
-    var cx=W/2, cy=H/2, R=Math.min(W,H)*0.30;
-    for(var c=0;c<nc;c++){ var a=2*Math.PI*c/nc+(Math.random()-0.5)*0.6, rr=R*(0.7+0.5*Math.random());
-      var ex=cx+rr*Math.cos(a), ey=cy+rr*Math.sin(a); cells.push({x:ex, y:ey, tx:[ex], ty:[ey]}); }
-    rebuildGrid();
-  } else {
-    // GelMA photopatterning: photo-cure the desired OUTLINE as a continuous guide;
-    // a cell suspension homes to it (durotaxis) and DEPOSITS ECM along it, so the
-    // matrix TRACES the designed shape (no bulk contraction -> no blob).
-    guideSegs=patternGuide(pat); guidePts=densifyGuide(guideSegs,9);
-    seedBackground(190);                                  // uniform GelMA matrix
-    if(guidePts.length){
-      for(var i=0;i<px.length;i++){ if(distToGuide(px[i],py[i])<9) cured[i]=true; }  // cure along the guide
-      for(var ff=0;ff<fib.length;ff++){ if(cured[fib[ff].i]&&cured[fib[ff].j]) fib[ff].k=3.0; }
-      var nsus=nc*9;                                      // cell suspension (uniform)
-      for(var c=0;c<nsus;c++){ var ex=8+Math.random()*(W-16), ey=8+Math.random()*(H-16);
-        cells.push({x:ex, y:ey, tx:[ex], ty:[ey]}); }
-    }
-    rebuildGrid();
-  }
-  draw(); readout();
+  for(var c=0;c<nc;c++) cells.push({x:8+Math.random()*(W-16), y:8+Math.random()*(H-16)});
+  draw(); readout('새 젤 — 디자인 선택 후 ⚡광경화');
 }
-// pattern mode: cell suspension DUROTAXES to the cured guide (long-range rigidity
-// sensing toward the cured outline), homing onto the designed shape.
-function migrateGuide(){
-  var nk=nodeStiffness(), sense=Math.min(W,H)*0.16, sp=Math.min(W,H)*0.007, lam=55;
-  function S(qx,qy){ var s=0, nn=nearNodes(qx,qy,sense);
-    for(var k=0;k<nn.length;k++) s+=0.1*nk[nn[k]];
-    for(var g=0;g<guidePts.length;g++){ var dx=qx-guidePts[g][0], dy=qy-guidePts[g][1];
-      s+=80/(1+(dx*dx+dy*dy)/(lam*lam)); }          // long-range pull toward the cured guide
-    return s; }
-  for(var c=0;c<cells.length;c++){ var cell=cells[c], p=sense*0.6;
-    var gx=S(cell.x+p,cell.y)-S(cell.x-p,cell.y), gy=S(cell.x,cell.y+p)-S(cell.x,cell.y-p), gn=Math.hypot(gx,gy);
-    var ra=Math.random()*6.283, mx, my;
-    if(gn>1e-6){ mx=gx/gn+0.15*Math.cos(ra); my=gy/gn+0.15*Math.sin(ra); } else { mx=Math.cos(ra); my=Math.sin(ra); }
-    var mn=Math.hypot(mx,my)||1;
-    cell.x=Math.max(6,Math.min(W-6,cell.x+sp*mx/mn)); cell.y=Math.max(6,Math.min(H-6,cell.y+sp*my/mn));
-    cell.tx.push(cell.x); cell.ty.push(cell.y); if(cell.tx.length>40){cell.tx.shift();cell.ty.shift();} }
+// PHOTO-CURE: crosslink the GelMA along the design -> dense, stiff ECM (the design)
+function cure(){
+  guide = guidePoints(designGuide(design), 6);
+  if(!guide.length){ readout('✎ 윤곽을 먼저 그리세요'); return; }
+  var Rc=9; matured=false;
+  for(var f=0;f<fib.length;f++){ var o=fib[f];
+    var mx=(px[o.i]+px[o.j])/2, my=(py[o.i]+py[o.j])/2;
+    if(distGuide(mx,my,guide)<Rc){ cured[f]=true; o.k=1.4; } else { cured[f]=false; o.k=0.4; } }
+  draw(); readout('광경화 완료 — ▶배양으로 세포가 성숙시킵니다');
 }
-// cells DEPOSIT ECM locally (reinforce fibers they sit on); elsewhere ECM slowly
-// clears. With cells homed onto the guide, the reinforced ECM traces the shape.
-// (No bulk contraction — that was what collapsed everything into a blob.)
-function deposit(){
-  var mark=new Uint8Array(px.length);
-  for(var c=0;c<cells.length;c++){ var nn=nearNodes(cells[c].x,cells[c].y,14);
-    for(var k=0;k<nn.length;k++) mark[nn[k]]=1; }
-  for(var f=0;f<fib.length;f++){ var o=fib[f]; if(cured[o.i]&&cured[o.j]) continue;
-    if(mark[o.i]||mark[o.j]) o.k=Math.min(3.0,o.k+0.10); else o.k=Math.max(0.0,o.k-0.01); }
-}
-
-// continuous, kinetic ECM SYNTHESIS: cells keep secreting collagen near
-// themselves every frame (rate tapers toward a soft cap), so the matrix is
-// PRODUCED THROUGHOUT — not in a one-shot burst. As cells migrate, deposition
-// follows them, laying matrix along their paths.
-function synthesize(){
-  var rate=0.9*(1-fib.length/FIBCAP); if(rate<=0 || px.length>NODECAP) return;
-  var reach=Math.min(W,H)*0.12, seg=5;
-  for(var c=0;c<cells.length;c++){ if(Math.random()>rate) continue; var cell=cells[c];
-    var nn=nearNodes(cell.x,cell.y,reach), from;
-    if(nn.length) from=nn[(Math.random()*nn.length)|0];
-    else from=addNode(cell.x+(Math.random()-0.5)*5, cell.y+(Math.random()-0.5)*5);
-    var ang=Math.random()*2*Math.PI, nx=px[from]+seg*Math.cos(ang), ny=py[from]+seg*Math.sin(ang);
-    if(nx<5||ny<5||nx>W-5||ny>H-5) continue;
-    var nj=addNode(nx,ny); addFiber(from,nj,false);
-    var near2=nearNodes(nx,ny,6);
-    for(var m=0;m<near2.length;m++){ if(near2[m]!==nj && near2[m]!==from){ addFiber(nj,near2[m],true); break; } }
-  }
-}
-
-function pbd(){
-  for(var f=0;f<fib.length;f++){ var o=fib[f], i=o.i, j=o.j;
-    var dx=px[j]-px[i], dy=py[j]-py[i], L=Math.hypot(dx,dy); if(L<1e-4)continue;
-    var s=0.5*Math.min(0.9,0.25+0.22*o.k)*(L-o.L0)/L, cxr=s*dx, cyr=s*dy;
-    if(!fx[i]){ px[i]+=cxr; py[i]+=cyr; }
-    if(!fx[j]){ px[j]-=cxr; py[j]-=cyr; } }
-}
-function traction(){
-  var reach=Math.min(W,H)*(pat==='free'?0.13:0.18), pull=(pat==='free'?0.05:0.06);
-  for(var c=0;c<cells.length;c++){ var cell=cells[c], near=nearNodes(cell.x,cell.y,reach);
-    for(var k=0;k<near.length;k++){ var n=near[k]; if(fx[n])continue;
-      var dx=cell.x-px[n], dy=cell.y-py[n], r=Math.hypot(dx,dy)||1;
-      if(r<8) continue;                         // don't collapse onto the cell
-      var w=pull*(1-r/reach); px[n]+=w*dx/r; py[n]+=w*dy/r; } }
-}
-// mechanochemical TURNOVER (continuous) with a STRUCTURAL BASELINE: tension-
-// saturating (Hill) synthesis on loaded fibers + strain-protected MMP degradation
-// that relaxes a fiber toward a baseline k_base (it does NOT dissolve the network
-// — the matrix the cells build PERSISTS and stays visible). Loaded fibers mature
-// well above baseline (bright bridges); only a few unloaded fibers are slowly
-// turned over.
-function remodelKinetics(){
-  var k_syn=0.10, F_syn=0.04, k_deg=0.025, F_prot=0.03, k_base=0.30;
-  for(var f=fib.length-1; f>=0; f--){ var o=fib[f];
-    if(cured[o.i] && cured[o.j]) continue;                  // cured anchors don't turn over
-    var dx=px[o.j]-px[o.i], dy=py[o.j]-py[o.i], L=Math.hypot(dx,dy);
-    var tens=Math.max((L-o.L0)/o.L0, 0);
-    o.k += k_syn*tens/(F_syn+tens) - k_deg*Math.max(o.k-k_base,0)*Math.exp(-tens/F_prot);
-    if(o.k>3.5) o.k=3.5; if(o.k<0) o.k=0;
-    if(o.k>1.8) o.L0=Math.max(0.62*o.r0, o.L0*0.992);      // compaction: true struts pull taut
-    if(o.k<0.4 && Math.random()<0.0015) fib.splice(f,1);   // slow turnover of unloaded fibers
-  }
-}
-// garbage-collect orphan nodes (freed by degradation) and remap fiber indices,
-// so continuous turnover stays bounded.
-function compact(){
-  var used={}; for(var f=0;f<fib.length;f++){ used[fib[f].i]=1; used[fib[f].j]=1; }
-  var map={}, nx=[],ny=[],nf=[],ncu=[], c=0;
-  for(var i=0;i<px.length;i++){ if(used[i]){ map[i]=c++; nx.push(px[i]); ny.push(py[i]); nf.push(fx[i]); ncu.push(cured[i]); } }
-  for(var f=0;f<fib.length;f++){ fib[f].i=map[fib[f].i]; fib[f].j=map[fib[f].j]; }
-  px=nx; py=ny; fx=nf; cured=ncu;
-}
-function nodeStiffness(){
-  var nk=new Float32Array(px.length);
-  for(var f=0;f<fib.length;f++){ nk[fib[f].i]+=fib[f].k; nk[fib[f].j]+=fib[f].k; }
-  return nk;
-}
-function migrate(){
-  rebuildGrid();
-  var nk=nodeStiffness(), sense=Math.min(W,H)*0.14, lam=Math.min(W,H)*0.34;
-  var wc=(on('chemo')? +Cw.value : 0), wd=(on('duro')? 1.0 : 0), speed=Math.min(W,H)*0.006;
-  function S(qx,qy){ var nn=nearNodes(qx,qy,sense), s=0; for(var k=0;k<nn.length;k++) s+=nk[nn[k]]; return s; }
-  var moved=[];
-  for(var c=0;c<cells.length;c++){ var cell=cells[c];
-    var p=sense*0.6;
-    var gx=S(cell.x+p,cell.y)-S(cell.x-p,cell.y), gy=S(cell.x,cell.y+p)-S(cell.x,cell.y-p);
-    var gn=Math.hypot(gx,gy)||1; var dux=gx/gn, duy=gy/gn;
-    var hx=0,hy=0; for(var j=0;j<cells.length;j++){ if(j===c)continue;
-      var ddx=cells[j].x-cell.x, ddy=cells[j].y-cell.y, r=Math.hypot(ddx,ddy)||1;
-      var wgt=Math.exp(-r/lam)/lam; hx+=ddx/r*wgt; hy+=ddy/r*wgt; }
-    var hn=Math.hypot(hx,hy)||1; hx/=hn; hy/=hn;
-    var rng=0.35, ra=Math.random()*6.283;
-    var mx=wd*dux+wc*hx+rng*Math.cos(ra), my=wd*duy+wc*hy+rng*Math.sin(ra);
-    var mn=Math.hypot(mx,my)||1;
-    moved.push([Math.max(10,Math.min(W-10,cell.x+speed*mx/mn)), Math.max(10,Math.min(H-10,cell.y+speed*my/mn))]); }
-  for(var c=0;c<cells.length;c++){ cells[c].x=moved[c][0]; cells[c].y=moved[c][1]; }
-  // resolve cell-cell separation: aggregate into a CLUSTER, not a single point
-  var minSep=26;
-  for(var rp=0;rp<4;rp++){ for(var a=0;a<cells.length;a++)for(var b=a+1;b<cells.length;b++){
-    var dx=cells[b].x-cells[a].x, dy=cells[b].y-cells[a].y, r=Math.hypot(dx,dy)||1;
-    if(r<minSep){ var pu=(minSep-r)/2/r; cells[a].x-=pu*dx; cells[a].y-=pu*dy; cells[b].x+=pu*dx; cells[b].y+=pu*dy; } } }
-  for(var c=0;c<cells.length;c++){ var cl=cells[c];
-    cl.x=Math.max(10,Math.min(W-10,cl.x)); cl.y=Math.max(10,Math.min(H-10,cl.y));
-    cl.tx.push(cl.x); cl.ty.push(cl.y); if(cl.tx.length>150){cl.tx.shift();cl.ty.shift();}
-  }
-}
-
-function connectivity(){
-  var rein=[]; for(var f=0;f<fib.length;f++) if(fib[f].k>1.5) rein.push(fib[f]);
-  if(rein.length<4) return 0;
-  var par={}; function find(a){ while(par[a]!==undefined && par[a]!==a){ a=par[a]; } return a; }
-  function uni(a,b){ par[a]=(par[a]===undefined?a:par[a]); par[b]=(par[b]===undefined?b:par[b]);
-    var ra=find(a), rb=find(b); if(ra!==rb) par[ra]=rb; }
-  var nodesSet={}; for(var i=0;i<rein.length;i++){ uni(rein[i].i, rein[i].j); nodesSet[rein[i].i]=1; nodesSet[rein[i].j]=1; }
-  var cnt={}, tot=0, best=0;
-  for(var key in nodesSet){ var r=find(+key); cnt[r]=(cnt[r]||0)+1; tot++; if(cnt[r]>best)best=cnt[r]; }
-  return tot? best/tot : 0;
-}
-
+// CULTURE: cells locally follow the cured structure (contact guidance, short range)
+// and deposit ECM ON the existing structure (no chemotaxis, no long-range homing).
 function step(){
-  frame++;
-  rebuildGrid();
-  if(pat==='free'){
-    if(on('secrete')) synthesize();                       // continuous secretion
-    for(var it=0; it<2; it++){ pbd(); traction(); }
-    if(on('remodel') && frame%3===0) remodelKinetics();   // continuous turnover
-    if(frame%4===0) migrate();
-    if(frame%24===0){ compact(); conn=connectivity(); }
-  } else if(guidePts.length){
-    // GUIDE-TRACING: cells home to the cured outline + deposit ECM (no bulk
-    // contraction). The reinforced ECM traces the designed shape.
-    migrateGuide(); deposit();
-    if(frame%30===0) conn=connectivity();
+  rebuild();
+  var sense=18, sp=1.3;
+  for(var c=0;c<cells.length;c++){ var cell=cells[c];
+    // local contact-guidance bias: drift toward nearby (stiffer) structure, short range only
+    var nn=near(cell.x,cell.y,sense), gx=0,gy=0;
+    for(var k=0;k<nn.length;k++){ var n=nn[k]; var w=nodeK[n]; var dx=px[n]-cell.x, dy=py[n]-cell.y;
+      gx+=w*dx; gy+=w*dy; }
+    var gn=Math.hypot(gx,gy), ra=Math.random()*6.283, mx,my;
+    if(gn>1e-6){ mx=0.5*gx/gn+Math.cos(ra); my=0.5*gy/gn+Math.sin(ra); } else { mx=Math.cos(ra); my=Math.sin(ra); }
+    var mn=Math.hypot(mx,my)||1;
+    cell.x=Math.max(5,Math.min(W-5,cell.x+sp*mx/mn)); cell.y=Math.max(5,Math.min(H-5,cell.y+sp*my/mn)); }
+  // deposit: cells mature the structure they sit on (reinforce stiffer fibers more)
+  var mark=new Float32Array(px.length);
+  for(var c=0;c<cells.length;c++){ var nn=near(cells[c].x,cells[c].y,12); for(var k=0;k<nn.length;k++) mark[nn[k]]=1; }
+  for(var f=0;f<fib.length;f++){ var o=fib[f]; if(!(mark[o.i]||mark[o.j])) continue;
+    if(o.k>0.7) o.k=Math.min(3.2, o.k+0.05*(o.k/3)+0.01);   // mature existing structure
   }
 }
+// per-node stiffness (sum of incident fiber k) — for the local contact-guidance bias
+var nodeK=[];
+function computeNodeK(){ nodeK=new Float32Array(px.length); for(var f=0;f<fib.length;f++){ nodeK[fib[f].i]+=fib[f].k; nodeK[fib[f].j]+=fib[f].k; } }
 
 function colFib(k){ var t=Math.min(1,k/3.0);
   var r=Math.round(0xcf+(0x1e-0xcf)*t), g=Math.round(0xe0+(0x3a-0xe0)*t), b=Math.round(0xf5+(0x8a-0xf5)*t);
   return 'rgb('+r+','+g+','+b+')'; }
 function draw(){
   x.clearRect(0,0,W,H); x.fillStyle='#f7fafc'; x.fillRect(0,0,W,H);
-  // fibers, weak first then strong on top
-  for(var pass=0; pass<2; pass++){
-    for(var f=0;f<fib.length;f++){ var o=fib[f]; var strong=o.k>1.5;
-      if((pass===0)===strong) continue;
-      x.strokeStyle=colFib(o.k); x.lineWidth=0.5+Math.min(2.2,o.k*0.7);
-      x.beginPath(); x.moveTo(px[o.i],py[o.i]); x.lineTo(px[o.j],py[o.j]); x.stroke(); } }
-  // designed outline (dashed) — the photo-cured guide the cells trace
-  if(pat!=='free' && guideSegs.length && document.getElementById('tTarget').checked){
-    x.strokeStyle='#e0a000'; x.lineWidth=2; x.setLineDash([7,6]);
-    for(var s=0;s<guideSegs.length;s++){ var v=guideSegs[s]; x.beginPath();
-      for(var k=0;k<v.length;k++){ k?x.lineTo(v[k][0],v[k][1]):x.moveTo(v[k][0],v[k][1]); } x.stroke(); }
-    x.setLineDash([]);
-  }
-  // in-progress drawn outline (draw mode)
-  if(pat==='draw' && drawnPath.length){
-    x.strokeStyle='#0d9488'; x.lineWidth=2.5; x.beginPath();
-    for(var k=0;k<drawnPath.length;k++){ k?x.lineTo(drawnPath[k][0],drawnPath[k][1]):x.moveTo(drawnPath[k][0],drawnPath[k][1]); } x.stroke();
-  }
-  // cell trails (free mode only)
-  if(pat==='free'){ x.strokeStyle='rgba(219,39,119,0.5)'; x.lineWidth=1.4;
-    for(var c=0;c<cells.length;c++){ var cl=cells[c]; x.beginPath();
-      for(var k=0;k<cl.tx.length;k++){ k?x.lineTo(cl.tx[k],cl.ty[k]):x.moveTo(cl.tx[k],cl.ty[k]); } x.stroke(); } }
-  // cells (smaller in pattern mode — many suspension cells)
-  var cr=(pat==='free')?7:3.0, clw=(pat==='free')?2:0.7;
-  for(var c=0;c<cells.length;c++){ var cl=cells[c]; x.fillStyle='#f97316'; x.strokeStyle='#fff'; x.lineWidth=clw;
-    x.beginPath(); x.arc(cl.x,cl.y,cr,0,7); x.fill(); x.stroke(); }
+  for(var pass=0;pass<2;pass++){ for(var f=0;f<fib.length;f++){ var o=fib[f], strong=o.k>1.0;
+    if((pass===0)===strong) continue; x.strokeStyle=colFib(o.k); x.lineWidth=0.5+Math.min(2.4,o.k*0.75);
+    x.beginPath(); x.moveTo(px[o.i],py[o.i]); x.lineTo(px[o.j],py[o.j]); x.stroke(); } }
+  if(design==='draw' && drawnPath.length){ x.strokeStyle='#0d9488'; x.lineWidth=2.5; x.beginPath();
+    for(var k=0;k<drawnPath.length;k++){ k?x.lineTo(drawnPath[k][0],drawnPath[k][1]):x.moveTo(drawnPath[k][0],drawnPath[k][1]); } x.stroke(); }
+  for(var c=0;c<cells.length;c++){ var cl=cells[c]; x.fillStyle='#f97316'; x.strokeStyle='#fff'; x.lineWidth=0.7;
+    x.beginPath(); x.arc(cl.x,cl.y,2.8,0,7); x.fill(); x.stroke(); }
 }
-function meanDist(){ var d=0,n=0; for(var i=0;i<cells.length;i++)for(var j=i+1;j<cells.length;j++){
-  var dx=cells[i].x-cells[j].x, dy=cells[i].y-cells[j].y; d+=Math.hypot(dx,dy); n++; } return n?d/n:0; }
-function readout(){
-  var xl=0,rein=0; for(var f=0;f<fib.length;f++){ if(fib[f].xl)xl++; if(fib[f].k>1.5)rein++; }
+function readout(msg){
+  var nc=0, mat=0; for(var f=0;f<fib.length;f++){ if(cured[f]){ nc++; mat+=fib[f].k; } }
   document.getElementById('rFib').textContent=fib.length;
-  document.getElementById('rXl').textContent=xl;
-  document.getElementById('rRein').textContent=rein;
-  document.getElementById('rDist').textContent=Math.round(meanDist())+' px';
-  document.getElementById('rConn').textContent=(conn*100).toFixed(0)+'%';
-  var ph=document.getElementById('phase');
-  if(pat==='free'){ ph.textContent='지속적 turnover — 분비 ⇄ 장력보호 분해 (동적 평형)'; ph.className='phase morph'; }
-  else if(pat==='draw' && !guidePts.length){ ph.textContent='✎ 캔버스에 마우스로 윤곽을 그린 뒤 ▶재생'; ph.className='phase'; }
-  else { ph.textContent='가이드 추적 — 세포가 광경화 윤곽을 따라 ECM deposit'; ph.className='phase morph'; }
+  document.getElementById('rCure').textContent=nc;
+  document.getElementById('rMat').textContent=nc?(mat/nc).toFixed(2):'–';
+  if(msg!==undefined) document.getElementById('status').textContent=msg;
 }
-function loop(){ if(!running)return; step(); draw(); readout(); raf=requestAnimationFrame(loop); }
+function loop(){ if(!running)return; computeNodeK(); for(var s=0;s<2;s++) step(); draw(); readout();
+  raf=requestAnimationFrame(loop); }
 
-function setPlay(t){ document.getElementById('play').textContent=t; }
-document.getElementById('play').onclick=function(){
-  if(pat==='draw' && frame===0) reset();      // build the cured guide from the drawn outline
-  running=!running; setPlay(running?'⏸ 일시정지':'▶ 재생'); if(running)loop(); else if(raf)cancelAnimationFrame(raf); };
-document.getElementById('reset').onclick=function(){ running=false; if(raf)cancelAnimationFrame(raf);
-  setPlay('▶ 재생'); reset(); };
+document.getElementById('cure').onclick=function(){ cure(); };
+document.getElementById('play').onclick=function(){ if(!guide.length){ readout('먼저 ⚡광경화를 누르세요'); return; }
+  running=!running; this.textContent=running?'⏸ 일시정지':'▶ 배양'; if(running){ computeNodeK(); loop(); } else if(raf)cancelAnimationFrame(raf); };
+document.getElementById('reset').onclick=function(){ newGel(); };
+document.getElementById('clearPath').onclick=function(){ drawnPath=[]; guide=[]; newGel(); };
 Nc.oninput=function(){ document.getElementById('vNc').textContent=Nc.value; };
-Cw.oninput=function(){ document.getElementById('vCw').textContent=(+Cw.value).toFixed(1); };
-document.getElementById('sPat').onchange=function(){ running=false; if(raf)cancelAnimationFrame(raf); setPlay('▶ 재생');
-  pat=this.value;
-  document.getElementById('clearPath').style.display=(pat==='draw')?'':'none';
-  if(pat==='draw') drawnPath=[];
-  reset(); };
-document.getElementById('tTarget').onchange=function(){ if(!running) draw(); };
-document.getElementById('clearPath').onclick=function(){ running=false; if(raf)cancelAnimationFrame(raf);
-  setPlay('▶ 재생'); drawnPath=[]; reset(); };
-// draw-your-own outline: click/drag on the canvas to lay the photo-cure guide
-function addDrawPt(e){ if(pat!=='draw')return; var rect=cv.getBoundingClientRect();
+document.getElementById('design').onchange=function(){ design=this.value;
+  document.getElementById('clearPath').style.display=(design==='draw')?'':'none';
+  if(design==='draw') drawnPath=[]; guide=[];
+  newGel(); readout((design==='draw'?'✎ 캔버스에 윤곽을 그린 뒤':'디자인 선택 — ')+' ⚡광경화'); };
+function addPt(e){ if(design!=='draw')return; var rect=cv.getBoundingClientRect();
   var xx=(e.clientX-rect.left)*(cv._w/rect.width), yy=(e.clientY-rect.top)*(cv._h/rect.height);
   if(xx<0||yy<0||xx>W||yy>H)return; var last=drawnPath[drawnPath.length-1];
   if(!last || Math.hypot(xx-last[0],yy-last[1])>7){ drawnPath.push([xx,yy]); if(!running) draw(); } }
-cv.addEventListener('mousedown', function(e){ if(pat!=='draw')return; drawing=true; addDrawPt(e); });
-cv.addEventListener('mousemove', function(e){ if(drawing) addDrawPt(e); });
+cv.addEventListener('mousedown', function(e){ if(design!=='draw')return; drawing=true; addPt(e); });
+cv.addEventListener('mousemove', function(e){ if(drawing) addPt(e); });
 window.addEventListener('mouseup', function(){ drawing=false; });
-reset();
+newGel();
 }catch(e){ showErr(e.message); console.error(e); }
 })();
 </script>

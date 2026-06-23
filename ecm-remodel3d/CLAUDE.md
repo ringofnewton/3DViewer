@@ -1,34 +1,39 @@
 # ECM simulation — project memory
 
-## Canonical design decision (user preference — keep)
+## Canonical purpose (user-confirmed, after a reset)
 
-**The INTEGRATED, single-network simulation is the best and most natural ECM
-design. Always build on it; do not split the model into separate, disconnected
-demos.**
+**The purpose is ECM NETWORK DESIGN via GelMA photopatterning** — design the ECM
+structure you want by choosing where to photo-cure the gel. The realistic,
+canonical interactive tool is **`ecm_simulation.html`**:
 
-The reference implementation is the *one coupled simulation* where every
-mechanism runs on the **same evolving network, together**:
+- GelMA = a uniform soft fiber network with embedded cells.
+- **Photo-cure a design** (line / ring / Y-branch / grid / star / spiral / ✎draw-
+  your-own) → the fibers along that design crosslink into a dense, stiff ECM
+  network (the designed structure). The rest stays soft background.
+- **Culture (▶)** = cells locally deposit ECM and mature the cured structure
+  (contact guidance / local reinforcement only). The design thickens over time.
+- Keep the ECM-network rendering (fibers coloured by reinforcement, light→dark).
 
-1. **Continuous secretion (NOT one-shot)** — cells keep synthesizing collagen
-   every step at a kinetic rate (tapering toward a soft cap); deposition follows
-   the cells as they migrate. Do NOT secrete everything up front and then stop —
-   that was a modeling bug the user flagged.
-2. **Mechanics** — cells apply traction; the network relaxes (force balance / PBD).
-3. **Mechanochemical turnover (with a structural baseline)** — tension-saturating
-   (Hill) synthesis on loaded fibers + strain-protected MMP degradation that
-   relaxes a fiber toward a **baseline k_base (~0.3), NOT to zero**. The network
-   the cells build PERSISTS and stays visible; loaded fibers mature into bright
-   bridges; only a few unloaded fibers are slowly turned over. Do NOT degrade
-   unloaded fibers to nothing — that made the whole network vanish (user flagged
-   "다 분해된다"). Turnover is a slow modulation on a persistent structure, not
-   dissolution. Mirrors `ecm_mechanochem.py`.
-4. **Migration** — cells sense stiffness (durotaxis) and signal each other
-   (chemotaxis) to move.
-5. **Aggregation** — cells cluster along the reinforced inter-cell bridges they
-   build (cell–cell separation keeps them a cluster, not a collapsed point).
+### DEPRECATED as unrealistic (do NOT re-add) — user flagged "엉망"
+The user found these UNREALISTIC; they were removed and must not come back into
+the main simulation:
+- **chemotaxis / cell–cell aggregation** ("자석" effect — cells rushing together),
+- **long-range cell migration / durotaxis homing to distant anchors** (gave blobs),
+- coupled "morphogenesis" where cells migrate+aggregate to self-organize topology.
+Cells in the canonical tool only do LOCAL contact-guided ECM deposition. No
+chemotaxis, no long-range homing, no aggregation.
 
-Realism rule: ECM kinetics must be CONTINUOUS (ongoing synthesis ⇄ degradation,
-dynamic equilibrium), never a single burst followed by a frozen network.
+Removed artifacts (churn from the unrealistic phase): build_aggregation_gif.py,
+build_durotaxis_gif.py, build_integrated_gif.py, build_patterns_fig.py,
+build_cure_compare.py and their figures. (coupled_sim.py / ecm_cells.py chemotaxis
+remain only as old research scripts, NOT the main sim.)
+
+### Kept (realistic) supporting pieces
+- `build_arbitrary_fig.py` → ecm_arbitrary.png: arbitrary shapes ARE achievable by
+  curing the outline as a continuous guide (verified: star 81% / spiral 100% /
+  wave 97% on-target).
+- `build_formation_gif.py` → ecm_formation.gif: cells secreting an ECM network.
+- Research validation (rheology / KS-EMD / MCMC) lives separately and is unaffected.
 
 ### NOT a substrate-attached model
 Bulk matrix model (cells embedded in / contracting a fiber network), NOT cells
