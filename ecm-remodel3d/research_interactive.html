@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ECM 연구 업그레이드 — 인터랙티브</title>
+<style>
+  :root{ --bg:#eef1f6; --card:#fff; --ink:#1f2933; --muted:#5b6776; --line:#e2e8f0;
+         --soft:#f1f5f9; --blue:#2563eb; --green:#059669; --purple:#7c3aed; --pink:#db2777; }
+  *{ box-sizing:border-box }
+  body{ margin:0; background:var(--bg); color:var(--ink);
+        font-family:'Apple SD Gothic Neo','Noto Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+        line-height:1.6; -webkit-font-smoothing:antialiased; }
+  header{ max-width:1080px; margin:0 auto; padding:46px 24px 6px; }
+  header h1{ font-size:28px; margin:0 0 8px; letter-spacing:-.02em; }
+  header p{ font-size:16px; color:var(--muted); margin:0; max-width:780px; }
+  .pill{ display:inline-block; font-size:12.5px; font-weight:600; color:#0b7285;
+         background:#d7f0f3; border-radius:999px; padding:3px 11px; margin-bottom:14px; }
+  main{ max-width:1080px; margin:0 auto; padding:14px 24px 70px; }
+  .card{ background:var(--card); border:1px solid var(--line); border-left:5px solid var(--c);
+         border-radius:14px; padding:22px 24px; margin:20px 0;
+         box-shadow:0 1px 2px rgba(15,23,42,.04),0 8px 24px rgba(15,23,42,.05); }
+  .head{ display:flex; align-items:center; gap:14px; margin-bottom:6px; }
+  .badge{ flex:none; width:38px; height:38px; border-radius:10px; background:var(--c);
+          color:#fff; font-weight:800; font-size:19px; display:grid; place-items:center; }
+  .head h2{ font-size:19px; margin:0; }
+  .head .sub{ margin:1px 0 0; color:var(--muted); font-size:13px;
+              font-family:ui-monospace,Menlo,monospace; }
+  .intro{ font-size:14.5px; color:#334155; margin:8px 0 14px; }
+  .stage{ display:grid; grid-template-columns:1fr 1fr; gap:22px; align-items:start; }
+  @media(max-width:840px){ .stage{ grid-template-columns:1fr; } }
+  .controls{ display:flex; flex-wrap:wrap; gap:14px 20px; align-items:center; margin:4px 0 12px;
+             padding:12px 14px; background:var(--soft); border-radius:10px; }
+  .ctl{ display:flex; flex-direction:column; gap:3px; font-size:12.5px; color:var(--muted); min-width:150px; }
+  .ctl b{ color:var(--ink); font-weight:700; font-family:ui-monospace,Menlo,monospace; }
+  input[type=range]{ width:170px; accent-color:var(--c); }
+  button{ font:inherit; font-size:13.5px; font-weight:600; color:#fff; background:var(--c);
+          border:0; border-radius:8px; padding:8px 14px; cursor:pointer; }
+  button.ghost{ background:#fff; color:var(--ink); border:1px solid var(--line); }
+  .toggle{ display:inline-flex; align-items:center; gap:7px; cursor:pointer; font-size:13.5px;
+           font-weight:600; color:var(--ink); user-select:none; }
+  canvas{ width:100%; background:#fff; border:1px solid var(--line); border-radius:10px; display:block; }
+  .readout{ font-size:13.5px; color:#334155; margin-top:8px; }
+  .readout .k{ font-family:ui-monospace,Menlo,monospace; font-weight:700; color:var(--c); }
+  .note{ font-size:12.5px; color:var(--muted); margin-top:8px; }
+  code{ background:#eef2f7; padding:1px 6px; border-radius:5px; font-size:12.5px;
+        font-family:ui-monospace,Menlo,monospace; }
+  #err{ display:none; max-width:1080px; margin:10px auto; padding:12px 16px; background:#fee2e2;
+        color:#b91c1c; border:1px solid #fca5a5; border-radius:10px; font-size:14px; }
+  footer{ max-width:1080px; margin:0 auto; padding:0 24px 60px; color:var(--muted); font-size:13px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="pill">interactive · 직접 실행해 보세요</div>
+  <h1>ECM 연구 업그레이드 — 인터랙티브</h1>
+  <p>맨 위는 모델의 출발점 — 세포가 ECM 네트워크를 형성하는 과정 — 이고, 그 아래는 네 가지
+  연구 업그레이드입니다. 모두 브라우저에서 직접 돌려볼 수 있게 만들었어요. 슬라이더를 움직이고,
+  토글을 켜고, 시뮬레이션을 재생해 보세요 — 전부 이 페이지 안에서 실시간 계산됩니다.</p>
+</header>
+<div id="err"></div>
+<main>
+
+  <!-- Formation -->
+  <section class="card" style="--c:#0d9488">
+    <div class="head"><span class="badge">★</span><div>
+      <h2>ECM 네트워크 형성 — 세포가 직접 생성</h2>
+      <div class="sub">cells secrete &amp; crosslink collagen outward · 실시간 성장</div></div></div>
+    <p class="intro">이게 모델의 출발점입니다. 세포(주황)가 콜라겐 섬유를 <b>바깥으로</b> 뻗고,
+    가까이 만난 섬유끼리 <b>크로스링크</b>되어 연결된 네트워크가 자라납니다 — “자석이 조각을
+    끌어당기는” 게 아니라 세포가 매트릭스를 <b>생성</b>해요. ▶재생을 눌러 형성 과정을 보세요.</p>
+    <div class="controls">
+      <button id="fPlay">▶ 재생</button>
+      <button class="ghost" id="fReset">↺ 리셋</button>
+      <label class="ctl">분기 확률 <b id="fBr">0.10</b><input id="fBrs" type="range" min="0.02" max="0.25" step="0.01" value="0.10"></label>
+      <label class="ctl">세포 수 <b id="fNc">10</b><input id="fNcs" type="range" min="4" max="18" step="1" value="10"></label>
+    </div>
+    <div class="stage">
+      <div><canvas id="fSim" height="360"></canvas></div>
+      <div><div class="readout" id="fRead"></div>
+        <div class="note">파랑=콜라겐 섬유 · 회색 점=크로스링크(연결) · 주황=세포. 섬유들이 서로
+        만나 크로스링크되며 공간을 채우는 연결망이 형성됩니다. (2D 도식 — 실제 모델은 3D이고
+        같은 규칙으로 작동, 정적 GIF로도 보냈어요.)</div></div>
+    </div>
+  </section>
+
+  <!-- A -->
+  <section class="card" style="--c:var(--blue)">
+    <div class="head"><span class="badge">A</span><div>
+      <h2>비선형 섬유 역학 + floppy-mode 솔버</h2>
+      <div class="sub">force-extension 라이브 계산 · FIRE vs Newton 수렴(실측 데이터)</div></div></div>
+    <p class="intro">왼쪽: 콜라겐 섬유의 비대칭 좌굴 + 변형 경화 구성식을 슬라이더로 직접
+    계산합니다(압축은 약하게 좌굴, 인장은 경화). 오른쪽: 실제 측정한 전단 스윕 — FIRE는
+    선형 영역 너머에서 힘 평형에 실패하지만, Newton 솔버는 강성 전이 γ_c까지 도달합니다.
+    γ 슬라이더로 두 솔버의 잔차를 비교해 보세요.</p>
+    <div class="controls">
+      <label class="ctl">buckle_ratio <b id="aB">0.02</b><input id="aBs" type="range" min="0.005" max="0.4" step="0.005" value="0.02"></label>
+      <label class="ctl">stiffen_alpha <b id="aA">6.0</b><input id="aAs" type="range" min="0" max="14" step="0.5" value="6"></label>
+      <label class="ctl">shear strain γ <b id="aG">0.08</b><input id="aGs" type="range" min="0" max="9" step="1" value="2"></label>
+    </div>
+    <div class="stage">
+      <div><canvas id="aFE" height="260"></canvas><div class="note">섬유 1개의 장력 vs 변형 — 0 근처에서 꺾임(좌굴), 인장에서 위로 휨(경화)</div></div>
+      <div><canvas id="aCV" height="260"></canvas><div class="readout" id="aRead"></div></div>
+    </div>
+  </section>
+
+  <!-- B -->
+  <section class="card" style="--c:var(--green)">
+    <div class="head"><span class="badge">B</span><div>
+      <h2>분포 적합도 — KS / EMD (디지타이즈 데이터 대비)</h2>
+      <div class="sub">binned KS · Wasserstein-1 · 실시간 계산</div></div></div>
+    <p class="intro">모델 pore 분포(초록)를 디지타이즈된 참조 히스토그램(회색 막대)에 맞춰
+    보세요. 중앙값을 맞춰도(스케일 일치) <b>모양이 다르면 KS가 잡아냅니다</b>. 슬라이더로
+    중앙값과 퍼짐을 바꾸면 D·p·EMD가 실시간으로 갱신됩니다. (참고: 로그정규로는 데이터에
+    잘 맞출 수 있지만, 실제 ECM 모델의 emergent 분포는 이 참조와 <b>D=0.087로 구분</b>됩니다 —
+    이게 연구 결과의 핵심: 중앙값 일치 ≠ 분포 일치.)</p>
+    <div class="controls">
+      <label class="ctl">모델 중앙값 (µm) <b id="bM">22</b><input id="bMs" type="range" min="8" max="45" step="0.5" value="22"></label>
+      <label class="ctl">로그 퍼짐 σ <b id="bS">0.55</b><input id="bSs" type="range" min="0.2" max="0.9" step="0.02" value="0.55"></label>
+      <button class="ghost" id="bFit">참조에 맞추기</button>
+    </div>
+    <div class="stage">
+      <div><canvas id="bHist" height="260"></canvas><div class="note">초록 곡선=모델 밀도 · 회색 막대=디지타이즈 참조(<code>collagen_pore_um.csv</code>, 453 pores)</div></div>
+      <div><canvas id="bCDF" height="260"></canvas><div class="readout" id="bRead"></div></div>
+    </div>
+  </section>
+
+  <!-- C -->
+  <section class="card" style="--c:var(--purple)">
+    <div class="head"><span class="badge">C</span><div>
+      <h2>베이즈 추론 — 라이브 사후분포</h2>
+      <div class="sub">실측 forward 응답 · 관측값+노이즈 → 사후분포</div></div></div>
+    <p class="intro">실제 forward 모델로 계산한 bridge 신호 vs <code>buckle_ratio</code> 곡선(왼쪽)을
+    씁니다. 관측값과 관측 노이즈를 정하면, 오른쪽에 <code>buckle_ratio</code>의 사후분포가
+    실시간으로 계산됩니다(가능도 × 균일 사전). 노이즈를 키우면 사후가 넓어지는 걸 보세요.</p>
+    <div class="controls">
+      <label class="ctl">관측값 (bridge) <b id="cD">0.239</b><input id="cDs" type="range" min="0.13" max="0.25" step="0.002" value="0.239"></label>
+      <label class="ctl">관측 노이즈 σ <b id="cN">0.025</b><input id="cNs" type="range" min="0.005" max="0.08" step="0.001" value="0.025"></label>
+    </div>
+    <div class="stage">
+      <div><canvas id="cFwd" height="240"></canvas><div class="note">실측 forward: bridge 신호는 buckle_ratio가 커질수록 감소(단조)</div></div>
+      <div><canvas id="cPost" height="240"></canvas><div class="readout" id="cRead"></div></div>
+    </div>
+  </section>
+
+  <!-- D -->
+  <section class="card" style="--c:var(--pink)">
+    <div class="head"><span class="badge">D</span><div>
+      <h2>세포 응집 — 라이브 시뮬레이션</h2>
+      <div class="sub">durotaxis ± chemotaxis · 실시간 ABM</div></div></div>
+    <p class="intro">세포(주황)가 자기가 만든 강성장(파랑)을 따라 이동합니다. <b>chemotaxis를
+    끄면</b> 각자 자기 강성만 따라가 흩어지고, <b>켜면</b> 서로를 향한 화학 신호로 모입니다.
+    재생하고 토글을 바꿔 보세요 — 평균 세포간 거리가 실시간으로 표시됩니다.</p>
+    <div class="controls">
+      <button id="dPlay">▶ 재생</button>
+      <button class="ghost" id="dReset">↺ 리셋</button>
+      <label class="toggle"><input id="dChemo" type="checkbox" checked> chemotaxis 켬</label>
+      <label class="ctl">chemotaxis 세기 <b id="dCw">2.0</b><input id="dCws" type="range" min="0" max="3.5" step="0.1" value="2.0"></label>
+    </div>
+    <div class="stage">
+      <div><canvas id="dSim" height="360"></canvas></div>
+      <div><canvas id="dPlot" height="170"></canvas><div class="readout" id="dRead"></div>
+        <div class="note">실제 3D 모델 결과와 동일한 경향: durotaxis만 → 분산(거리 증가),
+        +chemotaxis → 응집(거리 감소). 강화 네트워크(파랑 흔적)는 양쪽 다 생깁니다.</div></div>
+    </div>
+  </section>
+
+</main>
+<footer>전부 이 페이지 안에서 실시간 계산됩니다(외부 서버·인터넷 불필요). 비인터랙티브
+  요약본은 <code>research_upgrades.html</code>, 전체 서술은 <code>RESEARCH_UPGRADES.md</code>.</footer>
+
+<script>
+(function(){
+"use strict";
+function showErr(m){ var e=document.getElementById('err'); e.style.display='block';
+  e.textContent='데모 오류: '+m; }
+function safe(name,fn){ try{ fn(); }catch(e){ showErr(name+' — '+e.message); console.error(e); } }
+
+// crisp canvas sizing
+function setup(cv){ var dpr=window.devicePixelRatio||1; var w=cv.clientWidth||cv.width;
+  var h=cv.getAttribute('height')*1; cv.width=w*dpr; cv.height=h*dpr;
+  var x=cv.getContext('2d'); x.scale(dpr,dpr); cv._w=w; cv._h=h; return x; }
+function erf(x){ var s=x<0?-1:1; x=Math.abs(x); var t=1/(1+0.3275911*x);
+  var y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);
+  return s*y; }
+
+/* ---------- embedded REAL data ---------- */
+var RHEO={ g:[0.02,0.05,0.08,0.11,0.13,0.15,0.16,0.17,0.18,0.20],
+  fire:[0.095,11.951,57.71,218.327,203.542,409.568,296.691,359.744,593.028,14115.4],
+  newt:[0.024,0.011,0.019,0.024,0.023,0.024,225.691,915.404,323.439,574.261],
+  sig:[0.00001,0.00003,0.00004,0.00007,0.00009,0.00012,0.2524,0.39461,0.31883,0.26126],
+  su:155.8, ftol:0.025, gc:0.15 };
+var PORE=[[0,5,8],[5,10,34],[10,15,70],[15,20,78],[20,25,70],[25,30,55],[30,35,42],
+  [35,40,30],[40,45,22],[45,50,15],[50,55,10],[55,60,7],[60,65,5],[65,70,3],[70,75,2],
+  [75,80,1],[80,85,1]];
+var BRIDGE={ br:[0.005,0.0354,0.0658,0.0962,0.1265,0.1569,0.1873,0.2177,0.2481,0.2785,0.3088,0.3392,0.3696,0.4],
+  val:[0.2495,0.2175,0.1938,0.1783,0.1713,0.1645,0.1605,0.1575,0.1527,0.1483,0.1466,0.1495,0.1482,0.1332] };
+
+/* tiny plot helpers (data coords -> pixels) */
+function axes(x,w,h,pad){ x.strokeStyle='#cbd5e1'; x.lineWidth=1; x.beginPath();
+  x.moveTo(pad,6); x.lineTo(pad,h-pad); x.lineTo(w-6,h-pad); x.stroke(); }
+function lerp(xs,ys,xq){ if(xq<=xs[0])return ys[0]; if(xq>=xs[xs.length-1])return ys[ys.length-1];
+  for(var i=1;i<xs.length;i++){ if(xq<=xs[i]){ var t=(xq-xs[i-1])/(xs[i]-xs[i-1]);
+    return ys[i-1]+t*(ys[i]-ys[i-1]); } } return ys[ys.length-1]; }
+
+/* ================= Formation : cells grow the ECM network ================= */
+safe('Formation',function(){
+  var cv=document.getElementById('fSim'); var x=setup(cv); var L=cv._w;
+  var Brs=document.getElementById('fBrs'), Ncs=document.getElementById('fNcs');
+  var tips,fibers,xlinks,grid,GS,cells,nodeCount,running=false,raf=null;
+  function key(ix,iy){ return ix+','+iy; }
+  function addNode(px,py){ var ix=(px/GS)|0,iy=(py/GS)|0,k=key(ix,iy);
+    (grid[k]||(grid[k]=[])).push([px,py]); nodeCount++; }
+  function nearNode(px,py,d){ var ix=(px/GS)|0,iy=(py/GS)|0;
+    for(var a=-1;a<=1;a++)for(var b=-1;b<=1;b++){ var arr=grid[key(ix+a,iy+b)]; if(!arr)continue;
+      for(var n=0;n<arr.length;n++){ var dx=arr[n][0]-px,dy=arr[n][1]-py; if(dx*dx+dy*dy<d*d)return true; } } return false; }
+  function reset(){ var nc=+Ncs.value; document.getElementById('fNc').textContent=nc;
+    document.getElementById('fBr').textContent=(+Brs.value).toFixed(2);
+    tips=[];fibers=[];xlinks=[];nodeCount=0;GS=8;grid={};cells=[];
+    var cx=L/2,cy=L/2,R=L*0.16;
+    for(var i=0;i<nc;i++){ var a=2*Math.PI*i/nc,px=cx+R*Math.cos(a),py=cy+R*Math.sin(a);
+      cells.push({x:px,y:py}); var nt=4+((Math.random()*3)|0);
+      for(var t=0;t<nt;t++){ var d=2*Math.PI*Math.random();
+        tips.push({x:px,y:py,dx:Math.cos(d),dy:Math.sin(d),life:30+((Math.random()*30)|0)}); } }
+    draw(); readout(); }
+  function step(){ var br=+Brs.value,seg=4.5,pers=0.82,nt=[];
+    for(var i=0;i<tips.length;i++){ var tp=tips[i];
+      var rd=Math.random()*2*Math.PI, ndx=pers*tp.dx+(1-pers)*Math.cos(rd), ndy=pers*tp.dy+(1-pers)*Math.sin(rd);
+      var nn=Math.hypot(ndx,ndy)||1; ndx/=nn; ndy/=nn;
+      var nx=tp.x+seg*ndx, ny=tp.y+seg*ndy;
+      if(nx<4||ny<4||nx>L-4||ny>L-4||tp.life<=0||nodeCount>2600) continue;
+      fibers.push([tp.x,tp.y,nx,ny]); if(nearNode(nx,ny,5)) xlinks.push([nx,ny]); addNode(nx,ny);
+      tp.x=nx;tp.y=ny;tp.dx=ndx;tp.dy=ndy;tp.life--; nt.push(tp);
+      if(Math.random()<br && (tips.length+nt.length)<170){ var ang=Math.atan2(ndy,ndx)+(Math.random()-0.5)*1.4;
+        nt.push({x:nx,y:ny,dx:Math.cos(ang),dy:Math.sin(ang),life:20+((Math.random()*20)|0)}); } }
+    tips=nt; }
+  function draw(){ x.clearRect(0,0,L,cv._h); x.fillStyle='#f7fafc'; x.fillRect(0,0,L,cv._h);
+    x.strokeStyle='#3b82f6'; x.lineWidth=1; x.globalAlpha=0.72; x.beginPath();
+    for(var i=0;i<fibers.length;i++){ var f=fibers[i]; x.moveTo(f[0],f[1]); x.lineTo(f[2],f[3]); } x.stroke();
+    x.globalAlpha=1; x.fillStyle='#94a3b8';
+    for(var i=0;i<xlinks.length;i++){ x.beginPath(); x.arc(xlinks[i][0],xlinks[i][1],1.6,0,7); x.fill(); }
+    for(var i=0;i<cells.length;i++){ x.fillStyle='#f97316'; x.strokeStyle='#fff'; x.lineWidth=2;
+      x.beginPath(); x.arc(cells[i].x,cells[i].y,7,0,7); x.fill(); x.stroke(); } }
+  function readout(){ document.getElementById('fRead').innerHTML='섬유 세그먼트: <span class="k">'+fibers.length+
+    '</span> · 크로스링크: <span class="k">'+xlinks.length+'</span> · 활성 팁: <b>'+tips.length+'</b>'+
+    (tips.length===0&&fibers.length>0?' — 형성 완료':''); }
+  function loop(){ if(!running)return; for(var s=0;s<2;s++)step(); draw(); readout();
+    if(tips.length===0){ running=false; document.getElementById('fPlay').textContent='▶ 재생'; return; }
+    raf=requestAnimationFrame(loop); }
+  document.getElementById('fPlay').onclick=function(){ if(tips.length===0)reset(); running=!running;
+    this.textContent=running?'⏸ 일시정지':'▶ 재생'; if(running)loop(); else if(raf)cancelAnimationFrame(raf); };
+  document.getElementById('fReset').onclick=function(){ running=false; if(raf)cancelAnimationFrame(raf);
+    document.getElementById('fPlay').textContent='▶ 재생'; reset(); };
+  Brs.oninput=function(){ document.getElementById('fBr').textContent=(+Brs.value).toFixed(2); };
+  Ncs.oninput=reset; reset();
+});
+
+/* ================= A : fiber + solver ================= */
+safe('A',function(){
+  var feC=document.getElementById('aFE'), cvC=document.getElementById('aCV');
+  var fe=setup(feC), cv=setup(cvC);
+  var Bs=document.getElementById('aBs'),As=document.getElementById('aAs'),Gs=document.getElementById('aGs');
+  function tension(e,b,a){ var sw=0.5*(1+Math.tanh(e/0.03));
+    var k=(b+(1-b)*sw)*(1+a*Math.max(e,0)); return k*e; }
+  function drawFE(){ var b=+Bs.value,a=+As.value; document.getElementById('aB').textContent=b.toFixed(3);
+    document.getElementById('aA').textContent=a.toFixed(1);
+    var w=feC._w,h=feC._h,pad=34; fe.clearRect(0,0,w,h); axes(fe,w,h,pad);
+    var e0=-0.3,e1=0.5, tlist=[]; for(var i=0;i<=120;i++){ var e=e0+(e1-e0)*i/120; tlist.push(tension(e,b,a)); }
+    var tmax=Math.max.apply(null,tlist.map(Math.abs))*1.05||1;
+    function X(e){ return pad+(e-e0)/(e1-e0)*(w-pad-8); }
+    function Y(t){ return (h-pad)/2 - t/tmax*((h-pad)/2-8) + 0; }
+    fe.strokeStyle='#e2e8f0'; fe.beginPath(); fe.moveTo(pad,Y(0)); fe.lineTo(w-8,Y(0)); fe.stroke();
+    fe.strokeStyle='#94a3b8'; fe.beginPath(); fe.moveTo(X(0),6); fe.lineTo(X(0),h-pad); fe.stroke();
+    fe.strokeStyle='#2563eb'; fe.lineWidth=2.4; fe.beginPath();
+    for(var i=0;i<=120;i++){ var e=e0+(e1-e0)*i/120; var px=X(e),py=Y(tlist[i]);
+      i?fe.lineTo(px,py):fe.moveTo(px,py);} fe.stroke();
+    fe.fillStyle='#64748b'; fe.font='11px sans-serif';
+    fe.fillText('압축(좌굴)',pad+4,h-pad+14); fe.fillText('인장(경화) →',w-110,h-pad+14);
+    fe.fillText('장력',6,16); }
+  function drawCV(){ var gi=+Gs.value|0; var g=RHEO.g[gi];
+    document.getElementById('aG').textContent=g.toFixed(2);
+    var w=cvC._w,h=cvC._h,pad=40; cv.clearRect(0,0,w,h); axes(cv,w,h,pad);
+    var lo=Math.log10(0.005), hi=Math.log10(2e4);
+    function X(i){ return pad+i/(RHEO.g.length-1)*(w-pad-8); }
+    function Y(v){ var l=Math.log10(Math.max(v,0.005)); return (h-pad)-(l-lo)/(hi-lo)*(h-pad-8); }
+    // ftol line + transition
+    cv.strokeStyle='#cbd5e1'; cv.setLineDash([4,3]); cv.beginPath();
+    cv.moveTo(pad,Y(RHEO.ftol)); cv.lineTo(w-8,Y(RHEO.ftol)); cv.stroke(); cv.setLineDash([]);
+    cv.fillStyle='#94a3b8'; cv.font='10px sans-serif'; cv.fillText('ftol',w-30,Y(RHEO.ftol)-3);
+    function line(arr,col){ cv.strokeStyle=col; cv.lineWidth=2.2; cv.beginPath();
+      for(var i=0;i<arr.length;i++){ var px=X(i),py=Y(arr[i]); i?cv.lineTo(px,py):cv.moveTo(px,py);} cv.stroke();
+      for(var i=0;i<arr.length;i++){ cv.fillStyle=col; cv.beginPath(); cv.arc(X(i),Y(arr[i]),2.5,0,7); cv.fill(); } }
+    line(RHEO.fire,'#94a3b8'); line(RHEO.newt,'#2563eb');
+    // current gamma marker
+    cv.strokeStyle='#db2777'; cv.lineWidth=1.5; cv.beginPath(); cv.moveTo(X(gi),6); cv.lineTo(X(gi),h-pad); cv.stroke();
+    cv.fillStyle='#64748b'; cv.font='11px sans-serif';
+    cv.fillText('잔차 max force (log)',pad,14); cv.fillText('FIRE',w-110,h-pad-2);
+    cv.fillStyle='#2563eb'; cv.fillText('Newton',w-60,h-pad-2);
+    var fb=RHEO.fire[gi]<RHEO.ftol, nb=RHEO.newt[gi]<RHEO.ftol;
+    document.getElementById('aRead').innerHTML=
+      'γ=<span class="k">'+g.toFixed(2)+'</span> 에서 — FIRE 힘평형: <b>'+(fb?'✓':'✗ ('+RHEO.fire[gi].toFixed(1)+')')+
+      '</b> · Newton: <b>'+(nb?'✓':'✗ ('+RHEO.newt[gi].toFixed(0)+')')+'</b> · 응력 σ='+
+      (RHEO.sig[gi]*RHEO.su).toFixed(3)+' Pa'+
+      (g>RHEO.gc?'  — 강성 전이 위(near-singular, 둘 다 미수렴; Newton 잔차가 ~10× 낮음)':'  — Newton 힘평형 달성, FIRE 실패'); }
+  Bs.oninput=drawFE; As.oninput=drawFE; Gs.oninput=drawCV; drawFE(); drawCV();
+});
+
+/* ================= B : KS / EMD ================= */
+safe('B',function(){
+  var hC=document.getElementById('bHist'), cC=document.getElementById('bCDF');
+  var hx=setup(hC), cx=setup(cC);
+  var Ms=document.getElementById('bMs'),Ss=document.getElementById('bSs');
+  var lo=0, hi=85, N=400;
+  // reference piecewise-linear CDF from bins
+  var tot=0; PORE.forEach(function(b){tot+=b[2];});
+  var cum=[]; var run=0; PORE.forEach(function(b){ cum.push(run); run+=b[2]; });
+  function refCDF(x){ if(x<=PORE[0][0])return 0; if(x>=PORE[PORE.length-1][1])return 1;
+    for(var k=0;k<PORE.length;k++){ if(x<PORE[k][1]){ return (cum[k]+PORE[k][2]*(x-PORE[k][0])/(PORE[k][1]-PORE[k][0]))/tot; } } return 1; }
+  function lnCDF(x,med,sig){ if(x<=0)return 0; return 0.5*(1+erf(Math.log(x/med)/(sig*Math.SQRT2))); }
+  function compute(med,sig){ var D=0,xstar=0,emd=0,prev=null;
+    for(var i=0;i<=N;i++){ var x=lo+(hi-lo)*i/N; var F=lnCDF(x,med,sig),G=refCDF(x);
+      var d=Math.abs(F-G); if(d>D){D=d;xstar=x;} if(prev!==null){ emd+=Math.abs(F-G)*(hi-lo)/N; } prev=1; }
+    var n1=2000,n2=tot, ne=n1*n2/(n1+n2);
+    var lam=(Math.sqrt(ne)+0.12+0.11/Math.sqrt(ne))*D;
+    var p=0; for(var k=1;k<=100;k++){ p+=2*Math.pow(-1,k-1)*Math.exp(-2*k*k*lam*lam); }
+    p=Math.min(Math.max(p,0),1); return {D:D,p:p,emd:emd,xstar:xstar}; }
+  function draw(){ var med=+Ms.value,sig=+Ss.value;
+    document.getElementById('bM').textContent=med.toFixed(0); document.getElementById('bS').textContent=sig.toFixed(2);
+    var r=compute(med,sig);
+    // hist + model density
+    var w=hC._w,h=hC._h,pad=30; hx.clearRect(0,0,w,h); axes(hx,w,h,pad);
+    var maxden=0; PORE.forEach(function(b){ var d=b[2]/(tot*(b[1]-b[0])); if(d>maxden)maxden=d; });
+    function mden(x){ if(x<=0)return 0; return Math.exp(-Math.pow(Math.log(x/med),2)/(2*sig*sig))/(x*sig*Math.sqrt(2*Math.PI)); }
+    for(var x=0.5;x<hi;x+=0.5){ if(mden(x)>maxden)maxden=mden(x); }
+    function X(v){ return pad+v/hi*(w-pad-8); } function Y(d){ return (h-pad)-d/(maxden*1.1)*(h-pad-10); }
+    PORE.forEach(function(b){ var d=b[2]/(tot*(b[1]-b[0]));
+      hx.fillStyle='#cbd5e1'; hx.fillRect(X(b[0]),Y(d),X(b[1])-X(b[0])-1,(h-pad)-Y(d)); });
+    hx.strokeStyle='#059669'; hx.lineWidth=2.4; hx.beginPath();
+    for(var i=0;i<=N;i++){ var x=lo+(hi-lo)*i/N; var px=X(x),py=Y(mden(x)); i?hx.lineTo(px,py):hx.moveTo(px,py);} hx.stroke();
+    hx.fillStyle='#64748b'; hx.font='11px sans-serif'; hx.fillText('pore size (µm)',w-90,h-pad+14); hx.fillText('밀도',6,14);
+    // CDF overlay + D marker
+    var pad2=30; cx.clearRect(0,0,w,h); axes(cx,w,h,pad2);
+    function Yc(F){ return (h-pad2)-F*(h-pad2-10); }
+    cx.strokeStyle='#94a3b8'; cx.lineWidth=2; cx.beginPath();
+    for(var i=0;i<=N;i++){ var x=lo+(hi-lo)*i/N; var px=X(x),py=Yc(refCDF(x)); i?cx.lineTo(px,py):cx.moveTo(px,py);} cx.stroke();
+    cx.strokeStyle='#059669'; cx.beginPath();
+    for(var i=0;i<=N;i++){ var x=lo+(hi-lo)*i/N; var px=X(x),py=Yc(lnCDF(x,med,sig)); i?cx.lineTo(px,py):cx.moveTo(px,py);} cx.stroke();
+    cx.strokeStyle='#db2777'; cx.lineWidth=1.6; cx.beginPath();
+    cx.moveTo(X(r.xstar),Yc(refCDF(r.xstar))); cx.lineTo(X(r.xstar),Yc(lnCDF(r.xstar,med,sig))); cx.stroke();
+    cx.fillStyle='#64748b'; cx.font='11px sans-serif'; cx.fillText('CDF: 회색=참조, 초록=모델, 분홍=KS D',pad2,14);
+    document.getElementById('bRead').innerHTML='KS D=<span class="k">'+r.D.toFixed(3)+
+      '</span> · p=<span class="k">'+(r.p<1e-4?'<1e-4':r.p.toFixed(3))+
+      '</span> · EMD=<span class="k">'+r.emd.toFixed(2)+' µm</span> → '+
+      (r.p>0.05?'참조와 구분 안 됨 (적합)':'참조와 <b>구분됨</b> (모양 차이 검출)'); }
+  Ms.oninput=draw; Ss.oninput=draw;
+  document.getElementById('bFit').onclick=function(){ Ms.value=22; Ss.value=0.55; draw(); };
+  draw();
+});
+
+/* ================= C : Bayesian ================= */
+safe('C',function(){
+  var fC=document.getElementById('cFwd'), pC=document.getElementById('cPost');
+  var fx=setup(fC), px=setup(pC);
+  var Ds=document.getElementById('cDs'),Ns=document.getElementById('cNs');
+  var blo=0.005,bhi=0.4,N=200;
+  function fwd(br){ return lerp(BRIDGE.br,BRIDGE.val,br); }
+  function draw(){ var data=+Ds.value,sig=+Ns.value;
+    document.getElementById('cD').textContent=data.toFixed(3); document.getElementById('cN').textContent=sig.toFixed(3);
+    // forward curve
+    var w=fC._w,h=fC._h,pad=38; fx.clearRect(0,0,w,h); axes(fx,w,h,pad);
+    var vmin=0.12,vmax=0.26;
+    function X(br){ return pad+(br-blo)/(bhi-blo)*(w-pad-8); }
+    function Yf(v){ return (h-pad)-(v-vmin)/(vmax-vmin)*(h-pad-10); }
+    fx.strokeStyle='#7c3aed'; fx.lineWidth=2.4; fx.beginPath();
+    for(var i=0;i<BRIDGE.br.length;i++){ var px2=X(BRIDGE.br[i]),py=Yf(BRIDGE.val[i]); i?fx.lineTo(px2,py):fx.moveTo(px2,py);} fx.stroke();
+    fx.strokeStyle='#db2777'; fx.setLineDash([5,3]); fx.beginPath(); fx.moveTo(pad,Yf(data)); fx.lineTo(w-8,Yf(data)); fx.stroke(); fx.setLineDash([]);
+    fx.fillStyle='#64748b'; fx.font='11px sans-serif'; fx.fillText('bridge 신호',pad,14); fx.fillText('buckle_ratio →',w-100,h-pad+14);
+    fx.fillStyle='#db2777'; fx.fillText('관측값',w-46,Yf(data)-4);
+    // posterior on grid
+    var post=[],mx=-1e9; for(var i=0;i<=N;i++){ var br=blo+(bhi-blo)*i/N; var ll=-0.5*Math.pow((fwd(br)-data)/sig,2); post.push(ll); if(ll>mx)mx=ll; }
+    var s=0; for(var i=0;i<=N;i++){ post[i]=Math.exp(post[i]-mx); s+=post[i]; }
+    var mean=0; for(var i=0;i<=N;i++){ post[i]/=s; mean+=(blo+(bhi-blo)*i/N)*post[i]; }
+    var varr=0; for(var i=0;i<=N;i++){ var br=blo+(bhi-blo)*i/N; varr+=post[i]*(br-mean)*(br-mean); }
+    var sd=Math.sqrt(varr), pmax=Math.max.apply(null,post);
+    var w2=pC._w,h2=pC._h,pad3=34; px.clearRect(0,0,w2,h2); axes(px,w2,h2,pad3);
+    function Xp(br){ return pad3+(br-blo)/(bhi-blo)*(w2-pad3-8); } function Yp(v){ return (h2-pad3)-v/(pmax*1.1)*(h2-pad3-10); }
+    px.fillStyle='rgba(124,58,237,0.18)'; px.strokeStyle='#7c3aed'; px.lineWidth=2.2; px.beginPath();
+    px.moveTo(Xp(blo),h2-pad3);
+    for(var i=0;i<=N;i++){ var br=blo+(bhi-blo)*i/N; px.lineTo(Xp(br),Yp(post[i])); }
+    px.lineTo(Xp(bhi),h2-pad3); px.closePath(); px.fill(); px.stroke();
+    px.strokeStyle='#db2777'; px.lineWidth=1.6; px.beginPath(); px.moveTo(Xp(0.02),12); px.lineTo(Xp(0.02),h2-pad3); px.stroke();
+    px.fillStyle='#64748b'; px.font='11px sans-serif'; px.fillText('P(buckle_ratio | 관측)',pad3,14); px.fillText('참값 0.02',Xp(0.02)+3,22);
+    document.getElementById('cRead').innerHTML='사후: buckle_ratio = <span class="k">'+mean.toFixed(3)+
+      ' ± '+sd.toFixed(3)+'</span> (참값 0.02) — 노이즈 σ를 키우면 사후가 넓어집니다(불확실성↑).'; }
+  Ds.oninput=draw; Ns.oninput=draw; draw();
+});
+
+/* ================= D : cell aggregation ABM ================= */
+safe('D',function(){
+  var sC=document.getElementById('dSim'), pC=document.getElementById('dPlot');
+  var sx=setup(sC), pp=setup(pC);
+  var L=sC._w, G=44, cs=L/G;
+  var stiff, cells, hist, t, raf=null, running=false;
+  var chemo=document.getElementById('dChemo'), Cw=document.getElementById('dCws');
+  function reset(){ stiff=new Float32Array(G*G); t=0; hist=[];
+    cells=[]; var N=6, cx=L/2, cy=L/2, R=L*0.32;
+    for(var i=0;i<N;i++){ cells.push({x:cx+R*Math.cos(2*Math.PI*i/N), y:cy+R*Math.sin(2*Math.PI*i/N),
+      tx:[], ty:[]}); }
+    draw(); readout(); }
+  function meanDist(){ var d=0,n=0; for(var i=0;i<cells.length;i++)for(var j=i+1;j<cells.length;j++){
+    var dx=cells[i].x-cells[j].x,dy=cells[i].y-cells[j].y; d+=Math.sqrt(dx*dx+dy*dy); n++; } return d/n; }
+  function gi(x){ return Math.max(0,Math.min(G-1,Math.floor(x/cs))); }
+  function step(){ t++;
+    // deposit stiffness around each cell
+    for(var c=0;c<cells.length;c++){ var ci=gi(cells[c].x),cj=gi(cells[c].y);
+      for(var a=-3;a<=3;a++)for(var b=-3;b<=3;b++){ var ii=ci+a,jj=cj+b;
+        if(ii<0||jj<0||ii>=G||jj>=G)continue; var w=Math.exp(-(a*a+b*b)/4.5); stiff[jj*G+ii]+=0.08*w; } }
+    for(var k=0;k<stiff.length;k++){ stiff[k]*=0.997; if(stiff[k]>6)stiff[k]=6; }
+    var wc=(chemo.checked? +Cw.value : 0), lam=L*0.30, speed=cs*0.42;
+    var nu=cells.map(function(c){ return {x:c.x,y:c.y}; });
+    for(var c=0;c<cells.length;c++){ var x=cells[c].x,y=cells[c].y, ci=gi(x),cj=gi(y);
+      // durotaxis: gradient of stiffness (central diff)
+      var gx=stiff[cj*G+Math.min(G-1,ci+1)]-stiff[cj*G+Math.max(0,ci-1)];
+      var gy=stiff[Math.min(G-1,cj+1)*G+ci]-stiff[Math.max(0,cj-1)*G+ci];
+      var gn=Math.hypot(gx,gy)||1; var dux=gx/gn,duy=gy/gn;
+      // chemotaxis: toward other cells, screened
+      var hx=0,hy=0; for(var j=0;j<cells.length;j++){ if(j===c)continue;
+        var ddx=cells[j].x-x,ddy=cells[j].y-y,r=Math.hypot(ddx,ddy)||1;
+        var wgt=Math.exp(-r/lam)/lam; hx+=ddx/r*wgt; hy+=ddy/r*wgt; }
+      var hn=Math.hypot(hx,hy)||1; hx/=hn; hy/=hn;
+      // random motility (so durotaxis-only disperses, matching the real result)
+      var ang=Math.random()*6.283, rnd=0.55;
+      var mx=0.7*dux+wc*hx+rnd*Math.cos(ang), my=0.7*duy+wc*hy+rnd*Math.sin(ang);
+      var mn=Math.hypot(mx,my)||1;
+      nu[c].x=Math.max(6,Math.min(L-6,x+speed*mx/mn)); nu[c].y=Math.max(6,Math.min(L-6,y+speed*my/mn)); }
+    for(var c=0;c<cells.length;c++){ cells[c].x=nu[c].x; cells[c].y=nu[c].y;
+      cells[c].tx.push(cells[c].x); cells[c].ty.push(cells[c].y);
+      if(cells[c].tx.length>120){cells[c].tx.shift();cells[c].ty.shift();} }
+    hist.push(meanDist()); if(hist.length>240)hist.shift();
+  }
+  function draw(){ sx.clearRect(0,0,L,sC._h);
+    for(var i=0;i<G;i++)for(var j=0;j<G;j++){ var v=stiff[j*G+i]/6; if(v<0.02)continue;
+      sx.fillStyle='rgba(37,99,235,'+Math.min(0.75,v*0.9)+')'; sx.fillRect(i*cs,j*cs,cs+0.6,cs+0.6); }
+    for(var c=0;c<cells.length;c++){ sx.strokeStyle='rgba(219,39,119,0.45)'; sx.lineWidth=1.4; sx.beginPath();
+      for(var k=0;k<cells[c].tx.length;k++){ k?sx.lineTo(cells[c].tx[k],cells[c].ty[k]):sx.moveTo(cells[c].tx[k],cells[c].ty[k]); } sx.stroke(); }
+    for(var c=0;c<cells.length;c++){ sx.fillStyle='#f97316'; sx.strokeStyle='#fff'; sx.lineWidth=2;
+      sx.beginPath(); sx.arc(cells[c].x,cells[c].y,7,0,7); sx.fill(); sx.stroke(); }
+  }
+  function drawPlot(){ var w=pC._w,h=pC._h,pad=28; pp.clearRect(0,0,w,h); axes(pp,w,h,pad);
+    if(hist.length<2)return; var mx=Math.max.apply(null,hist)*1.05, mn=Math.min.apply(null,hist)*0.9;
+    function X(i){ return pad+i/(240)*(w-pad-6); } function Y(v){ return (h-pad)-(v-mn)/(mx-mn||1)*(h-pad-8); }
+    pp.strokeStyle=(chemo.checked&&+Cw.value>0)?'#db2777':'#94a3b8'; pp.lineWidth=2; pp.beginPath();
+    for(var i=0;i<hist.length;i++){ i?pp.lineTo(X(i),Y(hist[i])):pp.moveTo(X(i),Y(hist[i])); } pp.stroke();
+    pp.fillStyle='#64748b'; pp.font='11px sans-serif'; pp.fillText('평균 세포간 거리 vs 시간',pad,14); }
+  function readout(){ var d=meanDist(); var d0=hist.length?hist[0]:d;
+    document.getElementById('dRead').innerHTML='평균 세포간 거리: <span class="k">'+d.toFixed(0)+' px</span>'+
+      (hist.length>4?(' (시작 '+d0.toFixed(0)+' → '+(d<d0-2?'<b>응집 ↓</b>':d>d0+2?'분산 ↑':'≈')+')'):'')+
+      ' · chemotaxis: <b>'+(chemo.checked&&+Cw.value>0?'켬 (세기 '+(+Cw.value).toFixed(1)+')':'끔')+'</b>'; }
+  function loop(){ if(!running)return; for(var s=0;s<2;s++)step(); draw(); drawPlot(); readout();
+    document.getElementById('dCw').textContent=(+Cw.value).toFixed(1);
+    raf=requestAnimationFrame(loop); }
+  document.getElementById('dPlay').onclick=function(){ running=!running; this.textContent=running?'⏸ 일시정지':'▶ 재생';
+    if(running)loop(); else if(raf)cancelAnimationFrame(raf); };
+  document.getElementById('dReset').onclick=function(){ running=false; if(raf)cancelAnimationFrame(raf);
+    document.getElementById('dPlay').textContent='▶ 재생'; reset(); };
+  chemo.onchange=readout; Cw.oninput=function(){ document.getElementById('dCw').textContent=(+Cw.value).toFixed(1); readout(); };
+  reset();
+});
+
+})();
+</script>
+</body>
+</html>

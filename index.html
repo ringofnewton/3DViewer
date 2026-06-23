@@ -17,6 +17,38 @@
       --muted: #a8afc2;
       --ok: #75f0b5;
       --danger: #ff6b8a;
+      --body-bg:
+        radial-gradient(circle at 18% 10%, rgba(255, 0, 80, 0.18), transparent 30%),
+        radial-gradient(circle at 85% 15%, rgba(0, 90, 255, 0.20), transparent 35%),
+        radial-gradient(circle at 50% 90%, rgba(255, 255, 255, 0.08), transparent 28%),
+        var(--bg);
+      --header-bg: rgba(0, 0, 0, 0.26);
+      --header-border: rgba(255, 255, 255, 0.10);
+      --btn-bg: rgba(255, 255, 255, 0.92);
+      --btn-text: #11131a;
+      --overlay-bg: rgba(0, 0, 0, 0.58);
+      --card-bg: rgba(0, 0, 0, 0.42);
+    }
+
+    :root[data-theme="light"] {
+      --bg: #eef1f7;
+      --panel: rgba(20, 28, 46, 0.05);
+      --panel-border: rgba(20, 28, 46, 0.16);
+      --text: #11131a;
+      --muted: #5a6275;
+      --ok: #0a8f5a;
+      --danger: #c8324f;
+      --body-bg:
+        radial-gradient(circle at 18% 10%, rgba(255, 0, 80, 0.10), transparent 32%),
+        radial-gradient(circle at 85% 15%, rgba(0, 90, 255, 0.12), transparent 36%),
+        radial-gradient(circle at 50% 90%, rgba(20, 28, 46, 0.05), transparent 30%),
+        var(--bg);
+      --header-bg: rgba(255, 255, 255, 0.66);
+      --header-border: rgba(20, 28, 46, 0.12);
+      --btn-bg: rgba(20, 28, 46, 0.92);
+      --btn-text: #f5f7fb;
+      --overlay-bg: rgba(255, 255, 255, 0.82);
+      --card-bg: rgba(255, 255, 255, 0.78);
     }
 
     * { box-sizing: border-box; }
@@ -33,11 +65,7 @@
     }
 
     body {
-      background:
-        radial-gradient(circle at 18% 10%, rgba(255, 0, 80, 0.18), transparent 30%),
-        radial-gradient(circle at 85% 15%, rgba(0, 90, 255, 0.20), transparent 35%),
-        radial-gradient(circle at 50% 90%, rgba(255, 255, 255, 0.08), transparent 28%),
-        var(--bg);
+      background: var(--body-bg);
     }
 
     .page {
@@ -55,8 +83,8 @@
       gap: 16px;
       padding: 14px 18px;
       padding-top: max(14px, env(safe-area-inset-top));
-      background: rgba(0, 0, 0, 0.26);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+      background: var(--header-bg);
+      border-bottom: 1px solid var(--header-border);
       backdrop-filter: blur(18px);
       -webkit-backdrop-filter: blur(18px);
     }
@@ -95,8 +123,8 @@
       padding: 0 14px;
       border: 0;
       border-radius: 13px;
-      background: rgba(255, 255, 255, 0.92);
-      color: #11131a;
+      background: var(--btn-bg);
+      color: var(--btn-text);
       font-size: 14px;
       font-weight: 750;
       cursor: pointer;
@@ -158,7 +186,7 @@
       padding: 26px;
       border: 1px solid var(--panel-border);
       border-radius: 28px;
-      background: rgba(0, 0, 0, 0.42);
+      background: var(--card-bg);
       backdrop-filter: blur(18px);
       -webkit-backdrop-filter: blur(18px);
       text-align: center;
@@ -185,7 +213,7 @@
       padding: 12px 14px;
       border: 1px solid var(--panel-border);
       border-radius: 18px;
-      background: rgba(0, 0, 0, 0.58);
+      background: var(--overlay-bg);
       backdrop-filter: blur(18px);
       -webkit-backdrop-filter: blur(18px);
       box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
@@ -220,7 +248,7 @@
       padding: 0 10px;
       border: 1px solid var(--panel-border);
       border-radius: 12px;
-      background: rgba(255, 255, 255, 0.10);
+      background: var(--panel);
       color: var(--text);
       font-size: 12px;
       outline: none;
@@ -266,6 +294,7 @@
       </div>
 
       <div class="controls">
+        <button id="themeToggle" class="secondary" type="button" aria-label="Toggle light/dark theme" title="Toggle light/dark theme">🌙 Dark</button>
         <label for="modelUpload">Choose GLB</label>
         <input id="modelUpload" type="file" accept=".glb,model/gltf-binary" />
         <span id="fileName" class="file-name">No file selected</span>
@@ -324,6 +353,23 @@
     const statusBox = document.getElementById("status");
     const sharePanel = document.getElementById("sharePanel");
     const shareUrlInput = document.getElementById("shareUrlInput");
+    const themeToggle = document.getElementById("themeToggle");
+
+    function applyTheme(theme) {
+      const isLight = theme === "light";
+      document.documentElement.setAttribute("data-theme", isLight ? "light" : "dark");
+      themeToggle.textContent = isLight ? "☀️ Light" : "🌙 Dark";
+      try { localStorage.setItem("viewer-theme", isLight ? "light" : "dark"); } catch (e) {}
+    }
+
+    applyTheme((() => {
+      try { return localStorage.getItem("viewer-theme"); } catch (e) { return null; }
+    })() || "dark");
+
+    themeToggle.addEventListener("click", () => {
+      const next = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
+      applyTheme(next);
+    });
 
     let currentObjectUrl = null;
     let selectedFile = null;

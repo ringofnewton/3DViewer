@@ -1,0 +1,1578 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ECM 자기조직화 시뮬레이션 — 과학 원리 & 설계</title>
+<style>
+:root {
+  --bg:       #070c16;
+  --surf:     #0d1728;
+  --surf2:    #14213d;
+  --border:   #1e3a5f;
+  --accent:   #38bdf8;
+  --fiber:    #60a5fa;
+  --cell:     #fb923c;
+  --green:    #34d399;
+  --red:      #f87171;
+  --indigo:   #818cf8;
+  --text:     #e2e8f0;
+  --muted:    #64748b;
+  --head:     #f0f9ff;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+/* ── NAV ─────────────────────────────────────────── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(7,12,22,0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 2rem; height: 52px;
+}
+nav .brand { color: var(--accent); font-weight: 700; font-size: 0.9rem; letter-spacing: 0.05em; }
+nav ul { list-style: none; display: flex; gap: 1.6rem; }
+nav ul a {
+  color: var(--muted); text-decoration: none; font-size: 0.82rem;
+  letter-spacing: 0.03em; transition: color .2s;
+}
+nav ul a:hover { color: var(--accent); }
+
+/* ── SECTIONS ────────────────────────────────────── */
+section { padding: 100px 0 80px; }
+section:nth-child(even) { background: var(--surf); }
+.container { max-width: 900px; margin: 0 auto; padding: 0 2rem; }
+.container-wide { max-width: 1100px; margin: 0 auto; padding: 0 2rem; }
+
+/* ── HERO ─────────────────────────────────────────── */
+#hero {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden; padding-top: 52px;
+}
+#hero canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.hero-content { position: relative; z-index: 2; text-align: center; max-width: 780px; padding: 2rem; }
+.hero-content h1 {
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  font-weight: 800;
+  color: var(--head);
+  line-height: 1.25;
+  margin-bottom: 1.2rem;
+}
+.hero-content h1 span { color: var(--accent); }
+.hero-content p { font-size: 1.1rem; color: var(--muted); margin-bottom: 2rem; }
+.tag-row { display: flex; gap: .6rem; flex-wrap: wrap; justify-content: center; }
+.tag {
+  background: var(--surf2); border: 1px solid var(--border);
+  color: var(--accent); padding: .25rem .8rem; border-radius: 99px;
+  font-size: 0.78rem; font-weight: 600; letter-spacing: .04em;
+}
+
+/* ── SECTION HEADER ──────────────────────────────── */
+.sec-label {
+  display: inline-block; color: var(--accent);
+  font-size: 0.75rem; font-weight: 700; letter-spacing: .12em;
+  text-transform: uppercase; margin-bottom: .6rem;
+}
+.sec-title {
+  font-size: clamp(1.5rem, 3vw, 2.1rem);
+  font-weight: 800; color: var(--head); margin-bottom: 1rem;
+}
+.sec-intro { color: var(--muted); max-width: 680px; margin-bottom: 2.5rem; }
+
+/* ── CARDS ────────────────────────────────────────── */
+.card {
+  background: var(--surf2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 1.5rem;
+}
+.card h3 { color: var(--head); font-size: 1rem; margin-bottom: .5rem; }
+.card p, .card li { color: var(--muted); font-size: 0.9rem; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.2rem; }
+@media(max-width:640px){ .grid2,.grid3 { grid-template-columns:1fr; } }
+
+/* ── DEMO CONTAINERS ─────────────────────────────── */
+.demo-wrap {
+  background: var(--surf2); border: 1px solid var(--border);
+  border-radius: 14px; overflow: hidden; margin: 2rem 0;
+}
+.demo-header {
+  background: var(--surf); border-bottom: 1px solid var(--border);
+  padding: .7rem 1.2rem; display: flex; align-items: center; gap: .8rem;
+}
+.demo-header h4 { color: var(--accent); font-size: .85rem; font-weight: 700; }
+.demo-body { padding: 1.2rem; }
+canvas.demo { display: block; width: 100%; border-radius: 8px; }
+
+/* ── CONTROLS ────────────────────────────────────── */
+.ctrl-row { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: 1rem; }
+.ctrl-row label { color: var(--muted); font-size: .82rem; }
+input[type=range] {
+  -webkit-appearance: none;
+  width: 160px; height: 4px;
+  background: var(--border); border-radius: 99px; outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 14px; height: 14px;
+  background: var(--accent); border-radius: 50%; cursor: pointer;
+}
+.btn {
+  background: var(--accent); color: var(--bg);
+  border: none; border-radius: 8px;
+  padding: .45rem 1.1rem; font-size: .82rem; font-weight: 700;
+  cursor: pointer; transition: opacity .15s;
+}
+.btn:hover { opacity: .85; }
+.btn.sec { background: var(--surf2); color: var(--accent); border: 1px solid var(--border); }
+.btn.sec:hover { border-color: var(--accent); }
+.toggle-row { display: flex; gap: .5rem; }
+.pill {
+  padding: .3rem .9rem; border-radius: 99px; font-size: .78rem; font-weight: 700;
+  cursor: pointer; border: 1px solid var(--border); color: var(--muted); background: transparent;
+  transition: all .2s;
+}
+.pill.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+
+/* ── EQUATION BOX ────────────────────────────────── */
+.eq-box {
+  background: var(--bg); border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px; padding: 1rem 1.2rem; margin: 1rem 0;
+  font-family: 'Courier New', monospace; font-size: .88rem;
+  color: var(--accent);
+}
+.eq-box .comment { color: var(--muted); }
+
+/* ── RESULT BADGES ───────────────────────────────── */
+.result-big {
+  font-size: 2.4rem; font-weight: 800; color: var(--green);
+  display: block; line-height: 1.1;
+}
+.result-label { font-size: .78rem; color: var(--muted); letter-spacing: .05em; }
+.result-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; margin: 2rem 0; }
+.result-card {
+  background: var(--surf2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 1.2rem; text-align: center;
+}
+.result-card .n { font-size: 2rem; font-weight: 800; color: var(--green); }
+.result-card .l { font-size: .78rem; color: var(--muted); margin-top: .3rem; }
+.result-card .sub { font-size: .72rem; color: var(--muted); margin-top: .2rem; }
+
+/* ── ARCH DIAGRAM ────────────────────────────────── */
+.arch {
+  display: flex; flex-direction: column; gap: .6rem; margin: 2rem 0;
+}
+.arch-layer {
+  border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+  cursor: pointer; transition: border-color .2s;
+}
+.arch-layer:hover { border-color: var(--accent); }
+.arch-layer-header {
+  display: flex; align-items: center; gap: 1rem;
+  padding: .7rem 1.2rem; background: var(--surf2);
+}
+.arch-layer-num {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .75rem; font-weight: 800; flex-shrink: 0;
+}
+.arch-layer-title { font-weight: 700; font-size: .9rem; color: var(--head); }
+.arch-layer-sub { font-size: .78rem; color: var(--muted); }
+.arch-layer-body {
+  padding: 0 1.2rem;
+  max-height: 0; overflow: hidden;
+  transition: max-height .35s ease, padding .35s;
+}
+.arch-layer-body.open { max-height: 500px; padding: 1rem 1.2rem; }
+.arch-files { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .5rem; }
+.arch-file {
+  background: var(--bg); border: 1px solid var(--border);
+  padding: .2rem .6rem; border-radius: 6px;
+  font-family: 'Courier New', monospace; font-size: .75rem; color: var(--accent);
+}
+
+/* ── VALIDATION TABLE ────────────────────────────── */
+table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; font-size: .85rem; }
+th { background: var(--surf2); color: var(--accent); padding: .6rem 1rem; text-align: left;
+     font-weight: 700; letter-spacing: .04em; font-size: .78rem; }
+td { padding: .55rem 1rem; border-bottom: 1px solid var(--border); color: var(--text); }
+tr:last-child td { border-bottom: none; }
+.pass { color: var(--green); font-weight: 700; }
+
+/* ── FLOW ARROWS ─────────────────────────────────── */
+.flow {
+  display: flex; align-items: stretch; gap: 0; margin: 2rem 0;
+  overflow-x: auto; padding-bottom: .5rem;
+}
+.flow-step {
+  flex: 1; min-width: 130px;
+  background: var(--surf2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 1rem .8rem; text-align: center;
+}
+.flow-step .icon { font-size: 1.5rem; margin-bottom: .4rem; }
+.flow-step .ft { font-size: .78rem; font-weight: 700; color: var(--head); }
+.flow-step .fs { font-size: .7rem; color: var(--muted); margin-top: .2rem; }
+.flow-arrow {
+  display: flex; align-items: center; padding: 0 .3rem;
+  color: var(--accent); font-size: 1.2rem;
+}
+
+/* ── QUOTE ───────────────────────────────────────── */
+.callout {
+  border-left: 3px solid var(--accent); background: var(--surf2);
+  padding: 1rem 1.4rem; border-radius: 0 10px 10px 0;
+  margin: 1.5rem 0; font-size: .95rem; color: var(--text);
+}
+.callout strong { color: var(--accent); }
+
+/* ── FOOTER ──────────────────────────────────────── */
+footer {
+  background: var(--surf); border-top: 1px solid var(--border);
+  text-align: center; padding: 2.5rem;
+  color: var(--muted); font-size: .82rem;
+}
+
+/* ── NUMBER HIGHLIGHT ────────────────────────────── */
+.num { color: var(--green); font-weight: 700; }
+.num-w { color: var(--accent); font-weight: 700; }
+.em { color: var(--head); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<!-- ── NAV ──────────────────────────────────────── -->
+<nav>
+  <span class="brand">ECM 자기조직화 모델</span>
+  <ul>
+    <li><a href="#background">배경</a></li>
+    <li><a href="#physics">물리</a></li>
+    <li><a href="#model">모델</a></li>
+    <li><a href="#results">결과</a></li>
+    <li><a href="#design">설계</a></li>
+    <li><a href="#validation">검증</a></li>
+  </ul>
+</nav>
+
+<!-- ── HERO ─────────────────────────────────────── -->
+<section id="hero">
+  <canvas id="heroCanvas"></canvas>
+  <div class="hero-content">
+    <h1>세포는 어떻게 콜라겐 그물을<br><span>스스로 짜는가</span></h1>
+    <p>비선형 섬유 역학 + 소성 재형성 + 이산 네트워크 시뮬레이션<br>
+       — 기계적 자기조직화의 계산 모델</p>
+    <div class="tag-row">
+      <span class="tag">Discrete Fiber Network</span>
+      <span class="tag">FIRE Equilibrium</span>
+      <span class="tag">Plastic Remodeling</span>
+      <span class="tag">Emergence</span>
+      <span class="tag">Three.js Viewer</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── §1 배경 ──────────────────────────────────── -->
+<section id="background">
+<div class="container">
+  <span class="sec-label">§ 1 · 과학적 배경</span>
+  <h2 class="sec-title">ECM이란, 그리고 왜 구조가 중요한가</h2>
+  <p class="sec-intro">
+    생물 조직은 세포만으로 이뤄진 게 아니에요. 세포들 사이 공간을 채우는
+    <strong class="em">세포외기질(ECM, Extracellular Matrix)</strong>이 있고,
+    그 주성분인 콜라겐 섬유가 그물(reticular network)처럼 얽혀 있어요.
+    이 그물의 구조가 세포 이동, 분열, 분화를 물리적으로 제어해요.
+  </p>
+
+  <div class="grid3">
+    <div class="card">
+      <h3>🔬 콜라겐이란?</h3>
+      <p>직경 ~50 nm, 길이 수십 µm의 단백질 섬유. 체내 가장 흔한 구조 단백질 (단백질의 ~30%). 실처럼 구불구불하고, 당기면 강해지고 밀면 휜다.</p>
+    </div>
+    <div class="card">
+      <h3>🧬 세포는 뭘 하나?</h3>
+      <p>섬유모세포(fibroblast)는 LOX 효소로 콜라겐을 합성하고, 내부 액틴-미오신 모터로 ECM을 <strong class="em">수축</strong>시킨다. 견인력 ~1–10 nN.</p>
+    </div>
+    <div class="card">
+      <h3>🌐 구조는 어디서 오나?</h3>
+      <p>세포가 구조를 "그리는" 게 아니다. 수축력 + 비선형 역학 + 재형성이 결합해서 구조가 <strong class="em">자발적으로 출현(emergence)</strong>한다.</p>
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top:2rem">
+    <strong>핵심 실험 (Stopak & Harris, 1982)</strong><br>
+    닭 심장 조각(explant) 두 개를 콜라겐 젤 위에 올렸더니 —
+    단일 explant 주변엔 <strong>방사형 별(aster)</strong>이,
+    두 explant 사이엔 <strong>정렬된 교량(bridge)</strong>이 자발적으로 나타났다.
+    세포가 설계도를 갖고 있었던 게 아니라, 수축력이 ECM을 물리 법칙에 따라 자기조직화시킨 것.
+  </div>
+
+  <div class="demo-wrap" style="margin-top:1.5rem">
+    <div class="demo-header">
+      <h4>Stopak-Harris 현상 — 브릿지 정렬 (시뮬레이션 재현)</h4>
+    </div>
+    <div class="demo-body">
+      <canvas id="bridgeChart" class="demo" height="220"></canvas>
+      <p style="font-size:.78rem;color:var(--muted);margin-top:.5rem">
+        우리 모델(n=4 seeds, mean ± SEM). 파란 선: 두 세포를 잇는 축 방향 정렬.
+        회색 선: 수직 방향 (등방성 기준선 0.333). 거리 전 범위에서 축 방향이 유의미하게 높다.
+      </p>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ── §2 물리 ──────────────────────────────────── -->
+<section id="physics">
+<div class="container">
+  <span class="sec-label">§ 2 · 핵심 물리</span>
+  <h2 class="sec-title">콜라겐 섬유의 비선형 역학</h2>
+  <p class="sec-intro">
+    일반 스프링(후크 법칙)은 당기든 밀든 힘이 대칭이에요.
+    콜라겐은 그렇지 않아요. 두 가지 비선형성이 자기조직화를 가능하게 해요.
+  </p>
+
+  <!-- Force demo -->
+  <div class="demo-wrap">
+    <div class="demo-header">
+      <h4>인터랙티브 데모 — 섬유를 직접 당겨보세요</h4>
+      <div class="toggle-row" style="margin-left:auto">
+        <button class="pill active" id="pillNL" onclick="setForceModeNL()">비선형 (콜라겐)</button>
+        <button class="pill" id="pillL" onclick="setForceModeL()">선형 (일반 스프링)</button>
+      </div>
+    </div>
+    <div class="demo-body">
+      <canvas id="forceCanvas" class="demo" height="300"></canvas>
+      <div class="ctrl-row">
+        <label>변형률 (strain)</label>
+        <input type="range" id="strainSlider" min="-50" max="120" value="0" oninput="onStrain(this.value)">
+        <span id="strainVal" style="color:var(--accent);font-weight:700;font-size:.85rem;min-width:60px">0 %</span>
+        <span id="forceVal" style="color:var(--green);font-weight:700;font-size:.85rem;min-width:120px"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div>
+      <h3 style="color:var(--head);margin-bottom:.7rem">① 좌굴 (Buckling)</h3>
+      <p style="color:var(--muted);font-size:.9rem;margin-bottom:.8rem">
+        섬유는 실처럼 생겼어요. 당기면 팽팽해지지만 <strong class="em">밀면 즉시 휘어서
+        힘을 거의 전달하지 못해요.</strong> 압축 강성이 장력 강성의 ~5%에 불과.
+      </p>
+      <div class="eq-box">
+        <span class="comment">// 압축 (strain &lt; 0)</span><br>
+        F = k × <span style="color:var(--red)">buckle_ratio</span> × strain<br>
+        <span class="comment">// buckle_ratio ≈ 0.05 (장력 대비 5%)</span>
+      </div>
+      <p style="color:var(--muted);font-size:.85rem">
+        <strong class="em">왜 중요한가?</strong> 세포가 사방으로 당기면,
+        당기는 방향(방사) 섬유만 하중을 받고 수직 방향 섬유는 좌굴로 기여 못 해요.
+        힘이 특정 방향에 집중 → 정렬 패턴 출현.
+      </p>
+    </div>
+    <div>
+      <h3 style="color:var(--head);margin-bottom:.7rem">② 변형경화 (Strain-stiffening)</h3>
+      <p style="color:var(--muted);font-size:.9rem;margin-bottom:.8rem">
+        콜라겐 섬유는 구불구불한 형태를 가져서, 처음엔 쉽게 늘어나다가
+        <strong class="em">많이 늘어날수록 급격히 뻣뻣해져요.</strong>
+        섬유가 쭉 펴지는 시점에 강성이 수~수십 배 증가.
+      </p>
+      <div class="eq-box">
+        <span class="comment">// 장력 (strain &gt; 0)</span><br>
+        F = k × strain × (1 + <span style="color:var(--green)">α</span> × strain)<br>
+        <span class="comment">// α ≈ 8 (변형경화 계수)</span>
+      </div>
+      <p style="color:var(--muted);font-size:.85rem">
+        <strong class="em">왜 중요한가?</strong> 세포 근처 고변형 섬유가 더 강해지면서
+        힘 전달이 장거리로 집중돼요. 실험에서도 확인된 long-range force transmission.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top:1.5rem">
+    <strong>비선형성의 기여 (정량)</strong><br>
+    bridge 방향 신호 (axis − perp alignment):<br>
+    완전 선형 → <span class="num">0.081</span> ·
+    좌굴만 → <span class="num">0.156</span> ·
+    전체 비선형 → <span class="num">0.160</span><br>
+    <span style="color:var(--muted);font-size:.85rem">
+      비선형성이 신호를 ~2배 강화. 좌굴이 지배적 기여자, 변형경화는 부가적.
+    </span>
+  </div>
+</div>
+</section>
+
+<!-- ── §3 모델 ──────────────────────────────────── -->
+<section id="model">
+<div class="container">
+  <span class="sec-label">§ 3 · 시뮬레이션 모델</span>
+  <h2 class="sec-title">어떻게 시뮬레이션하는가</h2>
+  <p class="sec-intro">
+    연속체 방정식(PDE)이 아니라 섬유 하나하나를 명시적으로 다루는
+    <strong class="em">이산 섬유 네트워크(Discrete Fiber Network)</strong> 모델이에요.
+    세 가지 핵심 과정이 반복됩니다.
+  </p>
+
+  <!-- Flow -->
+  <div class="flow">
+    <div class="flow-step">
+      <div class="icon">🌱</div>
+      <div class="ft">① 네트워크 성장</div>
+      <div class="fs">ecm_network.py<br>Mikado 성장 모델</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="icon">⚡</div>
+      <div class="ft">② 역학 평형</div>
+      <div class="fs">ecm_mechanics.py<br>FIRE 알고리즘</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="icon">🔁</div>
+      <div class="ft">③ 소성 재형성</div>
+      <div class="fs">ecm_remodel.py<br>Percentile remodel</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="icon">📊</div>
+      <div class="ft">④ 측정 & 출력</div>
+      <div class="fs">metrics.py<br>web_export.py</div>
+    </div>
+  </div>
+
+  <!-- Step 1 -->
+  <div class="card" style="margin-bottom:1rem">
+    <h3>① 네트워크 성장 — Mikado 모델</h3>
+    <p style="margin-bottom:.8rem">실제 콜라겐 섬유화(fibrillogenesis)를 4단계로 모사해요:</p>
+    <div class="grid2">
+      <div>
+        <p style="font-size:.88rem;color:var(--muted)">
+          <strong class="em">Nucleation</strong>: 랜덤 위치에 씨앗점 생성<br>
+          <strong class="em">Elongation</strong>: 방향성 있는 성장 (persistence length로 구불구불함 제어)<br>
+          <strong class="em">Branching</strong>: 확률적 분기점 생성 (branch_prob)<br>
+          <strong class="em">Crosslinking</strong>: 근접 섬유 끝 연결 (crosslink_dist)
+        </p>
+      </div>
+      <div>
+        <div class="eq-box" style="font-size:.78rem">
+          NetworkParams(<br>
+          &nbsp; n_cells=24,<br>
+          &nbsp; seg_length=3.0,  <span class="comment">// µm/segment</span><br>
+          &nbsp; branch_prob=0.07,<br>
+          &nbsp; crosslink_dist=4.5<br>
+          )
+        </div>
+      </div>
+    </div>
+    <p style="font-size:.82rem;color:var(--muted);margin-top:.7rem">
+      결과: 3방향 분기점(coordination ≈ 3)이 지배적인 구불구불한 그물.
+      이게 실제 콜라겐/FRC 네트워크 형태와 일치해요.
+    </p>
+  </div>
+
+  <!-- Step 2 -->
+  <div class="card" style="margin-bottom:1rem">
+    <h3>② 역학 평형 — FIRE 알고리즘</h3>
+    <div class="grid2">
+      <div>
+        <p style="font-size:.88rem;color:var(--muted);margin-bottom:.7rem">
+          각 마디에 걸리는 힘(섬유 장력 + 굽힘 저항 + 세포 견인력)을 계산하고,
+          모든 마디가 힘 균형에 도달하는 위치를 찾아요.
+        </p>
+        <p style="font-size:.88rem;color:var(--muted)">
+          <strong class="em">FIRE (Fast Inertial Relaxation Engine)</strong>:
+          가상 관성을 이용해 에너지 최솟값으로 빠르게 수렴.
+          일반 gradient descent보다 ~5–10배 빠름.
+        </p>
+      </div>
+      <div>
+        <div class="eq-box" style="font-size:.78rem">
+          <span class="comment">// 수렴 조건</span><br>
+          while max|F| > ftol:<br>
+          &nbsp; F = Σ(fiber) + Σ(bend)<br>
+          &nbsp; &nbsp; + F_traction<br>
+          &nbsp; v = FIRE_update(v, F)<br>
+          &nbsp; x += v × dt<br>
+          <span class="comment">// max|F| → 9.9×10⁻³ 수렴</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3 with demo -->
+  <div class="card" style="margin-bottom:1rem">
+    <h3>③ 소성 재형성 — Percentile Remodeling</h3>
+    <div class="grid2">
+      <div>
+        <p style="font-size:.88rem;color:var(--muted);margin-bottom:.7rem">
+          실제 세포는 장력을 받는 섬유를 <strong class="em">강화(LOX 효소)</strong>하고,
+          느슨한 섬유를 <strong class="em">분해(MMP 효소)</strong>해요.
+          이를 percentile-based 규칙으로 구현해요.
+        </p>
+        <div class="eq-box" style="font-size:.78rem">
+          <span class="comment">// 상위 15% 장력 → 강화</span><br>
+          if strain > P85: k *= reinforce<br><br>
+          <span class="comment">// 하위 15% 장력 → 제거</span><br>
+          if strain &lt; P15: remove_fiber()
+        </div>
+      </div>
+      <div>
+        <p style="font-size:.88rem;color:var(--muted);margin-bottom:.7rem">
+          <strong class="em">소성 기억(Plastic Memory)</strong>:
+          재형성 후 세포를 제거해도 강화된 경로가 남아요.
+        </p>
+        <div class="result-card" style="margin:0">
+          <div class="n">×400</div>
+          <div class="l">세포 제거 후 잔류 내부응력</div>
+          <div class="sub">소성 4250 vs 탄성 11</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mini network demo -->
+  <div class="demo-wrap">
+    <div class="demo-header">
+      <h4>인터랙티브 데모 — 단일 세포 수축 & Aster 형성</h4>
+      <button class="btn" id="asterBtn" onclick="runAster()" style="margin-left:auto">▶ 수축 시작</button>
+    </div>
+    <div class="demo-body">
+      <canvas id="asterCanvas" class="demo" height="320"></canvas>
+      <p style="font-size:.78rem;color:var(--muted);margin-top:.5rem">
+        색상: 파란색 = 장력 (하중 전달), 회색 = 좌굴 (기여 없음), 주황 = 세포.
+        좌굴 비대칭성 때문에 방사 방향 섬유만 강화되어 별(aster) 패턴이 나타남.
+      </p>
+    </div>
+  </div>
+
+  <!-- SI calibration -->
+  <div class="callout" style="margin-top:1.5rem">
+    <strong>SI 단위 보정 (order-of-magnitude)</strong><br>
+    기준: 측정된 세포 견인력 ~1 nN, 세포 간격 ~100 µm<br>
+    → 길이 1 단위 = <span class="num">1 µm</span> ·
+       힘 1 단위 = <span class="num">0.156 nN</span> ·
+       응력 = <span class="num">156 Pa</span> ·
+       네트워크 탄성계수 <span class="num">G ≈ 0.8 Pa</span> (희석 콜라겐 젤 범위)
+  </div>
+</div>
+</section>
+
+<!-- ── §4 결과 ──────────────────────────────────── -->
+<section id="results">
+<div class="container">
+  <span class="sec-label">§ 4 · 핵심 결과</span>
+  <h2 class="sec-title">무엇이 나타나는가 (Emergence)</h2>
+  <p class="sec-intro">
+    세 가지 스케일에서 구조가 출현해요. 각각 독립적으로 검증됐어요.
+  </p>
+
+  <div class="result-grid">
+    <div class="result-card">
+      <div class="n">d = 9.1</div>
+      <div class="l">단일 세포 → 방사형 Aster</div>
+      <div class="sub">방사도 0.97 vs 0.69, n=16</div>
+    </div>
+    <div class="result-card">
+      <div class="n">d = 2.5</div>
+      <div class="l">두 세포 → 정렬 Bridge</div>
+      <div class="sub">축 0.53 vs 수직 0.37, n=16</div>
+    </div>
+    <div class="result-card" style="border-color:var(--accent)">
+      <div class="n" style="color:var(--accent)">3×</div>
+      <div class="l" style="color:var(--accent)">배치가 연결성 제어</div>
+      <div class="sub">촘촘 0.25 → 넓음 0.74, n=5</div>
+    </div>
+  </div>
+
+  <!-- Emergence control -->
+  <div class="demo-wrap">
+    <div class="demo-header">
+      <h4>헤드라인 결과 — 세포 배치 geometry가 ECM 연결성을 제어한다</h4>
+    </div>
+    <div class="demo-body">
+      <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem">
+        <button class="btn sec" onclick="showSpacing('tight')">촘촘 (34 µm)</button>
+        <button class="btn sec" onclick="showSpacing('medium')">중간 (52 µm)</button>
+        <button class="btn sec" onclick="showSpacing('wide')">넓음 (72 µm)</button>
+      </div>
+      <canvas id="emergenceCanvas" class="demo" height="340"></canvas>
+      <p style="font-size:.78rem;color:var(--muted);margin-top:.5rem">
+        좌: 세포 배치 & 형성된 망상 구조 (실제 결과 기반 schematic).
+        우: 연결성(largest connected fraction) mean ± 95% CI (n=5 seeds).
+      </p>
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top:1.5rem">
+    <strong>왜 이 결과가 중요한가?</strong><br>
+    세포 배치라는 단순한 geometry 변수 하나만으로 ECM 망상 구조의 연결성이
+    단조적으로 제어된다는 것 — "ECM 구조는 세포가 그리는 게 아니라 배치에서 나온다"는
+    핵심 주장의 정량적 근거예요.
+  </div>
+</div>
+</section>
+
+<!-- ── §5 설계 ──────────────────────────────────── -->
+<section id="design">
+<div class="container">
+  <span class="sec-label">§ 5 · 소프트웨어 설계</span>
+  <h2 class="sec-title">어떻게 코드를 설계했는가</h2>
+  <p class="sec-intro">
+    4개의 독립 레이어로 분리해서, 물리를 바꿔도 시각화는 그대로,
+    시각화를 바꿔도 물리는 건드리지 않아도 되게 설계했어요.
+    아래 레이어를 클릭하면 세부 내용이 펼쳐집니다.
+  </p>
+
+  <div class="arch" id="archDiagram">
+    <div class="arch-layer" onclick="toggleLayer(4)">
+      <div class="arch-layer-header">
+        <div class="arch-layer-num" style="background:#38bdf8;color:#070c16">4</div>
+        <div>
+          <div class="arch-layer-title">시각화 레이어 — HTML / Three.js</div>
+          <div class="arch-layer-sub">브라우저에서 보는 모든 것. Python 코어와 완전히 분리.</div>
+        </div>
+      </div>
+      <div class="arch-layer-body" id="layer4">
+        <div class="grid2">
+          <div>
+            <p style="font-size:.85rem;color:var(--muted);margin-bottom:.7rem">
+              <strong class="em">3D 뷰어 (viewer/index.html)</strong>: scene.json 읽어
+              Parallel Transport Frame으로 tapered tube 렌더링. 5개 스칼라(강화/장력/성숙도/길이/정렬)
+              실시간 recolor. SSAO 그림자.
+            </p>
+            <p style="font-size:.85rem;color:var(--muted)">
+              <strong class="em">2D 시뮬 (play2d.html)</strong>: 브라우저 Canvas만으로 실시간 ECM 분비+수축+재형성.
+              Python FIRE 대신 간소화 relaxation — 교육용 일러스트레이션으로 명시.
+            </p>
+          </div>
+          <div>
+            <p style="font-size:.82rem;color:var(--muted);margin-bottom:.5rem">핵심 렌더링 기법:</p>
+            <div class="eq-box" style="font-size:.75rem">
+              <span class="comment">// 섬유 끝이 뾰족해지는 taper</span><br>
+              r(i) = R × smoothstep(i, 0, tipLen)<br>
+              &nbsp; &nbsp; &nbsp; × smoothstep(i, N, N-tipLen)<br><br>
+              <span class="comment">// 구불구불한 곡선</span><br>
+              pts = catmullRom(rawPoints, subdiv=4)
+            </div>
+          </div>
+        </div>
+        <div class="arch-files">
+          <span class="arch-file">viewer/index.html</span>
+          <span class="arch-file">play2d.html</span>
+          <span class="arch-file">sim2d.html</span>
+          <span class="arch-file">export_glb.py</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- arrow -->
+    <div style="text-align:center;color:var(--accent);font-size:1.3rem;margin:-.2rem 0">↕ scene.json 인터페이스</div>
+
+    <div class="arch-layer" onclick="toggleLayer(3)">
+      <div class="arch-layer-header">
+        <div class="arch-layer-num" style="background:#818cf8;color:#070c16">3</div>
+        <div>
+          <div class="arch-layer-title">검증 레이어 — Validation Scripts</div>
+          <div class="arch-layer-sub">논문의 모든 숫자를 생성. SciPy 없이 numpy만으로 통계 구현.</div>
+        </div>
+      </div>
+      <div class="arch-layer-body" id="layer3">
+        <p style="font-size:.85rem;color:var(--muted);margin-bottom:.7rem">
+          각 검증 스크립트는 단일 명령으로 재현 가능하고, 결정론적(seed 고정)이에요.
+          결과는 항상 숫자 하나로 pass/fail 판정.
+        </p>
+        <div class="eq-box" style="font-size:.78rem">
+          <span class="comment"># 95% CI (SciPy 없이)</span><br>
+          T_CRIT = {5: 2.776, 8: 2.365, 16: 2.131}<br>
+          CI = T_CRIT[n] × std / √n<br><br>
+          <span class="comment"># Cohen's d (paired)</span><br>
+          d = mean(diff) / std(diff)
+        </div>
+        <div class="arch-files">
+          <span class="arch-file">stats_power.py</span>
+          <span class="arch-file">sensitivity.py</span>
+          <span class="arch-file">emergence_control.py</span>
+          <span class="arch-file">convergence_test.py</span>
+          <span class="arch-file">validate_3d.py</span>
+          <span class="arch-file">morphometry_compare.py</span>
+          <span class="arch-file">experiment_bridge.py</span>
+          <span class="arch-file">calibrate.py</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align:center;color:var(--muted);font-size:1.3rem;margin:-.2rem 0">↕</div>
+
+    <div class="arch-layer" onclick="toggleLayer(2)">
+      <div class="arch-layer-header">
+        <div class="arch-layer-num" style="background:#34d399;color:#070c16">2</div>
+        <div>
+          <div class="arch-layer-title">실험 레이어 — Runner Scripts</div>
+          <div class="arch-layer-sub">각 과학 시나리오의 설정만 담당. 물리 계산은 Layer 1에 위임.</div>
+        </div>
+      </div>
+      <div class="arch-layer-body" id="layer2">
+        <div class="grid2">
+          <div>
+            <p style="font-size:.85rem;color:var(--muted);margin-bottom:.7rem">
+              Runner는 파라미터 설정 + 시나리오 초기화만 해요.
+              "이렇게 세포를 놓아라" = seeding pattern.
+              "이런 파라미터를 써라" = NetworkParams.
+            </p>
+            <div class="eq-box" style="font-size:.76rem">
+              <span class="comment"># run_emergent.py 패턴</span><br>
+              P = NetworkParams(n_cells=24, ...)<br>
+              RP = RemodelParams(pct=85, ...)<br><br>
+              def ring_centers(n, R):<br>
+              &nbsp; return [(R·cos(2πi/n),<br>
+              &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;R·sin(2πi/n))<br>
+              &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; for i in range(n)]
+            </div>
+          </div>
+          <div>
+            <p style="font-size:.85rem;color:var(--muted);margin-bottom:.5rem">
+              새 실험 추가 = 새 runner 파일 하나만 추가.
+              코어 엔진(Layer 1)은 수정 불필요.
+            </p>
+            <div class="arch-files" style="flex-direction:column;gap:.3rem">
+              <span class="arch-file">run_emergent.py</span>
+              <span class="arch-file">make_track_scene.py</span>
+              <span class="arch-file">run_culture.py / run_spheroid.py / ...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align:center;color:var(--muted);font-size:1.3rem;margin:-.2rem 0">↕</div>
+
+    <div class="arch-layer" onclick="toggleLayer(1)">
+      <div class="arch-layer-header">
+        <div class="arch-layer-num" style="background:#fb923c;color:#070c16">1</div>
+        <div>
+          <div class="arch-layer-title">코어 엔진 레이어 — ecm_pipeline/</div>
+          <div class="arch-layer-sub">실제 물리 계산. 이 레이어만 과학적 정확도를 담당.</div>
+        </div>
+      </div>
+      <div class="arch-layer-body" id="layer1">
+        <div class="grid2">
+          <div>
+            <p style="font-size:.85rem;color:var(--muted);margin-bottom:.7rem">
+              13개 모듈이 각각 단일 책임 원칙으로 분리돼 있어요.
+              측정(metrics.py)이 출력 포맷(web_export.py)을 모르고,
+              역학(ecm_mechanics.py)이 어디서 호출되는지 몰라요.
+            </p>
+            <p style="font-size:.85rem;color:var(--muted)">
+              <strong class="em">핵심 설계</strong>: metrics.py는 항상 dict를 반환.
+              호출자가 포맷 결정.
+            </p>
+          </div>
+          <div>
+            <div class="arch-files" style="flex-direction:column;gap:.3rem">
+              <span class="arch-file">ecm_network.py    — 네트워크 성장</span>
+              <span class="arch-file">ecm_mechanics.py  — FIRE + 비선형 역학</span>
+              <span class="arch-file">ecm_remodel.py    — 소성 재형성</span>
+              <span class="arch-file">metrics.py        — 정량 측정</span>
+              <span class="arch-file">web_export.py     — scene.json 생성</span>
+              <span class="arch-file">seeding.py        — 세포 배치 패턴</span>
+              <span class="arch-file">calibration.py    — SI 단위 보정</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Data flow -->
+  <h3 style="color:var(--head);margin:2.5rem 0 1rem">데이터 흐름 전체</h3>
+  <div class="flow">
+    <div class="flow-step">
+      <div class="icon">🌱</div>
+      <div class="ft">ecm_network</div>
+      <div class="fs">polyline 성장<br>(nodes + edges)</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="icon">⚡</div>
+      <div class="ft">ecm_mechanics</div>
+      <div class="fs">FIRE 평형<br>비선형 힘</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="icon">🔁</div>
+      <div class="ft">ecm_remodel</div>
+      <div class="fs">강화/제거<br>반복 스텝</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="icon">📄</div>
+      <div class="ft">scene.json</div>
+      <div class="fs">polylines<br>+ scalars</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="icon">🌐</div>
+      <div class="ft">Three.js</div>
+      <div class="fs">tapered tube<br>WebGL 렌더</div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ── §6 검증 ──────────────────────────────────── -->
+<section id="validation">
+<div class="container">
+  <span class="sec-label">§ 6 · 검증 & 한계</span>
+  <h2 class="sec-title">무엇이 증명됐고, 무엇이 남았는가</h2>
+  <p class="sec-intro">
+    모든 클레임은 재현 가능한 스크립트 하나로 뒷받침돼요.
+    한계도 같은 무게로 명시해요.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th><th>클레임</th><th>검증 결과</th><th>스크립트</th><th>상태</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>C1</td>
+        <td>단일 세포 → 방사형 Aster</td>
+        <td>방사도 <span class="num">0.97</span> vs <span class="num">0.69</span>, d=9.1 (n=16)</td>
+        <td><code>stats_power.py</code></td>
+        <td><span class="pass">✓ PASS</span></td>
+      </tr>
+      <tr>
+        <td>C2</td>
+        <td>두 세포 → 축-특이적 Bridge</td>
+        <td>축 <span class="num">0.53</span> vs 수직 <span class="num">0.37</span>, d=2.5 (n=16)</td>
+        <td><code>stats_power.py</code></td>
+        <td><span class="pass">✓ PASS</span></td>
+      </tr>
+      <tr>
+        <td>C3</td>
+        <td>배치 geometry가 연결성 제어</td>
+        <td>촘촘 <span class="num">0.25</span> → 넓음 <span class="num">0.74</span> (단조, ~3×, n=5)</td>
+        <td><code>emergence_control.py</code></td>
+        <td><span class="pass">✓ PASS</span></td>
+      </tr>
+      <tr>
+        <td>C4</td>
+        <td>비선형성이 bridge 신호 구동</td>
+        <td>비선형 0.160 vs 선형 0.081 (~2×), 좌굴 지배적</td>
+        <td><code>sensitivity.py</code></td>
+        <td><span class="pass">✓ PASS</span></td>
+      </tr>
+      <tr>
+        <td>C5</td>
+        <td>소성 기억: 세포 제거 후 구조 잔류</td>
+        <td>잔류 응력 <span class="num">4250</span> vs 탄성 <span class="num">11</span> (~400×)</td>
+        <td><code>verify_remodel.py</code></td>
+        <td><span class="pass">✓ PASS</span></td>
+      </tr>
+      <tr>
+        <td>C6</td>
+        <td>망상 형태가 reticular 범위에 부합</td>
+        <td>coordination <span class="num">3.09</span>, pore <span class="num">22 µm</span></td>
+        <td><code>morphometry_compare.py</code></td>
+        <td><span class="pass">✓ PASS</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="grid2" style="margin-top:1.5rem">
+    <div class="card" style="border-color:var(--green)">
+      <h3 style="color:var(--green)">강건성 검증</h3>
+      <ul style="list-style:none;display:flex;flex-direction:column;gap:.5rem;margin-top:.5rem">
+        <li style="font-size:.85rem;color:var(--muted)">✓ <strong class="em">이산화 독립성</strong>: 1.3k→4k 노드, 변화 &lt;1.5%</li>
+        <li style="font-size:.85rem;color:var(--muted)">✓ <strong class="em">파라미터 민감도</strong>: OAT 전 파라미터에서 결론 유지</li>
+        <li style="font-size:.85rem;color:var(--muted)">✓ <strong class="em">3D 재현</strong>: aster Δ=0.348, bridge gap 동일</li>
+        <li style="font-size:.85rem;color:var(--muted)">✓ <strong class="em">SI 보정</strong>: G ≈ 0.8 Pa (soft gel 범위)</li>
+      </ul>
+    </div>
+    <div class="card" style="border-color:var(--red)">
+      <h3 style="color:var(--red)">명시된 한계 (향후 과제)</h3>
+      <ul style="list-style:none;display:flex;flex-direction:column;gap:.5rem;margin-top:.5rem">
+        <li style="font-size:.85rem;color:var(--muted)">◦ 분포-레벨 비교 (KS/EMD vs 실제 FRC 히스토그램)</li>
+        <li style="font-size:.85rem;color:var(--muted)">◦ 전역 민감도 (Sobol/LHS; 현재 OAT만)</li>
+        <li style="font-size:.85rem;color:var(--muted)">◦ Periodic-BC rheology (현재 order-of-magnitude)</li>
+        <li style="font-size:.85rem;color:var(--muted)">◦ LOX/MMP 명시적 동역학 (현재 percentile 근사)</li>
+        <li style="font-size:.85rem;color:var(--muted)">◦ 세포 능동 이동, 단일 기질 종 가정</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top:1.5rem">
+    <strong>한 줄 요약</strong><br>
+    세포가 콜라겐을 분비하고 수축시키면, 비선형 섬유 역학과 소성 재형성이 결합되어
+    세포 배치에 따라 예측 가능한 망상 구조가 물리 법칙으로부터 자발적으로 출현한다.
+  </div>
+
+  <div style="background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:1.2rem;margin-top:1.5rem">
+    <p style="color:var(--muted);font-size:.82rem;margin-bottom:.6rem">재현 명령어 (전체 검증 파이프라인):</p>
+    <div class="eq-box" style="margin:0">
+      pip install -r requirements.txt<br>
+      python verify_mechanics.py   <span class="comment"># 역학 + aster</span><br>
+      python stats_power.py        <span class="comment"># n=16 헤드라인 통계</span><br>
+      python emergence_control.py  <span class="comment"># 헤드라인 결과 C3</span><br>
+      python sensitivity.py        <span class="comment"># 비선형성 분해</span><br>
+      python validate_3d.py        <span class="comment"># 3D 재현</span><br>
+      python morphometry_compare.py<span class="comment"># 망상 형태</span>
+    </div>
+  </div>
+</div>
+</section>
+
+<footer>
+  <p style="color:var(--accent);font-weight:700;margin-bottom:.4rem">ECM 기계적 자기조직화 시뮬레이션</p>
+  <p>Discrete Fiber Network · FIRE Equilibrium · Plastic Remodeling · Three.js WebGL</p>
+  <p style="margin-top:.5rem">모든 결과는 결정론적이며 단일 스크립트로 재현 가능합니다.</p>
+</footer>
+
+<!-- ═══════════════════════════════════════════════ -->
+<script>
+/* ── COMPAT: roundRect polyfill (Safari <16, older Firefox) ─── */
+if (typeof CanvasRenderingContext2D !== 'undefined' &&
+    !CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r){
+    if (typeof r === 'number') r = [r, r, r, r];
+    else if (Array.isArray(r) && r.length === 1) r = [r[0],r[0],r[0],r[0]];
+    const [tl, tr, br, bl] = r;
+    this.moveTo(x + tl, y);
+    this.lineTo(x + w - tr, y);
+    this.arcTo(x + w, y, x + w, y + tr, tr);
+    this.lineTo(x + w, y + h - br);
+    this.arcTo(x + w, y + h, x + w - br, y + h, br);
+    this.lineTo(x + bl, y + h);
+    this.arcTo(x, y + h, x, y + h - bl, bl);
+    this.lineTo(x, y + tl);
+    this.arcTo(x, y, x + tl, y, tl);
+    this.closePath();
+    return this;
+  };
+}
+
+/* ── DIAGNOSTIC: surface any uncaught error instead of dying silently ── */
+window.addEventListener('error', function(e){
+  let b = document.getElementById('__errbanner');
+  if(!b){
+    b = document.createElement('div');
+    b.id = '__errbanner';
+    b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9999;'+
+      'background:#7f1d1d;color:#fff;font:12px monospace;padding:8px 14px;'+
+      'border-top:2px solid #f87171;white-space:pre-wrap';
+    document.body.appendChild(b);
+  }
+  b.textContent = '⚠ 스크립트 오류 (이 내용을 알려주세요): ' +
+    e.message + '  @' + (e.filename||'').split('/').pop() + ':' + e.lineno;
+});
+
+/* ── HERO ANIMATION ─────────────────────────────── */
+(function(){
+  const cv = document.getElementById('heroCanvas');
+  const ctx = cv.getContext('2d');
+  let W, H, nodes, edges, t = 0;
+
+  function resize(){
+    W = cv.width = cv.offsetWidth;
+    H = cv.height = cv.offsetHeight;
+    init();
+  }
+
+  function init(){
+    nodes = [];
+    edges = [];
+    const N = 80;
+    for(let i=0;i<N;i++){
+      nodes.push({
+        x: Math.random()*W, y: Math.random()*H,
+        vx:(Math.random()-.5)*.15, vy:(Math.random()-.5)*.15,
+        r: Math.random()
+      });
+    }
+    for(let i=0;i<N;i++){
+      for(let j=i+1;j<N;j++){
+        const dx=nodes[i].x-nodes[j].x, dy=nodes[i].y-nodes[j].y;
+        if(dx*dx+dy*dy < 140*140) edges.push([i,j]);
+      }
+    }
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    // edges
+    edges.forEach(([a,b])=>{
+      const dx=nodes[a].x-nodes[b].x, dy=nodes[a].y-nodes[b].y;
+      const d=Math.sqrt(dx*dx+dy*dy);
+      const alpha = Math.max(0, 1-d/140);
+      ctx.beginPath();
+      ctx.strokeStyle = `rgba(96,165,250,${alpha*0.35})`;
+      ctx.lineWidth = 0.8;
+      ctx.moveTo(nodes[a].x,nodes[a].y);
+      ctx.lineTo(nodes[b].x,nodes[b].y);
+      ctx.stroke();
+    });
+    // nodes
+    nodes.forEach(n=>{
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(56,189,248,${0.15+n.r*0.2})`;
+      ctx.arc(n.x,n.y,2,0,Math.PI*2);
+      ctx.fill();
+    });
+    // update
+    nodes.forEach(n=>{
+      n.x+=n.vx; n.y+=n.vy;
+      if(n.x<0||n.x>W) n.vx*=-1;
+      if(n.y<0||n.y>H) n.vy*=-1;
+    });
+    t++;
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+  draw();
+})();
+
+/* ── BRIDGE ALIGNMENT CHART ─────────────────────── */
+(function(){
+  const cv = document.getElementById('bridgeChart');
+  const ctx = cv.getContext('2d');
+  const W = cv.width = cv.offsetWidth || 700;
+  const H = cv.height = 220;
+
+  const seps = [24,44,68,96,128];
+  const bridge = [0.497,0.586,0.527,0.554,0.598];
+  const perp   = [0.422,0.361,0.369,0.345,0.323];
+  const semB   = [0.017,0.006,0.003,0.006,0.011];
+  const semP   = [0.010,0.004,0.005,0.003,0.006];
+
+  const pad = {l:55,r:20,t:20,b:45};
+  const pw = W-pad.l-pad.r, ph = H-pad.t-pad.b;
+  const minY=0.28, maxY=0.65;
+
+  function toX(v){ return pad.l + (v-24)/(128-24)*pw; }
+  function toY(v){ return pad.t + ph - (v-minY)/(maxY-minY)*ph; }
+
+  // axes
+  ctx.strokeStyle='#1e3a5f'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(pad.l,pad.t); ctx.lineTo(pad.l,pad.t+ph); ctx.lineTo(pad.l+pw,pad.t+ph); ctx.stroke();
+
+  // gridlines + y labels
+  ctx.fillStyle='#64748b'; ctx.font='11px monospace'; ctx.textAlign='right';
+  [0.33,0.40,0.50,0.60].forEach(v=>{
+    const y=toY(v);
+    ctx.strokeStyle='rgba(30,58,95,0.5)'; ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(pad.l+pw,y); ctx.stroke();
+    ctx.fillText(v.toFixed(2),pad.l-6,y+4);
+  });
+
+  // isotropic line
+  ctx.strokeStyle='rgba(100,116,139,0.4)'; ctx.setLineDash([5,5]); ctx.lineWidth=1;
+  const y333=toY(0.333);
+  ctx.beginPath(); ctx.moveTo(pad.l,y333); ctx.lineTo(pad.l+pw,y333); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // perp line
+  ctx.strokeStyle='rgba(148,163,184,0.6)'; ctx.lineWidth=1.5;
+  ctx.beginPath();
+  perp.forEach((v,i)=>{ i===0?ctx.moveTo(toX(seps[i]),toY(v)):ctx.lineTo(toX(seps[i]),toY(v)); });
+  ctx.stroke();
+
+  // bridge line
+  ctx.strokeStyle='#60a5fa'; ctx.lineWidth=2.5;
+  ctx.beginPath();
+  bridge.forEach((v,i)=>{ i===0?ctx.moveTo(toX(seps[i]),toY(v)):ctx.lineTo(toX(seps[i]),toY(v)); });
+  ctx.stroke();
+
+  // error bars + dots
+  seps.forEach((s,i)=>{
+    const x=toX(s);
+    // bridge
+    ctx.strokeStyle='#60a5fa'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(x,toY(bridge[i]+semB[i])); ctx.lineTo(x,toY(bridge[i]-semB[i])); ctx.stroke();
+    ctx.fillStyle='#60a5fa';
+    ctx.beginPath(); ctx.arc(x,toY(bridge[i]),4,0,Math.PI*2); ctx.fill();
+    // perp
+    ctx.strokeStyle='#94a3b8'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(x,toY(perp[i]+semP[i])); ctx.lineTo(x,toY(perp[i]-semP[i])); ctx.stroke();
+    ctx.fillStyle='#94a3b8';
+    ctx.beginPath(); ctx.arc(x,toY(perp[i]),3,0,Math.PI*2); ctx.fill();
+  });
+
+  // x labels
+  ctx.fillStyle='#64748b'; ctx.font='11px monospace'; ctx.textAlign='center';
+  seps.forEach(s=>{ ctx.fillText(s,toX(s),H-pad.b+16); });
+  ctx.fillText('세포 간격 (µm)',pad.l+pw/2,H-3);
+
+  // legend
+  ctx.font='11px monospace'; ctx.textAlign='left';
+  ctx.fillStyle='#60a5fa'; ctx.fillRect(pad.l+5,pad.t+2,18,3);
+  ctx.fillStyle='#e2e8f0'; ctx.fillText('교량 방향 (bridge axis)',pad.l+28,pad.t+7);
+  ctx.fillStyle='#94a3b8'; ctx.fillRect(pad.l+180,pad.t+2,18,3);
+  ctx.fillStyle='#94a3b8'; ctx.fillText('수직 방향 (perp control)',pad.l+203,pad.t+7);
+  ctx.fillStyle='rgba(100,116,139,0.5)'; ctx.fillRect(pad.l+370,pad.t+2,18,1);
+  ctx.fillStyle='#64748b'; ctx.fillText('등방성 기준(0.333)',pad.l+393,pad.t+7);
+})();
+
+/* ── FORCE DEMO ─────────────────────────────────── */
+let forceMode = 'nonlinear';
+const KS = 1.0, BUCKLE = 0.05, ALPHA = 8.0;
+
+function forceVal(strain, mode){
+  if(mode==='linear') return KS * strain;
+  if(strain < 0) return KS * BUCKLE * strain;
+  return KS * strain * (1 + ALPHA * strain);
+}
+
+function setForceModeNL(){ forceMode='nonlinear'; document.getElementById('pillNL').classList.add('active'); document.getElementById('pillL').classList.remove('active'); drawForce(); }
+function setForceModeL(){ forceMode='linear'; document.getElementById('pillL').classList.add('active'); document.getElementById('pillNL').classList.remove('active'); drawForce(); }
+
+let currentStrain = 0;
+function onStrain(v){
+  currentStrain = v/100;
+  document.getElementById('strainVal').textContent = (v>0?'+':'')+v+' %';
+  const F = forceVal(currentStrain, forceMode);
+  const label = currentStrain < -0.05 ? '🟥 좌굴 — 힘 거의 없음' : currentStrain > 0.1 ? '🟢 장력 — 변형경화 작동' : '⬜ 이완';
+  document.getElementById('forceVal').textContent = `F = ${F.toFixed(3)} | ${label}`;
+  drawForce();
+}
+
+function drawForce(){
+  const cv = document.getElementById('forceCanvas');
+  const ctx = cv.getContext('2d');
+  const W = cv.width = cv.offsetWidth || 700;
+  const H = cv.height = 300;
+
+  ctx.clearRect(0,0,W,H);
+
+  const LEFT = W*0.35, chartW = W*0.6;
+  const pad = {l:55,r:15,t:20,b:40};
+  const pw = chartW - pad.l - pad.r;
+  const ph = H - pad.t - pad.b;
+  const chartX = LEFT + pad.l;
+  const chartY = pad.t;
+  const minS=-0.5, maxS=1.2;
+  const minF=-0.12, maxF=2.2;
+
+  const sx = s => chartX + (s-minS)/(maxS-minS)*pw;
+  const sy = f => chartY + ph - (f-minF)/(maxF-minF)*ph;
+
+  // ── LEFT: fiber visualization ──
+  const cy = H/2, cx = LEFT/2;
+  const restLen = 80;
+  const curLen = restLen * (1 + currentStrain);
+  const x0 = cx - curLen/2, x1 = cx + curLen/2;
+
+  // fiber color
+  let fColor;
+  if(currentStrain < -0.05) fColor = 'rgba(248,113,113,0.7)';
+  else if(currentStrain > 0.1) fColor = '#60a5fa';
+  else fColor = 'rgba(148,163,184,0.6)';
+
+  // draw fiber as wavy bezier
+  const waveAmp = Math.max(0, -currentStrain) * 15 + 3;
+  ctx.strokeStyle = fColor;
+  ctx.lineWidth = currentStrain > 0.2 ? 3 : 2;
+  ctx.beginPath();
+  const steps = 20;
+  for(let i=0;i<=steps;i++){
+    const t = i/steps;
+    const xi = x0 + t*(x1-x0);
+    const yi = cy + waveAmp * Math.sin(t*Math.PI*3) * (1-currentStrain*0.5);
+    i===0 ? ctx.moveTo(xi,yi) : ctx.lineTo(xi,yi);
+  }
+  ctx.stroke();
+
+  // endpoints (fixed walls)
+  [x0,x1].forEach(x=>{
+    ctx.fillStyle='#94a3b8';
+    ctx.fillRect(x-2,cy-12,4,24);
+  });
+
+  // strain arrow
+  if(Math.abs(currentStrain) > 0.05){
+    const arr = currentStrain > 0 ? '←  →' : '→  ←';
+    ctx.fillStyle = fColor;
+    ctx.font = 'bold 13px monospace';
+    ctx.textAlign='center';
+    ctx.fillText(arr, cx, cy+28);
+  }
+
+  ctx.fillStyle='#64748b'; ctx.font='11px monospace'; ctx.textAlign='center';
+  ctx.fillText('섬유', cx, cy-22);
+
+  // ── RIGHT: force curve ──
+  // background
+  ctx.fillStyle='rgba(14,23,40,0.5)';
+  ctx.fillRect(chartX-pad.l+5, chartY-5, pw+pad.l+pad.r-5, ph+pad.t+pad.b-15);
+
+  // zero lines
+  ctx.strokeStyle='rgba(30,58,95,0.8)'; ctx.lineWidth=1; ctx.setLineDash([]);
+  const y0 = sy(0), x0l = sx(0);
+  ctx.beginPath(); ctx.moveTo(chartX,y0); ctx.lineTo(chartX+pw,y0); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x0l,chartY); ctx.lineTo(x0l,chartY+ph); ctx.stroke();
+
+  // region labels
+  ctx.fillStyle='rgba(248,113,113,0.25)';
+  ctx.fillRect(chartX, chartY, x0l-chartX, ph);
+  ctx.fillStyle='rgba(96,165,250,0.08)';
+  ctx.fillRect(x0l, chartY, pw-(x0l-chartX), ph);
+
+  ctx.fillStyle='rgba(248,113,113,0.6)'; ctx.font='10px monospace'; ctx.textAlign='center';
+  ctx.fillText('압축 → 좌굴', (chartX+x0l)/2, chartY+14);
+  ctx.fillStyle='rgba(96,165,250,0.6)';
+  ctx.fillText('장력 → 변형경화', (x0l+chartX+pw)/2, chartY+14);
+
+  // linear curve (dashed)
+  ctx.strokeStyle='rgba(148,163,184,0.4)'; ctx.lineWidth=1.5; ctx.setLineDash([6,4]);
+  ctx.beginPath();
+  for(let si=minS;si<=maxS;si+=0.02){
+    const f=forceVal(si,'linear');
+    if(f<minF||f>maxF) continue;
+    const x=sx(si), y=sy(f);
+    si===minS?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // nonlinear curve (always show for reference)
+  ctx.strokeStyle='rgba(96,165,250,0.35)'; ctx.lineWidth=1.5;
+  if(forceMode==='linear'){ ctx.strokeStyle='rgba(96,165,250,0.35)'; }
+  ctx.beginPath();
+  for(let si=minS;si<=maxS;si+=0.02){
+    const f=forceVal(si,'nonlinear');
+    if(f<minF||f>maxF) continue;
+    const x=sx(si), y=sy(f);
+    si===minS?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+
+  // active curve (thick)
+  ctx.strokeStyle = forceMode==='nonlinear' ? '#60a5fa' : '#94a3b8';
+  ctx.lineWidth=2.5;
+  ctx.beginPath();
+  let first=true;
+  for(let si=minS;si<=maxS;si+=0.01){
+    const f=forceVal(si,forceMode);
+    if(f<minF||f>maxF) continue;
+    const x=sx(si), y=sy(f);
+    first?(ctx.moveTo(x,y),first=false):ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+
+  // current point
+  const cf = forceVal(currentStrain, forceMode);
+  if(cf>=minF && cf<=maxF){
+    ctx.fillStyle='#f0f9ff';
+    ctx.beginPath(); ctx.arc(sx(currentStrain), sy(cf), 6, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#60a5fa'; ctx.lineWidth=2;
+    ctx.stroke();
+  }
+
+  // axes labels
+  ctx.fillStyle='#64748b'; ctx.font='10px monospace'; ctx.textAlign='center'; ctx.setLineDash([]);
+  [-0.4,-0.2,0,0.2,0.4,0.6,0.8,1.0].forEach(s=>{
+    if(s<minS||s>maxS) return;
+    ctx.fillText((s*100).toFixed(0)+'%', sx(s), chartY+ph+14);
+  });
+  ctx.fillText('변형률 (strain)', chartX+pw/2, chartY+ph+30);
+  ctx.save(); ctx.translate(chartX-40, chartY+ph/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText('힘 (force)', 0, 0); ctx.restore();
+
+  [0,0.5,1.0,1.5,2.0].forEach(f=>{
+    if(f<minF||f>maxF) return;
+    ctx.textAlign='right'; ctx.fillText(f.toFixed(1), chartX-6, sy(f)+4);
+  });
+
+  // legend
+  ctx.textAlign='left'; ctx.font='10px monospace';
+  ctx.fillStyle='#60a5fa'; ctx.fillRect(chartX,chartY+ph+35,20,2);
+  ctx.fillStyle='#94a3b8'; ctx.fillText('비선형 (콜라겐)', chartX+25, chartY+ph+38);
+  ctx.fillStyle='rgba(148,163,184,0.4)';
+  for(let i=0;i<20;i+=6){ ctx.fillRect(chartX+160+i,chartY+ph+35,4,2); }
+  ctx.fillStyle='#64748b'; ctx.fillText('선형', chartX+185, chartY+ph+38);
+}
+
+window.addEventListener('load', ()=>{ onStrain(0); });
+
+/* ── ASTER DEMO ─────────────────────────────────── */
+let asterState = 'idle', asterT = 0, asterAnimId = null;
+let asterNodes = [], asterEdges = [];
+
+function initAster(){
+  const cv = document.getElementById('asterCanvas');
+  const W = cv.offsetWidth || 600;
+  const H = 320;
+  cv.width = W; cv.height = H;
+  const cx=W/2, cy=H/2, R=120;
+  const N_SPOKE=10, N_RAND=25;
+  asterNodes = [{x:cx,y:cy,fixed:true,tension:0}];
+  asterEdges = [];
+
+  // spoke fibers: each has 3 segments
+  for(let i=0;i<N_SPOKE;i++){
+    const ang = (i/N_SPOKE)*Math.PI*2 + (Math.random()-.5)*.3;
+    const r = R*(0.7+Math.random()*.3);
+    const n1 = {x:cx+Math.cos(ang)*r*.4+rnd(8),y:cy+Math.sin(ang)*r*.4+rnd(8),fixed:false,tension:0};
+    const n2 = {x:cx+Math.cos(ang)*r*.7+rnd(10),y:cy+Math.sin(ang)*r*.7+rnd(10),fixed:false,tension:0};
+    const n3 = {x:cx+Math.cos(ang)*r+rnd(12),y:cy+Math.sin(ang)*r+rnd(12),fixed:false,tension:0};
+    const i1=asterNodes.length; asterNodes.push(n1,n2,n3);
+    asterEdges.push({a:0,b:i1,spoke:true});
+    asterEdges.push({a:i1,b:i1+1,spoke:true});
+    asterEdges.push({a:i1+1,b:i1+2,spoke:true});
+  }
+
+  // random cross-fibers
+  for(let i=0;i<N_RAND;i++){
+    const ang=Math.random()*Math.PI*2, r1=R*(0.3+Math.random()*.7), r2=R*(0.3+Math.random()*.7);
+    const ang2=ang+(Math.random()-.5)*.8;
+    const na={x:cx+Math.cos(ang)*r1,y:cy+Math.sin(ang)*r1,fixed:false,tension:0};
+    const nb={x:cx+Math.cos(ang2)*r2,y:cy+Math.sin(ang2)*r2,fixed:false,tension:0};
+    const i1=asterNodes.length; asterNodes.push(na,nb);
+    asterEdges.push({a:i1,b:i1+1,spoke:false});
+  }
+
+  // save rest positions
+  asterNodes.forEach(n=>{ n.rx=n.x; n.ry=n.y; });
+  drawAster(0);
+}
+
+function rnd(s){ return (Math.random()-.5)*s; }
+
+function runAster(){
+  if(asterAnimId) cancelAnimationFrame(asterAnimId);
+  asterT=0; asterState='contracting';
+  document.getElementById('asterBtn').textContent='↺ 다시보기';
+  animAster();
+}
+
+function animAster(){
+  asterT = Math.min(1, asterT+0.012);
+  const ease = asterT<0.5 ? 2*asterT*asterT : -1+(4-2*asterT)*asterT;
+  drawAster(ease);
+  if(asterT<1){ asterAnimId=requestAnimationFrame(animAster); }
+}
+
+function drawAster(progress){
+  const cv = document.getElementById('asterCanvas');
+  const ctx = cv.getContext('2d');
+  const W=cv.width, H=cv.height;
+  const cx=W/2, cy=H/2;
+  ctx.clearRect(0,0,W,H);
+
+  // move nodes toward radial positions
+  const nodes = asterNodes.map(n=>{
+    if(n.fixed) return {x:n.rx,y:n.ry};
+    const dx=n.rx-cx, dy=n.ry-cy;
+    const ang=Math.atan2(dy,dx);
+    const r=Math.sqrt(dx*dx+dy*dy);
+    // spoke-aligned target
+    const targetX = cx+Math.cos(ang)*r;
+    const targetY = cy+Math.sin(ang)*r;
+    return {
+      x: n.rx + (targetX-n.rx)*progress*0.3,
+      y: n.ry + (targetY-n.ry)*progress*0.3
+    };
+  });
+
+  // draw edges
+  asterEdges.forEach(e=>{
+    const a=nodes[e.a], b=nodes[e.b];
+    const dx=a.x-b.x, dy=a.y-b.y, d=Math.sqrt(dx*dx+dy*dy);
+    const ddx=a.x-cx, ddy=a.y-cy, r=Math.sqrt(ddx*ddx+ddy*ddy);
+    const adx=b.x-cx, ady=b.y-cy;
+    const dot=(ddx*adx+ddy*ady)/(r*Math.sqrt(adx*adx+ady*ady)+0.001);
+    const isRadial = dot>0.7;
+    const tension = isRadial ? progress : Math.max(0, progress*(1-progress)*2*0.3);
+    const alpha = e.spoke ? (0.2+tension*0.7) : (0.35-progress*0.25);
+    const w = e.spoke ? (0.8+tension*1.5) : 0.7;
+    const col = tension>0.5 ? `rgba(96,165,250,${alpha})` : `rgba(148,163,184,${alpha})`;
+    ctx.beginPath();
+    ctx.strokeStyle=col; ctx.lineWidth=w;
+    ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y);
+    ctx.stroke();
+  });
+
+  // cell
+  const grad = ctx.createRadialGradient(cx,cy,2,cx,cy,14+progress*3);
+  grad.addColorStop(0,'rgba(251,146,60,0.9)');
+  grad.addColorStop(1,'rgba(251,146,60,0)');
+  ctx.beginPath(); ctx.fillStyle=grad; ctx.arc(cx,cy,18,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.strokeStyle='#fb923c'; ctx.lineWidth=2;
+  ctx.arc(cx,cy,10,0,Math.PI*2); ctx.stroke();
+
+  // label
+  if(progress>0.3){
+    ctx.fillStyle=`rgba(96,165,250,${progress})`;
+    ctx.font=`bold ${11+progress*2}px monospace`;
+    ctx.textAlign='center';
+    ctx.fillText('Aster 형성', cx, cy-30);
+  }
+  if(progress<0.1 && asterState==='idle'){
+    ctx.fillStyle='rgba(100,116,139,0.7)';
+    ctx.font='12px monospace';
+    ctx.textAlign='center';
+    ctx.fillText('▶ 수축 시작 버튼을 누르세요', cx, cy-30);
+  }
+}
+
+/* ── EMERGENCE DEMO ─────────────────────────────── */
+const EMERGE_DATA = {
+  tight:  {R:34, conn:0.25, ci:0.07, color:'#f87171'},
+  medium: {R:52, conn:0.44, ci:0.22, color:'#fb923c'},
+  wide:   {R:72, conn:0.74, ci:0.18, color:'#34d399'},
+};
+let currentSpacing = 'wide';
+
+function showSpacing(s){ currentSpacing=s; drawEmergence(); }
+
+function drawEmergence(){
+  const cv = document.getElementById('emergenceCanvas');
+  const ctx = cv.getContext('2d');
+  const W = cv.width = cv.offsetWidth || 700;
+  const H = cv.height = 340;
+  ctx.clearRect(0,0,W,H);
+
+  const netW = W*0.42, netH = H-60;
+  const chartX = netW+30, chartW = W-chartX-20;
+
+  // ── LEFT: network schematic ──
+  const d = EMERGE_DATA[currentSpacing];
+  const cx=netW/2, cy=netH/2+30;
+  const R = d.R * (netW < 300 ? 1.0 : 1.2);
+  const cellR=10;
+
+  // 4 spheroid positions
+  const angles=[0,1,2,3].map(i=>i*Math.PI/2+Math.PI/4);
+  const cellPos = angles.map(a=>({ x:cx+Math.cos(a)*R*0.6, y:cy+Math.sin(a)*R*0.6 }));
+
+  // draw connections based on connectivity
+  const conn = d.conn;
+  ctx.strokeStyle=d.color; ctx.lineWidth=1.5;
+  const pairs=[[0,1],[1,2],[2,3],[3,0],[0,2],[1,3]];
+  pairs.forEach(([a,b],i)=>{
+    const show = conn > [0.1,0.2,0.3,0.5,0.6,0.7][i];
+    if(!show) return;
+    ctx.globalAlpha = 0.15+conn*0.5;
+    ctx.beginPath();
+    const mx=(cellPos[a].x+cellPos[b].x)/2+(Math.random()-.5)*20;
+    const my=(cellPos[a].y+cellPos[b].y)/2+(Math.random()-.5)*20;
+    ctx.moveTo(cellPos[a].x,cellPos[a].y);
+    ctx.quadraticCurveTo(mx,my,cellPos[b].x,cellPos[b].y);
+    ctx.stroke();
+    ctx.globalAlpha=1;
+  });
+
+  // radial fibers from each cell
+  cellPos.forEach(cp=>{
+    for(let i=0;i<8;i++){
+      const ang=i/8*Math.PI*2;
+      const len = 18+conn*12;
+      ctx.strokeStyle=d.color; ctx.lineWidth=0.8; ctx.globalAlpha=0.3+conn*0.3;
+      ctx.beginPath();
+      ctx.moveTo(cp.x,cp.y);
+      ctx.lineTo(cp.x+Math.cos(ang)*len, cp.y+Math.sin(ang)*len);
+      ctx.stroke();
+      ctx.globalAlpha=1;
+    }
+    ctx.beginPath();
+    ctx.fillStyle=d.color;
+    ctx.arc(cp.x,cp.y,cellR,0,Math.PI*2); ctx.fill();
+  });
+
+  // labels
+  ctx.fillStyle='#e2e8f0'; ctx.font='bold 13px monospace'; ctx.textAlign='center';
+  ctx.fillText(`${currentSpacing === 'tight' ? '촘촘' : currentSpacing==='medium'?'중간':'넓음'} 배치 (R=${d.R} µm)`,
+    netW/2, 18);
+  ctx.fillStyle=d.color;
+  ctx.font='bold 15px monospace';
+  ctx.fillText(`연결성 = ${d.conn.toFixed(2)}`, netW/2, 38);
+
+  // ── RIGHT: bar chart ──
+  const spacing = ['tight','medium','wide'];
+  const names = ['촘촘\n(34 µm)','중간\n(52 µm)','넓음\n(72 µm)'];
+  const barH = (netH-80)/3.5;
+  const maxConn = 0.85;
+  const chartLeft = chartX+10;
+
+  ctx.fillStyle='#e2e8f0'; ctx.font='bold 12px monospace'; ctx.textAlign='left';
+  ctx.fillText('연결성 (largest connected fraction)', chartLeft, 22);
+
+  spacing.forEach((s,i)=>{
+    const dd = EMERGE_DATA[s];
+    const y = 45 + i*(barH+10);
+    const barMaxW = chartW - 80;
+    const bw = dd.conn/maxConn*barMaxW;
+    const active = s===currentSpacing;
+
+    ctx.fillStyle = active ? dd.color : `${dd.color}55`;
+    ctx.beginPath();
+    ctx.roundRect(chartLeft, y, bw, barH, 4);
+    ctx.fill();
+
+    // error bar
+    const errW = dd.ci/maxConn*barMaxW;
+    ctx.strokeStyle=active?'#f0f9ff':'#94a3b8'; ctx.lineWidth=1.5;
+    ctx.beginPath();
+    ctx.moveTo(chartLeft+bw-errW, y+barH/2);
+    ctx.lineTo(chartLeft+bw+errW, y+barH/2);
+    ctx.moveTo(chartLeft+bw-errW, y+barH*.2);
+    ctx.lineTo(chartLeft+bw-errW, y+barH*.8);
+    ctx.moveTo(chartLeft+bw+errW, y+barH*.2);
+    ctx.lineTo(chartLeft+bw+errW, y+barH*.8);
+    ctx.stroke();
+
+    // label
+    ctx.fillStyle = active ? '#f0f9ff' : '#94a3b8';
+    ctx.font = `${active?'bold':''}  12px monospace`;
+    ctx.textAlign='left';
+    const nameStr = s==='tight'?'촘촘(34µm)':s==='medium'?'중간(52µm)':'넓음(72µm)';
+    ctx.fillText(nameStr, chartLeft, y-3);
+    ctx.fillStyle=active?dd.color:'#64748b';
+    ctx.fillText(`${dd.conn.toFixed(2)} ± ${dd.ci.toFixed(2)}`, chartLeft+bw+errW+6, y+barH/2+4);
+  });
+
+  // x axis
+  ctx.strokeStyle='#1e3a5f'; ctx.lineWidth=1;
+  const axY = 45+3*(barH+10);
+  ctx.beginPath(); ctx.moveTo(chartLeft,axY); ctx.lineTo(chartLeft+chartW-75,axY); ctx.stroke();
+  [0, 0.25, 0.5, 0.74].forEach(v=>{
+    const x=chartLeft+v/maxConn*(chartW-80);
+    ctx.fillStyle='#64748b'; ctx.font='10px monospace'; ctx.textAlign='center';
+    ctx.fillText(v.toFixed(2), x, axY+14);
+  });
+  ctx.fillStyle='#64748b'; ctx.font='10px monospace'; ctx.textAlign='center';
+  ctx.fillText('연결성', chartLeft+(chartW-80)/2, axY+28);
+}
+
+/* ── ARCH DIAGRAM ────────────────────────────────── */
+function toggleLayer(n){
+  const el = document.getElementById('layer'+n);
+  el.classList.toggle('open');
+}
+
+/* ── INIT ────────────────────────────────────────── */
+function safe(fn){ try { fn(); } catch(e){ console.error(e); window.dispatchEvent(new ErrorEvent('error',{message:e.message,filename:'init',lineno:0})); } }
+
+window.addEventListener('load', ()=>{
+  safe(initAster);
+  safe(drawEmergence);
+  safe(drawForce);
+  safe(()=>document.getElementById('layer1').classList.add('open'));
+});
+
+window.addEventListener('resize', ()=>{
+  safe(drawEmergence);
+  safe(()=>onStrain(currentStrain*100));
+});
+</script>
+</body>
+</html>

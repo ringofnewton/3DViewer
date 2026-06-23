@@ -1,0 +1,24 @@
+# Reference fiber-diameter distribution for fibrillar collagen (SEM-style), nm.
+#
+# FORMAT: bin_low_nm , bin_high_nm , count   (same digitized-histogram convention
+# as collagen_pore_um.csv). Provided as a second example of the dataset format;
+# the model's primary emergent observable is pore size, so distribution_compare.py
+# wires in collagen_pore_um.csv. This file documents the format for a fiber-
+# diameter comparison (the model would need a diameter observable to use it).
+#
+# PROVENANCE: literature-informed reconstruction of collagen fibril diameters
+# (tens to a few hundred nm, right-skewed), NOT pixel-digitized from one figure.
+bin_low_nm,bin_high_nm,count
+20,40,12
+40,60,41
+60,80,68
+80,100,72
+100,120,58
+120,140,40
+140,160,26
+160,180,16
+180,200,9
+200,220,5
+220,240,3
+240,260,2
+260,280,1

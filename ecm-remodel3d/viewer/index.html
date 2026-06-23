@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>ECM 3D Viewer — cells & collagen</title>
+<style>
+  :root { --ink:#e8f0ff; --muted:#9fb0c8; --panel:rgba(14,22,38,.72); --line:rgba(255,255,255,.12);
+    --bg:#05080f; --err:#ff9aa6; }
+  :root[data-theme="light"] { --ink:#15203a; --muted:#5a6580; --panel:rgba(255,255,255,.80);
+    --line:rgba(20,28,46,.14); --bg:#eef1f6; --err:#c8324f; }
+  * { box-sizing: border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR",sans-serif; overflow:hidden; }
+  #app { position:fixed; inset:0; }
+  .panel { position:fixed; top:14px; left:14px; background:var(--panel); border:1px solid var(--line);
+    border-radius:16px; padding:14px 16px; backdrop-filter:blur(14px); width:260px; }
+  .panel h1 { font-size:15px; margin:0 0 2px; letter-spacing:-.02em; }
+  .panel p { margin:0 0 12px; font-size:12px; color:var(--muted); line-height:1.5; }
+  .row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:9px 0; font-size:13px; }
+  .row label { color:var(--muted); }
+  input[type=range]{ width:130px; }
+  select { background:var(--panel); color:var(--ink); border:1px solid var(--line);
+    border-radius:8px; padding:3px 6px; font-size:12px; }
+  .leg-title { margin-top:12px; font-size:12px; color:var(--ink); font-weight:600; }
+  .stats { margin-top:6px; font-size:11.5px; color:var(--muted); }
+  .stats .s { display:flex; justify-content:space-between; gap:10px; padding:2px 0;
+    border-bottom:1px solid var(--line); }
+  .stats .s b { color:var(--ink); font-weight:600; }
+  .legend { margin-top:6px; height:12px; border-radius:6px; border:1px solid var(--line);
+    background:linear-gradient(90deg,#0b0b3b,#7a1d6f,#e2643b,#ffd884); }
+  .legend-l { display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-top:4px; }
+  .hint { position:fixed; bottom:12px; left:50%; transform:translateX(-50%); font-size:12px; color:var(--muted);
+    background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:7px 14px; backdrop-filter:blur(14px); }
+  #err { position:fixed; inset:auto 14px 14px 14px; color:var(--err); font-size:12px; white-space:pre-wrap; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="app"></div>
+<div class="panel">
+  <h1>ECM 3D Viewer</h1>
+  <p>세포 견인으로 형성된 콜라겐 네트워크. 드래그=회전, 스크롤=확대.
+     &nbsp;<a href="../play2d.html" style="color:#8ab4ff">인터랙티브 2D →</a>
+     &nbsp;<a href="../sim2d.html" style="color:#8ab4ff">2D 갤러리 →</a></p>
+  <div class="row"><label>Cells</label><input id="tCells" type="checkbox" checked></div>
+  <div class="row"><label>Fibers</label><input id="tFibers" type="checkbox" checked></div>
+  <div class="row"><label>Cell opacity</label><input id="sOpacity" type="range" min="0" max="100" value="45"></div>
+  <div class="row"><label>Ambient occlusion</label><input id="tAO" type="checkbox" checked></div>
+  <div class="row"><label>Light mode</label><input id="tLight" type="checkbox"></div>
+  <div class="row"><label>Color by</label><select id="sScalar"></select></div>
+  <div class="leg-title" id="legTitle">Collagen color scale</div>
+  <div class="legend" id="legBar"></div>
+  <div class="legend-l"><span id="legLo">low</span><span id="legMid"></span><span id="legHi">high</span></div>
+  <div class="leg-title">Matrix metrics</div>
+  <div class="stats" id="stats"></div>
+</div>
+<div class="hint">scene.json 을 불러옵니다 · 로컬에서 열면 <code>python -m http.server</code> 로 서빙하세요</div>
+<div id="err"></div>
+
+<!-- classic script: runs even when ES modules are blocked (file://) -->
+<script>
+  if (location.protocol === 'file:') {
+    document.getElementById('err').innerHTML =
+      '⚠ 파일을 더블클릭(file://)으로 열면 브라우저 보안 때문에 3D가 로드되지 않습니다.<br>' +
+      '터미널에서 &nbsp;<b>cd viewer &amp;&amp; python serve.py</b>&nbsp; 실행 후 ' +
+      '열리는 &nbsp;<b>http://localhost:8000</b>&nbsp; 으로 보세요.';
+    document.querySelector('.hint').style.display = 'none';
+  }
+  window.addEventListener('error', e => {
+    const el = document.getElementById('err');
+    if (el) el.textContent = '오류: ' + (e.message || (e.error && e.error.message) || e);
+  });
+  window.addEventListener('unhandledrejection', e => {
+    const el = document.getElementById('err');
+    if (el) el.textContent = '오류: ' + ((e.reason && e.reason.message) || e.reason || e);
+  });
+  // watchdog: if the 3D engine never boots (CDN blocked / offline), say so
+  if (location.protocol !== 'file:') {
+    window.__bootTimer = setTimeout(function(){
+      if (!window.__booted) {
+        var el = document.getElementById('err');
+        if (el) el.innerHTML = '3D 엔진 로드가 지연/실패했습니다.<br>' +
+          '인터넷 연결 또는 three.js CDN(unpkg) 접근 차단을 확인하세요.';
+      }
+    }, 6000);
+  }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const errEl = document.getElementById('err');
+const showErr = (m) => { errEl.textContent = String(m); };
+
+// ---- inferno-like colormap (0..1) -----------------------------------------
+function colormap(t){
+  t = Math.min(1, Math.max(0, t));
+  const stops = [[0.0,0.02,0.02,0.23],[0.25,0.42,0.07,0.43],[0.5,0.74,0.21,0.33],
+                 [0.75,0.95,0.5,0.16],[1.0,0.99,0.85,0.55]];
+  for (let i=0;i<stops.length-1;i++){
+    const a=stops[i], b=stops[i+1];
+    if (t>=a[0] && t<=b[0]){
+      const u=(t-a[0])/(b[0]-a[0]);
+      return new THREE.Color(a[1]+(b[1]-a[1])*u, a[2]+(b[2]-a[2])*u, a[3]+(b[3]-a[3])*u);
+    }
+  }
+  return new THREE.Color(0.99,0.85,0.55);
+}
+
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05080f);
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.5, 5000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+
+const key = new THREE.DirectionalLight(0xffffff, 2.2); key.position.set(1,1.5,1); scene.add(key);
+const rim = new THREE.DirectionalLight(0x88aaff, 1.1); rim.position.set(-1,0.4,-1); scene.add(rim);
+const amb = new THREE.AmbientLight(0x33405a, 0.6); scene.add(amb);
+
+// ---- light / dark theme ----------------------------------------------------
+const THEME = {
+  dark:  { bg:0x05080f, amb:0x33405a, ambI:0.6 },
+  light: { bg:0xeef1f6, amb:0xc4d0e4, ambI:1.0 },
+};
+function applyTheme(name){
+  const isLight = name === 'light';
+  const t = isLight ? THEME.light : THEME.dark;
+  document.documentElement.setAttribute('data-theme', isLight ? 'light' : 'dark');
+  scene.background = new THREE.Color(t.bg);
+  amb.color.setHex(t.amb); amb.intensity = t.ambI;
+  const cb = document.getElementById('tLight'); if (cb) cb.checked = isLight;
+  try { localStorage.setItem('ecm-viewer-theme', isLight ? 'light' : 'dark'); } catch(e){}
+}
+applyTheme((() => { try { return localStorage.getItem('ecm-viewer-theme'); } catch(e){ return null; } })() || 'dark');
+document.getElementById('tLight').onchange = e => applyTheme(e.target.checked ? 'light' : 'dark');
+
+const root = new THREE.Group(); scene.add(root);
+let cellGroup = new THREE.Group(), fiberMesh = null;
+root.add(cellGroup);
+
+// ---- build cells: smooth translucent spheres ------------------------------
+function makeCell(p, r, tint){
+  const geo = new THREE.SphereGeometry(r, 48, 32);
+  const mat = new THREE.MeshPhysicalMaterial({
+    color: tint, roughness:0.18, metalness:0.0, transmission:0.9, thickness:r*1.4,
+    ior:1.36, attenuationColor: tint, attenuationDistance: r*6,
+    clearcoat:0.6, clearcoatRoughness:0.25, transparent:true, opacity:0.42,
+    envMapIntensity:1.2, depthWrite:false
+  });
+  const m = new THREE.Mesh(geo, mat);
+  m.position.copy(p);
+  m.renderOrder = 2;
+  return m;
+}
+
+const PHENO_TINT = { producing:0x6fb0ff, contractile:0xb98cff, degrading:0xff8d8d,
+                     quiescent:0x9fe0d0 };
+
+// ---- build fibers: smooth tapered tubes (pointed organic ends) -------------
+// One merged mesh; each filament is a continuous tube whose radius tapers to a
+// point at both tips (no flat cylinder caps, no bent-wire joints). Vertex colors
+// are stored per filament so we can recolor by any scalar live.
+let FIB_RANGES = [];          // [{f, start, count}] vertex range per filament
+let FIB_COLOR_ATTR = null;
+
+function fiberValue(f, key){
+  return (f.vals && (key in f.vals)) ? f.vals[key] : f.v;
+}
+
+// append a tapered tube around polyline `path` into pos/idx; returns #vertices
+function tubeInto(pos, idx, path, radius, radial, taperN){
+  const n = path.length;
+  if (n < 2) return 0;
+  const P = path.map(p => new THREE.Vector3(p[0], p[1], p[2]));
+  const T = [];
+  for (let i=0;i<n;i++){
+    let t;
+    if (i===0) t = new THREE.Vector3().subVectors(P[1], P[0]);
+    else if (i===n-1) t = new THREE.Vector3().subVectors(P[n-1], P[n-2]);
+    else t = new THREE.Vector3().subVectors(P[i+1], P[i-1]);
+    if (t.lengthSq() < 1e-12) t.set(0,0,1);
+    T.push(t.normalize());
+  }
+  // parallel-transport frame to avoid twisting
+  let normal = new THREE.Vector3(0,0,1);
+  if (Math.abs(T[0].z) > 0.9) normal.set(0,1,0);
+  normal.crossVectors(T[0], normal).normalize();
+  let binormal = new THREE.Vector3().crossVectors(T[0], normal).normalize();
+  const base = pos.length/3;
+  const dir = new THREE.Vector3();
+  for (let i=0;i<n;i++){
+    if (i>0){
+      const v = new THREE.Vector3().crossVectors(T[i-1], T[i]);
+      const c = Math.min(1, Math.max(-1, T[i-1].dot(T[i])));
+      const ang = Math.acos(c);
+      if (v.lengthSq() > 1e-12 && ang > 1e-6){ v.normalize(); normal.applyAxisAngle(v, ang); }
+      binormal.crossVectors(T[i], normal).normalize();
+      normal.crossVectors(binormal, T[i]).normalize();
+    }
+    // taper to a point at the ends: smoothstep ramp over the first/last taperN samples
+    const edge = Math.min(i, n-1-i) / taperN;
+    const e = Math.min(1, edge);
+    const ramp = e*e*(3-2*e);                 // smoothstep
+    const r = radius * (0.06 + 0.94*ramp);    // ~0 at tip, full in the middle
+    for (let j=0;j<radial;j++){
+      const th = 2*Math.PI*j/radial;
+      dir.set(0,0,0)
+         .addScaledVector(normal, Math.cos(th)*r)
+         .addScaledVector(binormal, Math.sin(th)*r);
+      pos.push(P[i].x+dir.x, P[i].y+dir.y, P[i].z+dir.z);
+    }
+  }
+  for (let i=0;i<n-1;i++){
+    for (let j=0;j<radial;j++){
+      const a = base + i*radial + j;
+      const b = base + i*radial + (j+1)%radial;
+      const c = base + (i+1)*radial + j;
+      const d = base + (i+1)*radial + (j+1)%radial;
+      idx.push(a,c,b,  b,c,d);
+    }
+  }
+  return n*radial;
+}
+
+function buildFibers(fibers, key){
+  FIB_RANGES = [];
+  const pos = [], idx = [];
+  const radial = 6, taperN = 4;
+  for (const f of fibers){
+    if (!f.path || f.path.length < 2) continue;
+    const start = pos.length/3;
+    const added = tubeInto(pos, idx, f.path, f.r || 0.5, radial, taperN);
+    if (added) FIB_RANGES.push({ f, start, count: added });
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(pos.length), 3));
+  FIB_COLOR_ATTR = geo.getAttribute('color');
+  const mat = new THREE.MeshStandardMaterial({ vertexColors:true, roughness:0.42,
+    metalness:0.0, envMapIntensity:0.7 });
+  const mesh = new THREE.Mesh(geo, mat);
+  recolorFibers(key);
+  return mesh;
+}
+
+function recolorFibers(key){
+  if (!FIB_COLOR_ATTR) return;
+  const arr = FIB_COLOR_ATTR.array;
+  for (const { f, start, count } of FIB_RANGES){
+    const c = colormap(fiberValue(f, key));
+    for (let v=0; v<count; v++){ const o = (start+v)*3; arr[o]=c.r; arr[o+1]=c.g; arr[o+2]=c.b; }
+  }
+  FIB_COLOR_ATTR.needsUpdate = true;
+}
+
+// ---- composer (SSAO) -------------------------------------------------------
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const ssao = new SSAOPass(scene, camera, innerWidth, innerHeight);
+ssao.kernelRadius = 12; ssao.minDistance = 0.0015; ssao.maxDistance = 0.1;
+composer.addPass(ssao);
+composer.addPass(new OutputPass());
+
+function frameScene(domain){
+  const c = domain*0.5;
+  controls.target.set(c,c,c);
+  camera.position.set(c+domain*1.05, c+domain*0.7, c+domain*1.15);
+  camera.near = domain*0.01; camera.far = domain*12; camera.updateProjectionMatrix();
+}
+
+async function load(){
+  let data;
+  try {
+    const res = await fetch('scene.json', {cache:'no-store'});
+    if (!res.ok) throw new Error('scene.json '+res.status);
+    data = await res.json();
+  } catch(e){ showErr('scene.json 로드 실패: '+e.message+'\n(로컬이면 http.server 로 서빙)'); return; }
+
+  const domain = data.domain || 200;
+  frameScene(domain);
+  // build the colour scale legend straight from the colormap used on the fibers
+  let grad = [];
+  for (let i=0;i<=10;i++){ const c = colormap(i/10); grad.push(`#${c.getHexString()} ${i*10}%`); }
+  document.getElementById('legBar').style.background = `linear-gradient(90deg,${grad.join(',')})`;
+  document.getElementById('legMid').textContent = '→';
+
+  // available per-fiber scalars (fall back to a single scalar for old scenes)
+  const FALLBACK = {reinforce:['Collagen — reinforcement','soft','reinforced'],
+                    tension:['Collagen — tension','slack','high tension'],
+                    state:['Collagen — fiber maturity','nascent','crosslinked']};
+  const scalars = (data.scalars && data.scalars.length) ? data.scalars
+    : [{key:data.scalar||'reinforce',
+        title:(FALLBACK[data.scalar]||['Collagen color scale'])[0],
+        lo:(FALLBACK[data.scalar]||[,'low'])[1], hi:(FALLBACK[data.scalar]||[,, 'high'])[2]}];
+  const SCALARS = {}; scalars.forEach(s => SCALARS[s.key] = s);
+
+  function setLegend(key){
+    const s = SCALARS[key] || {title:'Collagen color scale', lo:'low', hi:'high'};
+    document.getElementById('legTitle').textContent = s.title;
+    document.getElementById('legLo').textContent = s.lo || 'low';
+    document.getElementById('legHi').textContent = s.hi || 'high';
+  }
+
+  // populate the "Color by" selector
+  const sel = document.getElementById('sScalar');
+  sel.innerHTML = '';
+  scalars.forEach(s => { const o = document.createElement('option');
+    o.value = s.key; o.textContent = s.key; sel.appendChild(o); });
+  let curKey = data.scalar || scalars[0].key;
+  sel.value = curKey;
+  sel.onchange = e => { curKey = e.target.value; recolorFibers(curKey); setLegend(curKey); };
+
+  setLegend(curKey);
+  fiberMesh = buildFibers(data.fibers || [], curKey);
+  root.add(fiberMesh);
+
+  // scene-level metrics panel
+  if (data.stats){
+    const labels = data.stat_labels || {};
+    const fmt = v => (typeof v === 'number')
+      ? (Number.isInteger(v) ? v.toString()
+         : (Math.abs(v) < 0.01 ? v.toExponential(2) : v.toFixed(3)))
+      : v;
+    document.getElementById('stats').innerHTML = Object.entries(data.stats)
+      .map(([k,v]) => `<div class="s"><span>${labels[k]||k}</span><b>${fmt(v)}</b></div>`).join('');
+  }
+
+  for (const c of (data.cells||[])){
+    const tint = PHENO_TINT[c.pheno] ?? 0x8fb6ff;
+    cellGroup.add(makeCell(new THREE.Vector3(c.p[0],c.p[1],c.p[2]), c.r, tint));
+  }
+  showErr('');
+}
+load();
+
+// ---- UI --------------------------------------------------------------------
+document.getElementById('tCells').onchange = e => cellGroup.visible = e.target.checked;
+document.getElementById('tFibers').onchange = e => { if (fiberMesh) fiberMesh.visible = e.target.checked; };
+document.getElementById('tAO').onchange = e => ssao.enabled = e.target.checked;
+document.getElementById('sOpacity').oninput = e => {
+  const o = e.target.value/100;
+  cellGroup.children.forEach(m => { m.material.opacity = o; m.material.transmission = 0.2+0.6*(1-o); });
+};
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
+});
+
+window.__booted = true;
+if (window.__bootTimer) clearTimeout(window.__bootTimer);
+renderer.setAnimationLoop(() => {
+  controls.update();
+  (ssao.enabled ? composer : renderer).render(scene, camera);
+});
+</script>
+</body>
+</html>

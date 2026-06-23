@@ -1,0 +1,48 @@
+# Regenerable bulk outputs (run `python run_demo.py` to recreate)
+output/*.csv
+output/*.vtp
+output/*.json
+
+# Keep the publication figures tracked so they render on GitHub:
+!output/figures/
+
+# Network-growth demo: ignore bulk data, keep its figures
+output_network/*.csv
+output_network/*.json
+output_network/*.vtp
+!output_network/figures/
+
+# Mechanics / morphogenesis demo: ignore bulk data, keep its figures
+output_mech/*.csv
+!output_mech/figures/
+
+# Plastic remodeling demo: keep its figures
+!output_remodel/figures/
+
+# 2D morphology demo: keep its figures
+!output_morph2d/figures/
+
+# Cell-culture / DLP density-pattern demo: keep its figures
+!output_culture/figures/
+
+# Spheroid time-course demo: keep its figures
+!output_spheroid/figures/
+
+# White-pulp mimic demo: keep its figures
+!output_whitepulp/figures/
+
+# Pattern-seeding time-course demo: keep its figures
+!output_patterns/figures/
+
+# Test / sample artifacts (regenerable via fixture.py / verify_parser.py)
+sample_physicell_output/
+output_real/
+
+__pycache__/
+*.pyc
+.DS_Store
+!output_emergent/figures/
+!output_inverse/figures/
+!output_pore/figures/
+!output_freegel/figures/
+!output_cleangraph/figures/

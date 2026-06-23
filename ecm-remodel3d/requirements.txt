@@ -1,0 +1,5 @@
+numpy>=1.24
+matplotlib>=3.7
+# scipy is optional; the pipeline does not require it.
+# trimesh is optional; only needed for export_glb.py (scene.json -> GLB).
+trimesh>=4.0

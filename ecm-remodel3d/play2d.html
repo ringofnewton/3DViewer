@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Interactive 2D ECM Simulation — cells secrete & remodel collagen</title>
+<style>
+  :root { --bg:#0a0d14; --panel:rgba(16,22,34,.82); --line:rgba(255,255,255,.12);
+    --ink:#e8f0ff; --muted:#9fb0c8; --accent:#8ab4ff; }
+  :root[data-theme="light"] { --bg:#eef1f6; --panel:rgba(255,255,255,.86); --line:rgba(20,28,46,.14);
+    --ink:#15203a; --muted:#5a6580; --accent:#2f6bd8; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; overflow:hidden; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR",sans-serif; }
+  #cv { position:fixed; inset:0; display:block; touch-action:none; }
+  .panel { position:fixed; top:12px; left:12px; width:270px; max-height:calc(100% - 24px);
+    overflow:auto; background:var(--panel); border:1px solid var(--line); border-radius:16px;
+    padding:14px 16px; backdrop-filter:blur(14px); }
+  .panel h1 { font-size:15px; margin:0 0 2px; letter-spacing:-.02em; }
+  .panel p.sub { margin:0 0 10px; font-size:12px; color:var(--muted); line-height:1.5; }
+  .row { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:7px 0; font-size:12.5px; }
+  .row label { color:var(--muted); }
+  input[type=range]{ width:124px; }
+  select { background:var(--panel); color:var(--ink); border:1px solid var(--line);
+    border-radius:8px; padding:3px 6px; font-size:12px; }
+  .btns { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 4px; }
+  button { font:inherit; font-size:12px; font-weight:600; cursor:pointer; color:var(--ink);
+    background:rgba(138,180,255,.16); border:1px solid var(--line); border-radius:9px; padding:6px 9px; }
+  button:hover { border-color:var(--accent); }
+  button.primary { background:var(--accent); color:#06101f; border-color:transparent; }
+  .sec { margin-top:11px; font-size:11px; font-weight:700; text-transform:uppercase;
+    letter-spacing:.04em; color:var(--muted); }
+  .legend { margin-top:6px; height:11px; border-radius:6px; border:1px solid var(--line); }
+  .legend-l { display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-top:3px; }
+  .stats { margin-top:8px; font-size:11.5px; color:var(--muted); }
+  .stats .s { display:flex; justify-content:space-between; padding:2px 0; border-bottom:1px solid var(--line); }
+  .stats .s b { color:var(--ink); font-weight:600; }
+  .hint { position:fixed; bottom:12px; left:50%; transform:translateX(-50%); font-size:12px;
+    color:var(--muted); background:var(--panel); border:1px solid var(--line); border-radius:999px;
+    padding:7px 14px; backdrop-filter:blur(14px); max-width:90vw; text-align:center; }
+  a { color:var(--accent); }
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div class="panel">
+  <h1>2D ECM 시뮬레이션</h1>
+  <p class="sub">세포가 주변에 <b>콜라겐을 분비</b>(축적)하고, 수축이 그걸 트랙으로 <b>정렬·보강</b>합니다. 캔버스 클릭/드래그로 세포를 놓으세요.</p>
+  <p class="sub" style="color:#d8a23a;border:1px solid var(--line);border-radius:8px;padding:6px 8px">⚠ 실시간 <b>교육용 일러스트레이션</b>입니다 — 검증된 솔버가 아닙니다. 정량 결과는 Python 파이프라인(<a href="METHODS.md">METHODS</a>)을 쓰세요.</p>
+
+  <div class="btns">
+    <button class="primary" id="play">⏸ Pause</button>
+    <button id="step">Step</button>
+    <button id="clearEcm">Clear ECM</button>
+    <button id="clearCells">Clear cells</button>
+  </div>
+
+  <div class="sec">Presets (resets ECM)</div>
+  <div class="btns">
+    <button data-preset="two">Two cells</button>
+    <button data-preset="line">Line</button>
+    <button data-preset="ring">Ring</button>
+    <button data-preset="grid">Grid</button>
+  </div>
+
+  <div class="sec">Cell behavior</div>
+  <div class="row"><label>Secretion rate</label><input id="secrete" type="range" min="0" max="100" value="60"></div>
+  <div class="row"><label>Secretion radius</label><input id="srad" type="range" min="12" max="70" value="34"></div>
+  <div class="row"><label>Contraction</label><input id="traction" type="range" min="0" max="300" value="60"></div>
+  <div class="row"><label>Reach</label><input id="reach" type="range" min="15" max="80" value="46"></div>
+  <div class="row"><label>Remodeling</label><input id="remodel" type="checkbox" checked></div>
+
+  <div class="sec">Display</div>
+  <div class="row"><label>Color by</label>
+    <select id="scalar">
+      <option value="age">age (new→old)</option>
+      <option value="tension">tension</option>
+      <option value="reinforce">reinforce</option>
+      <option value="alignment">alignment</option>
+    </select>
+  </div>
+  <div class="row"><label>Light mode</label><input id="light" type="checkbox"></div>
+  <div class="legend" id="legend"></div>
+  <div class="legend-l"><span id="lo">low</span><span>→</span><span id="hi">high</span></div>
+
+  <div class="sec">Live metrics</div>
+  <div class="stats" id="stats"></div>
+
+  <div class="sec">More</div>
+  <p class="sub" style="margin-top:6px"><a href="viewer/">3D viewer →</a> &nbsp; <a href="sim2d.html">2D gallery →</a></p>
+</div>
+
+<div class="hint">클릭=세포 추가 · 드래그=이동 · Shift+클릭=삭제 · 세포가 ECM을 분비하는 걸 지켜보세요</div>
+
+<script>
+// ---------------------------------------------------------------------------
+function colormap(t){
+  t=Math.min(1,Math.max(0,t));
+  const s=[[0,0.02,0.02,0.23],[0.25,0.42,0.07,0.43],[0.5,0.74,0.21,0.33],
+           [0.75,0.95,0.5,0.16],[1,0.99,0.85,0.55]];
+  for(let i=0;i<s.length-1;i++){const a=s[i],b=s[i+1];
+    if(t>=a[0]&&t<=b[0]){const u=(t-a[0])/(b[0]-a[0]);
+      return [a[1]+(b[1]-a[1])*u,a[2]+(b[2]-a[2])*u,a[3]+(b[3]-a[3])*u];}}
+  return [0.99,0.85,0.55];
+}
+const css=c=>`rgb(${(c[0]*255)|0},${(c[1]*255)|0},${(c[2]*255)|0})`;
+
+// ---------------------------------------------------------------------------
+const DOMAIN=200;
+const P={ kT:1.0,buckle:0.05,alpha:4.0,kBend:0.12, traction:0.6,reach:46,decay:18,cellR:8,
+  anchor:7, subIters:6, relax:0.6, maxStep:1.4,
+  // secretion (deposited-disk model, METHODS §6)
+  secretionRadius:34, fiberLen:20, segPerFiber:4, crosslinkDist:5.0,
+  secreteEvery:3, secreteProb:0.6, maxNodes:4600,
+  // remodeling
+  remodelEvery:20, reinforcePct:0.85, slackPct:0.13, slackPersist:6 };
+
+// dynamic network state (plain arrays so cells can ADD ECM over time)
+let px,py,fixed;                  // nodes
+let ea,eb,rest,orest,kscale,estate,slackAge,eage;  // edges; estate 0/1/2 = normal/reinforced/degraded
+let bendMap;                      // node -> list of incident node neighbors (for bending), built lazily
+let cells, grid, frame, simTime, secreteTick, remodelTick;
+let fx,fy,kdiag;                  // force scratch (resized on demand)
+
+function resetState(){
+  px=[]; py=[]; fixed=[];
+  ea=[]; eb=[]; rest=[]; orest=[]; kscale=[]; estate=[]; slackAge=[]; eage=[];
+  grid=new Map(); frame=0; simTime=0; secreteTick=0; remodelTick=0;
+}
+const gkey=(x,y)=>Math.floor(x/P.crosslinkDist)+','+Math.floor(y/P.crosslinkDist);
+function gridAdd(i){ const k=gkey(px[i],py[i]); let a=grid.get(k); if(!a){a=[];grid.set(k,a);} a.push(i); }
+function gridNear(x,y){ const gx=Math.floor(x/P.crosslinkDist),gy=Math.floor(y/P.crosslinkDist),out=[];
+  for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++){const a=grid.get((gx+dx)+','+(gy+dy));if(a)for(const i of a)out.push(i);} return out; }
+function addNode(x,y){ x=Math.min(DOMAIN,Math.max(0,x)); y=Math.min(DOMAIN,Math.max(0,y));
+  const i=px.length; px.push(x); py.push(y);
+  fixed.push((x<P.anchor||x>DOMAIN-P.anchor||y<P.anchor||y>DOMAIN-P.anchor)?1:0);
+  gridAdd(i); return i; }
+function addEdge(a,b){ if(a===b)return; const dx=px[b]-px[a],dy=py[b]-py[a],L=Math.max(1e-3,Math.hypot(dx,dy));
+  ea.push(a); eb.push(b); rest.push(L); orest.push(L); kscale.push(1); estate.push(0); slackAge.push(0); eage.push(0); }
+
+// ---- secretion: cells deposit short collagen fibers in a disk around them --
+// Mirrors the validated pipeline (METHODS §6, build_deposited_network): fibers
+// are laid down uniformly in a disk of radius rho_s about each cell and crosslink
+// into a connected mesh. No ad-hoc "tip growth" or maturity tricks — deposition
+// builds the matrix, mechanics (relax-to-equilibrium) + remodeling organize it.
+function diskPoint(cx,cy,R){ const r=R*Math.sqrt(Math.random()), a=Math.random()*Math.PI*2;
+  return [cx+r*Math.cos(a), cy+r*Math.sin(a)]; }
+function depositFiber(cx,cy){
+  const [mx,my]=diskPoint(cx,cy,P.secretionRadius);
+  const ang=Math.random()*Math.PI*2, dx=Math.cos(ang), dy=Math.sin(ang);
+  const segs=P.segPerFiber, L=P.fiberLen;
+  const made=[]; let prev=-1;
+  for(let i=0;i<=segs;i++){ const t=(i/segs-0.5)*L;
+    const n=addNode(mx+dx*t, my+dy*t); made.push(n); if(prev>=0) addEdge(prev,n); prev=n; }
+  // crosslink each new node to the nearest existing node of a DIFFERENT fiber
+  const mset=new Set(made);
+  for(const n of made){ let best=-1, bd=P.crosslinkDist;
+    for(const j of gridNear(px[n],py[n])){ if(mset.has(j)) continue;
+      const d=Math.hypot(px[j]-px[n],py[j]-py[n]); if(d<bd){ bd=d; best=j; } }
+    if(best>=0) addEdge(n,best); }
+}
+function secrete(){
+  for(const c of cells){ if(px.length>=P.maxNodes) break;
+    if(Math.random()<P.secreteProb) depositFiber(c.x,c.y); }
+}
+
+// ---- mechanics: contraction relaxes the (growing) network ------------------
+function ensureScratch(){ const N=px.length;
+  if(!fx||fx.length<N){ fx=new Float32Array(N); fy=new Float32Array(N); kdiag=new Float32Array(N); } }
+function physicsStep(){
+  const N=px.length, M=ea.length; ensureScratch();
+  for(let i=0;i<N;i++){ fx[i]=0; fy[i]=0; kdiag[i]=0; }
+  const kT=P.kT,buckle=P.buckle,alpha=P.alpha;
+  for(let e=0;e<M;e++){ if(estate[e]===2) continue;
+    const a=ea[e],b=eb[e]; const dx=px[b]-px[a],dy=py[b]-py[a]; const len=Math.hypot(dx,dy); if(len<1e-6) continue;
+    const ux=dx/len,uy=dy/len,strain=(len-rest[e])/rest[e];
+    const k=(strain>0?kT*(1+alpha*strain):kT*buckle)*kscale[e]; const f=k*(len-rest[e]);
+    fx[a]+=f*ux; fy[a]+=f*uy; fx[b]-=f*ux; fy[b]-=f*uy; kdiag[a]+=k; kdiag[b]+=k; }
+  // cell contraction: integrin-mediated traction toward each cell, decaying with
+  // distance (METHODS §4). Acts on the connected, boundary-anchored network.
+  const tr=P.traction,reach=P.reach,decay=P.decay,cr=P.cellR;
+  for(const c of cells){ for(let n=0;n<N;n++){ if(fixed[n]) continue;
+    const dx=c.x-px[n],dy=c.y-py[n],d=Math.hypot(dx,dy);
+    if(d>cr && d<reach){ const m=tr*Math.exp(-(d-cr)/decay); fx[n]+=m*dx/d; fy[n]+=m*dy/d; kdiag[n]+=m/Math.max(d,1); } } }
+  const relax=P.relax,ms=P.maxStep;
+  for(let n=0;n<N;n++){ if(fixed[n]) continue;
+    const inv=relax/(kdiag[n]+1e-3); let sx=fx[n]*inv, sy=fy[n]*inv;
+    const s=Math.hypot(sx,sy); if(s>ms){ sx*=ms/s; sy*=ms/s; } px[n]+=sx; py[n]+=sy; }
+}
+
+function edgeTension(e){ if(estate[e]===2) return 0;
+  const a=ea[e],b=eb[e]; const len=Math.hypot(px[b]-px[a],py[b]-py[a]); const strain=(len-rest[e])/rest[e];
+  const k=(strain>0?P.kT*(1+P.alpha*strain):P.kT*P.buckle)*kscale[e]; return Math.max(0,k*(len-rest[e])); }
+
+function remodel(){ const M=ea.length; const pos=[];
+  for(let e=0;e<M;e++){ const t=edgeTension(e); if(estate[e]!==2&&t>0) pos.push(t); }
+  if(!pos.length) return; pos.sort((a,b)=>a-b);
+  const hi=pos[Math.min(pos.length-1,(pos.length*P.reinforcePct)|0)], lo=pos[(pos.length*P.slackPct)|0]||0;
+  for(let e=0;e<M;e++){ if(estate[e]===2) continue; const t=edgeTension(e);
+    if(t>=hi){ kscale[e]=Math.min(kscale[e]*1.15,4); rest[e]=Math.max(rest[e]*0.97,orest[e]*0.5); estate[e]=1; slackAge[e]=0; }
+    else if(t<=lo){ slackAge[e]++; if(slackAge[e]>=P.slackPersist && kscale[e]<1.4) estate[e]=2; }
+    else slackAge[e]=0; }
+}
+
+// ---- coloring --------------------------------------------------------------
+let meanAxis=[1,0], tenMax=1, ageMax=1;
+function refreshNorms(){ const M=ea.length; let txx=0,txy=0,tyy=0,w=0; tenMax=1e-6; ageMax=1;
+  for(let e=0;e<M;e++){ if(estate[e]===2) continue; const a=ea[e],b=eb[e];
+    const dx=px[b]-px[a],dy=py[b]-py[a],L=Math.hypot(dx,dy); if(L<1e-6) continue; const ux=dx/L,uy=dy/L;
+    txx+=ux*ux*L; txy+=ux*uy*L; tyy+=uy*uy*L; w+=L; const t=edgeTension(e); if(t>tenMax) tenMax=t; if(eage[e]>ageMax) ageMax=eage[e]; }
+  if(w>0){ txx/=w; txy/=w; tyy/=w; const tr=txx+tyy,det=txx*tyy-txy*txy,l=tr/2+Math.sqrt(Math.max(0,tr*tr/4-det));
+    let vx=txy,vy=l-txx; const n=Math.hypot(vx,vy); if(n<1e-9){vx=1;vy=0;}else{vx/=n;vy/=n;} meanAxis=[vx,vy]; } }
+function edgeValue(e,key){ const a=ea[e],b=eb[e]; const dx=px[b]-px[a],dy=py[b]-py[a],L=Math.hypot(dx,dy)||1e-6;
+  if(key==='reinforce') return Math.min(1,(kscale[e]-1)/3);
+  if(key==='alignment') return Math.abs((dx/L)*meanAxis[0]+(dy/L)*meanAxis[1]);
+  if(key==='age') return Math.min(1, eage[e]/Math.max(20,ageMax));
+  return Math.min(1, edgeTension(e)/tenMax); }
+
+// ---------------------------------------------------------------------------
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+let scale=1,offx=0,offy=0;
+function resize(){ const dpr=Math.min(devicePixelRatio||1,2);
+  cv.width=innerWidth*dpr; cv.height=innerHeight*dpr; cv.style.width=innerWidth+'px'; cv.style.height=innerHeight+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0); const fit=Math.min(innerWidth,innerHeight)*0.92; scale=fit/DOMAIN;
+  offx=(innerWidth-DOMAIN*scale)/2; offy=(innerHeight-DOMAIN*scale)/2; }
+addEventListener('resize',resize); resize();
+const SX=x=>offx+x*scale, SY=y=>offy+y*scale, toWorld=(cx,cy)=>[(cx-offx)/scale,(cy-offy)/scale];
+
+function draw(){ const light=document.documentElement.getAttribute('data-theme')==='light';
+  ctx.clearRect(0,0,innerWidth,innerHeight); const key=document.getElementById('scalar').value;
+  ctx.lineWidth=Math.max(0.6,scale*0.42); ctx.lineCap='round'; const M=ea.length;
+  for(let e=0;e<M;e++){ if(estate[e]===2) continue; const a=ea[e],b=eb[e];
+    ctx.strokeStyle=css(colormap(edgeValue(e,key)));
+    ctx.beginPath(); ctx.moveTo(SX(px[a]),SY(py[a])); ctx.lineTo(SX(px[b]),SY(py[b])); ctx.stroke(); }
+  for(const c of cells){ const r=P.cellR*scale;
+    const g=ctx.createRadialGradient(SX(c.x),SY(c.y),r*0.2,SX(c.x),SY(c.y),r);
+    g.addColorStop(0,'rgba(185,140,255,0.95)'); g.addColorStop(1,'rgba(150,110,230,0.25)');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(SX(c.x),SY(c.y),r,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle=light?'rgba(40,40,70,.6)':'rgba(255,255,255,.7)'; ctx.lineWidth=1; ctx.stroke(); } }
+
+let statTick=0;
+function updateStats(){ const M=ea.length; let active=0,reinforced=0,tsum=0,totLen=0;
+  for(let e=0;e<M;e++){ if(estate[e]===2) continue; active++; if(kscale[e]>1.4) reinforced++; tsum+=edgeTension(e);
+    const a=ea[e],b=eb[e]; totLen+=Math.hypot(px[b]-px[a],py[b]-py[a]); }
+  let txx=0,tyy=0,txy=0,w=0; for(let e=0;e<M;e++){ if(estate[e]===2) continue; const a=ea[e],b=eb[e];
+    const dx=px[b]-px[a],dy=py[b]-py[a],L=Math.hypot(dx,dy); if(L<1e-6) continue; const ux=dx/L,uy=dy/L;
+    txx+=ux*ux*L; tyy+=uy*uy*L; txy+=ux*uy*L; w+=L; }
+  let align=0; if(w>0){ txx/=w; tyy/=w; txy/=w; const tr=txx+tyy,det=txx*tyy-txy*txy,l=tr/2+Math.sqrt(Math.max(0,tr*tr/4-det)); align=2*l-1; }
+  const rows=[['Cells',cells.length],['ECM fibers',active],['ECM secreted (Σlen)',Math.round(totLen)],
+    ['Reinforced',active?Math.round(100*reinforced/active)+'%':'—'],
+    ['Mean tension',active?(tsum/active).toFixed(3):'—'],['Alignment index',align.toFixed(3)]];
+  document.getElementById('stats').innerHTML=rows.map(r=>`<div class="s"><span>${r[0]}</span><b>${r[1]}</b></div>`).join(''); }
+
+// ---------------------------------------------------------------------------
+let playing=true;
+function tick(){
+  if(playing){
+    const sr=+document.getElementById('secrete').value/100; P.secreteProb=sr;
+    if(sr>0 && (++secreteTick % P.secreteEvery===0)) secrete();
+    for(let i=0;i<P.subIters;i++) physicsStep();
+    for(let e=0;e<eage.length;e++) eage[e]++;
+    frame++;
+    if(document.getElementById('remodel').checked && (++remodelTick % P.remodelEvery===0)) remodel();
+  }
+  if((statTick++ % 4)===0) refreshNorms();
+  draw();
+  if((statTick % 18)===0) updateStats();
+  requestAnimationFrame(tick);
+}
+
+// ---- interaction -----------------------------------------------------------
+let dragging=-1;
+function nearestCell(wx,wy){ let bi=-1,bd=1e9; for(let i=0;i<cells.length;i++){ const d=Math.hypot(cells[i].x-wx,cells[i].y-wy); if(d<bd){bd=d;bi=i;} } return [bi,bd]; }
+function pointerDown(ev){ ev.preventDefault(); const [wx,wy]=toWorld(ev.clientX,ev.clientY); const [i,d]=nearestCell(wx,wy);
+  if(ev.shiftKey){ if(i>=0&&d<P.cellR*1.6) cells.splice(i,1); return; }
+  if(i>=0&&d<P.cellR*1.4) dragging=i;
+  else { cells.push({x:Math.max(0,Math.min(DOMAIN,wx)),y:Math.max(0,Math.min(DOMAIN,wy))}); dragging=cells.length-1; } }
+function pointerMove(ev){ if(dragging<0) return; const [wx,wy]=toWorld(ev.clientX,ev.clientY);
+  cells[dragging].x=Math.max(0,Math.min(DOMAIN,wx)); cells[dragging].y=Math.max(0,Math.min(DOMAIN,wy)); }
+cv.addEventListener('pointerdown',pointerDown); cv.addEventListener('pointermove',pointerMove);
+addEventListener('pointerup',()=>dragging=-1);
+cv.addEventListener('contextmenu',e=>{ e.preventDefault(); const [wx,wy]=toWorld(e.clientX,e.clientY); const [i,d]=nearestCell(wx,wy); if(i>=0&&d<P.cellR*1.6) cells.splice(i,1); });
+
+function preset(kind){ resetState(); cells=[]; const c=DOMAIN/2;
+  if(kind==='two'){ cells.push({x:c-34,y:c},{x:c+34,y:c}); }
+  else if(kind==='line'){ for(let i=0;i<5;i++) cells.push({x:40+i*30,y:c}); }
+  else if(kind==='ring'){ for(let i=0;i<8;i++){ const a=i/8*Math.PI*2; cells.push({x:c+55*Math.cos(a),y:c+55*Math.sin(a)}); } }
+  else if(kind==='grid'){ for(let i=0;i<3;i++) for(let j=0;j<3;j++) cells.push({x:60+i*40,y:60+j*40}); } }
+document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>preset(b.dataset.preset));
+
+const play=document.getElementById('play');
+play.onclick=()=>{ playing=!playing; play.textContent=playing?'⏸ Pause':'▶ Play'; };
+document.getElementById('step').onclick=()=>{ secrete(); for(let i=0;i<P.subIters;i++) physicsStep(); for(let e=0;e<eage.length;e++) eage[e]++; if(document.getElementById('remodel').checked) remodel(); refreshNorms(); draw(); updateStats(); };
+document.getElementById('clearEcm').onclick=()=>{ const keep=cells.slice(); resetState(); cells=keep; };
+document.getElementById('clearCells').onclick=()=>cells=[];
+document.getElementById('traction').oninput=e=>P.traction=+e.target.value/100;
+document.getElementById('srad').oninput=e=>P.secretionRadius=+e.target.value;
+document.getElementById('reach').oninput=e=>P.reach=+e.target.value;
+
+(function(){ let g=[]; for(let i=0;i<=10;i++) g.push(css(colormap(i/10))+' '+(i*10)+'%');
+  document.getElementById('legend').style.background='linear-gradient(90deg,'+g.join(',')+')'; })();
+const LO={tension:'slack',reinforce:'soft',alignment:'off-axis',age:'newly secreted'};
+const HI={tension:'high tension',reinforce:'reinforced',alignment:'on-axis',age:'mature'};
+function setLegendLabels(){ const k=document.getElementById('scalar').value; document.getElementById('lo').textContent=LO[k]; document.getElementById('hi').textContent=HI[k]; }
+document.getElementById('scalar').onchange=setLegendLabels; setLegendLabels();
+
+const lt=document.getElementById('light');
+function applyTheme(t){ const light=t==='light'; document.documentElement.setAttribute('data-theme',light?'light':'dark'); lt.checked=light; try{ localStorage.setItem('ecm-viewer-theme',light?'light':'dark'); }catch(e){} }
+applyTheme((()=>{ try{ return localStorage.getItem('ecm-viewer-theme'); }catch(e){ return null; } })()||'dark');
+lt.onchange=e=>applyTheme(e.target.checked?'light':'dark');
+
+// go: start empty, with two cells that will secrete the matrix
+resetState(); preset('two'); tick();
+</script>
+</body>
+</html>
