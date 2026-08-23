@@ -212,7 +212,7 @@
 <header>
   <div>
     <h1>배양액 분주 설계기</h1>
-    <div class="sub" id="recipe-sub">한 번에 만들어 분주하는 흐름 그대로 · 시약별 µL 자동 계산</div>
+    <div class="sub" id="recipe-sub">실험 디자인에서 배지 부피를 역산하고 시약 µL을 자동 계산</div>
   </div>
   <div class="toolbar noprint">
     <select id="recipe-sel" style="min-width:150px"></select>
@@ -260,11 +260,47 @@
     <div id="reagent-warn"></div>
   </section>
 
-  <!-- ② 흐름 -->
+  <!-- ② 실험 디자인 -->
+  <section>
+    <div class="shead">
+      <div>
+        <h2>② 실험 디자인</h2>
+        <div class="sub">그룹마다 <b>플레이트 규격 × n수 × 사용 일수</b>를 넣으면 필요한 배지량이 나옵니다 (하루 1회 교환 기준). 그 값이 흐름을 타고 위로 합산됩니다.</div>
+      </div>
+      <div class="toolbar noprint">
+        <span class="fld"><label>여유율</label><input id="opt-overage" class="num" style="width:52px" inputmode="decimal"><label>%</label></span>
+        <span class="fld"><label>올림</label>
+          <select id="opt-round">
+            <option value="0">없음</option><option value="0.1">0.1 mL</option>
+            <option value="0.5">0.5 mL</option><option value="1">1 mL</option>
+            <option value="5">5 mL</option><option value="10">10 mL</option>
+          </select></span>
+        <button id="btn-addgroup" class="primary">+ 그룹 추가</button>
+      </div>
+    </div>
+    <div class="tblwrap">
+      <table id="groups">
+        <thead><tr>
+          <th style="min-width:130px">그룹</th>
+          <th style="min-width:150px">쓸 배지 (단계)</th>
+          <th>플레이트</th>
+          <th colspan="2">웰당 배지</th>
+          <th>웰 수 (n)</th>
+          <th title="하루 1회 교환 기준. Day 라벨에서 자동으로 채워집니다.">사용 일수</th>
+          <th>필요량</th>
+          <th class="noprint"></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div id="group-sum"></div>
+  </section>
+
+  <!-- ③ 흐름 -->
   <section class="noprint">
     <div class="shead">
       <div>
-        <h2>② 배지 흐름</h2>
+        <h2>③ 배지 흐름</h2>
         <div class="sub">부피를 넣고 그 단계에서 <b>새로 넣는</b> 시약만 체크하세요. 칩 안의 숫자를 고치면 그 단계만 다른 농도로 쓸 수 있습니다.</div>
       </div>
       <div class="toolbar noprint">
@@ -273,6 +309,8 @@
         </span>
         <label class="pill"><input type="checkbox" id="opt-compact"> 체크한 시약만 표시</label>
         <label class="pill"><input type="checkbox" id="opt-subtract"> 시약 부피를 총 부피에 포함</label>
+        <button id="btn-autoall">모두 자동</button>
+        <button id="btn-fixall">모두 직접</button>
         <button id="btn-addroot">+ 마스터 믹스</button>
       </div>
     </div>
@@ -281,21 +319,21 @@
 
   <!-- ③ 흐름도 -->
   <section>
-    <h2>③ 흐름도</h2>
+    <h2>④ 흐름도</h2>
     <div class="sub">전체 분주 구조를 한눈에 확인합니다.</div>
     <div class="diagram" id="diagram"></div>
   </section>
 
   <!-- ④ 프로토콜 -->
   <section>
-    <h2>④ 조제 프로토콜</h2>
+    <h2>⑤ 조제 프로토콜</h2>
     <div class="sub">단계(날짜)별 순서. 이대로 실험대에서 따라 하면 됩니다.</div>
     <div id="protocol"></div>
   </section>
 
   <!-- ⑤ 총량 -->
   <section>
-    <h2>⑤ 시약 총 소모량</h2>
+    <h2>⑥ 시약 총 소모량</h2>
     <div class="sub">스톡 튜브에서 꺼내야 하는 전체 양입니다.</div>
     <div class="tblwrap"><table id="totals">
       <thead><tr><th>시약</th><th>총 사용량</th><th>사용 단계</th><th>스톡 → 최종</th></tr></thead>
@@ -416,6 +454,58 @@ function amt(v){ // µL → 1000 이상이면 mL 병기
 }
 function vol(v){ return sig(v) + " " + S.opt.volUnit; }        // 사용자가 고른 부피 단위로 표시
 function toML(v){ return (num(v)||0) * (VOLF[S.opt.volUnit]||1); }
+function fromML(v){ return v / (VOLF[S.opt.volUnit]||1); }
+function volML(v){ return sig(fromML(v)) + " " + S.opt.volUnit; }   // mL 값을 현재 단위로 표시
+
+/* ---- 컬쳐 플레이트 규격 (웰당 배지량) ---- */
+const PLATES = [
+  {name:"6-well",      well:2,    unit:"mL"},
+  {name:"12-well",     well:1,    unit:"mL"},
+  {name:"24-well",     well:0.5,  unit:"mL"},
+  {name:"48-well",     well:250,  unit:"µL"},
+  {name:"96-well",     well:100,  unit:"µL"},
+  {name:"384-well",    well:50,   unit:"µL"},
+  {name:"35 mm dish",  well:2,    unit:"mL"},
+  {name:"60 mm dish",  well:5,    unit:"mL"},
+  {name:"100 mm dish", well:10,   unit:"mL"},
+  {name:"T25",         well:5,    unit:"mL"},
+  {name:"T75",         well:15,   unit:"mL"},
+  {name:"T175",        well:25,   unit:"mL"},
+  {name:"직접 입력",    well:1,    unit:"mL"}
+];
+const WELLF = {"mL":1, "µL":0.001};
+function plateByName(nm){ return PLATES.find(x=>x.name===nm) || PLATES[PLATES.length-1]; }
+// 그룹 1개가 필요로 하는 배지량 (mL) = 웰당 × 웰 수 × 교환 횟수
+function groupML(g){
+  const w = num(g.well), k = num(g.n), d = num(g.days);
+  if(!(w>0) || !(k>0)) return 0;
+  return w * (WELLF[g.wellUnit]||1) * k * (d>0 ? d : 1);   // 하루 1회 교환
+}
+// 한 단계에서 직접 쓰이는 양 (여유율 포함, mL)
+function demandML(node){
+  const base = (S.groups||[]).filter(g=>g.nodeId===node.id).reduce((t,g)=>t+groupML(g), 0);
+  return base * (1 + (num(S.opt.overage)||0)/100);
+}
+function roundUpML(v){
+  const st = num(S.opt.round)||0;
+  if(!(st>0) || !isFinite(v)) return v;
+  return Math.ceil(v/st - 1e-9) * st;
+}
+// 모든 단계의 부피(mL)를 아래에서 위로 역산
+let VOL = {};
+function computeVolumes(){
+  const map = {};
+  const rec = (n)=>{
+    const kids = (n.kids||[]).reduce((t,k)=> t + rec(k), 0);
+    const v = n.auto ? roundUpML(demandML(n) + kids) : toML(n.volume);
+    map[n.id] = v;
+    return v;
+  };
+  (S.roots||[]).forEach(rec);
+  VOL = map;
+  return map;
+}
+function volOf(n){ return VOL[n.id] != null ? VOL[n.id] : toML(n.volume); }
 function foldTxt(f){
   if(!isFinite(f)||f<=0) return "—";
   const r = f >= 100 ? Math.round(f) : Math.round(f*100)/100;
@@ -478,13 +568,22 @@ let DB = null;    // {activeId, recipes:[…]}
 let S  = null;    // 현재 레시피 {id,name,opt,reagents,roots}
 
 function newRecipe(name){
-  return {id:uid(), name:name||"새 레시피", opt:{subtract:false, volUnit:"mL", compact:false},
-    reagents:[], roots:[{id:uid(), name:"마스터 믹스", day:"Day 0", volume:10, adds:[], note:"", kids:[]}]};
+  return {id:uid(), name:name||"새 레시피", opt:{subtract:false, volUnit:"mL", compact:false, overage:10, round:0},
+    reagents:[], groups:[], roots:[{id:uid(), name:"마스터 믹스", day:"Day 0", volume:10, adds:[], note:"", auto:false, kids:[]}]};
 }
 const R_ = (o)=> Object.assign({id:uid(), name:"", stockVal:"", stockUnit:"mM", finalVal:"", finalUnit:"µM",
   mw:"", mode:"conc", fold:"", perML:"", note:""}, o);
 const N_ = (name, day, volume, adds, kids)=> ({id:uid(), name, day, volume,
-  adds:(adds||[]).map(a=> typeof a === "string" ? {rid:a, ov:null} : a), note:"", kids:kids||[]});
+  adds:(adds||[]).map(a=> typeof a === "string" ? {rid:a, ov:null} : a), note:"", auto:false, kids:kids||[]});
+const G_ = (o)=> Object.assign({id:uid(), name:"", nodeId:"", plate:"6-well", well:2, wellUnit:"mL",
+  n:"", days:1, note:""}, o);
+// "Day 2-3" → 2일, "Day 1" → 1일 (하루 1회 교환 기준)
+function daysFromLabel(lab){
+  const t = String(lab||"");
+  const r = t.match(/(\d+)\s*[-~–—]\s*(\d+)/);
+  if(r){ const d = parseInt(r[2],10) - parseInt(r[1],10) + 1; return d>0 ? d : 1; }
+  return 1;
+}
 
 /* --- 예시들 --- */
 const EXAMPLES = {
@@ -507,30 +606,72 @@ const EXAMPLES = {
         N_(label+" 4 mL", "Day 2-3", 4, [])
       ])
     ];
-    return {id:uid(), name:"분주 흐름 예시", opt:{subtract:false, volUnit:"mL", compact:false}, reagents:rs,
-      roots:[ N_("마스터 믹스","Day 0",36,[id("FGF2"),id("PDGF-BB"),id("A83-01")],[
+    return {id:uid(), name:"분주 흐름 예시", opt:{subtract:false, volUnit:"mL", compact:false, overage:10, round:0},
+      reagents:rs, groups:[], roots:[ N_("마스터 믹스","Day 0",36,[id("FGF2"),id("PDGF-BB"),id("A83-01")],[
         N_("SHH −","Day 0",18,[], branch("SHH −")),
         N_("SHH +","Day 0",18,[id("Purmorphamine")], branch("SHH +"))
       ])]};
   },
+  "실험 디자인 역산 (24-well, n=6, 하루 1회 교환)": function(){
+    const rs = [
+      R_({name:"FGF2",          stockVal:100, stockUnit:"µg/mL", finalVal:10,  finalUnit:"ng/mL"}),
+      R_({name:"PDGF-BB",       stockVal:100, stockUnit:"µg/mL", finalVal:10,  finalUnit:"ng/mL"}),
+      R_({name:"A83-01",        stockVal:10,  stockUnit:"mM",    finalVal:0.5, finalUnit:"µM"}),
+      R_({name:"Purmorphamine", stockVal:10,  stockUnit:"mM",    finalVal:1,   finalUnit:"µM"}),
+      R_({name:"RA",            stockVal:10,  stockUnit:"mM",    finalVal:2,   finalUnit:"µM"}),
+      R_({name:"LT",            stockVal:10,  stockUnit:"mM",    finalVal:2,   finalUnit:"µM"}),
+      R_({name:"DAPT",          stockVal:10,  stockUnit:"mM",    finalVal:10,  finalUnit:"µM"})
+    ];
+    const id = n => rs.find(r=>r.name===n).id;
+    const arm = (tag, extra)=> N_(tag, "Day 0", 0, extra, [
+      N_(tag+" 대조",   "Day 1", 0, []),
+      N_(tag+" RA",     "Day 1", 0, [id("RA")]),
+      N_(tag+" LT",     "Day 1", 0, [id("LT")], [
+        N_(tag+" LT 단독",  "Day 2-3", 0, []),
+        N_(tag+" LT+DAPT",  "Day 2-3", 0, [id("DAPT")])
+      ])
+    ]);
+    const rec = {id:uid(), name:"실험 디자인 역산", opt:{subtract:false, volUnit:"mL", compact:false, overage:10, round:0.5},
+      reagents:rs, groups:[],
+      roots:[ N_("마스터 믹스","Day 0",0,[id("FGF2"),id("PDGF-BB"),id("A83-01")],[
+        arm("SHH−", []), arm("SHH+", [id("Purmorphamine")])
+      ])]};
+    walk(rec.roots, n=>{ n.auto = true; });
+    // 말단(실제로 세포에 넣는 배지)마다 그룹 배정: 24-well 500 µL, n=6, 3회 교환
+    walk(rec.roots, n=>{
+      if(n.kids && n.kids.length) return;
+      rec.groups.push(G_({name:n.name, nodeId:n.id, plate:"24-well", well:0.5, wellUnit:"mL",
+        n:6, days:daysFromLabel(n.day)}));
+    });
+    return rec;
+  },
   "단순 1단계 (배지 한 통에 시약 첨가)": function(){
     const rs = [ R_({name:"시약 A", stockVal:10, stockUnit:"mM", finalVal:10, finalUnit:"µM"}) ];
-    return {id:uid(), name:"단순 배지", opt:{subtract:false, volUnit:"mL", compact:false}, reagents:rs,
-      roots:[ N_("배지","Day 0",50,[rs[0].id]) ]};
+    return {id:uid(), name:"단순 배지", opt:{subtract:false, volUnit:"mL", compact:false, overage:10, round:0},
+      reagents:rs, groups:[], roots:[ N_("배지","Day 0",50,[rs[0].id]) ]};
   },
   "빈 레시피": function(){ return newRecipe("새 레시피"); }
 };
 
 function normalize(rec){
-  rec.opt = Object.assign({subtract:false, volUnit:"mL", compact:false}, rec.opt||{});
+  rec.opt = Object.assign({subtract:false, volUnit:"mL", compact:false, overage:10, round:0}, rec.opt||{});
   rec.reagents = (rec.reagents||[]).map(r=> Object.assign(R_({}), r));
   const fixNode = n => {
     n.id = n.id || uid();
+    n.auto = !!n.auto;
     n.adds = (n.adds||[]).map(a=> typeof a === "string" ? {rid:a, ov:null} : Object.assign({rid:"", ov:null}, a));
     n.kids = (n.kids||[]).map(fixNode);
     return n;
   };
   rec.roots = (rec.roots && rec.roots.length ? rec.roots : [newRecipe().roots[0]]).map(fixNode);
+  rec.groups = (rec.groups||[]).map(g=>{
+    const o = Object.assign(G_({}), g);
+    if(g && g.feeds != null && g.days == null) o.days = g.feeds;
+    delete o.feeds;
+    return o;
+  });
+  const ids = {}; walk(rec.roots, n=>{ ids[n.id] = 1; });
+  rec.groups.forEach(g=>{ if(!ids[g.nodeId]) g.nodeId = ""; });
   rec.id = rec.id || uid();
   rec.name = rec.name || "레시피";
   return rec;
@@ -596,7 +737,7 @@ function reagentById(id){ return S.reagents.find(r=>r.id===id); }
 
 // 이 단계에서 새로 넣는 시약 → µL
 function nodeAdds(n){
-  const vML = toML(n.volume);
+  const vML = volOf(n);
   return (n.adds||[]).map(a=>{
     const base = reagentById(a.rid);
     if(!base) return null;
@@ -605,7 +746,8 @@ function nodeAdds(n){
     return {base, r, ov:a.ov, perML:c.perML, err:c.err, uLv: isFinite(c.perML) ? c.perML*vML : NaN};
   }).filter(Boolean);
 }
-function kidsVolume(n){ return (n.kids||[]).reduce((s,k)=> s + (num(k.volume)||0), 0); }
+function kidsVolumeML(n){ return (n.kids||[]).reduce((s,k)=> s + volOf(k), 0); }
+function groupsOf(n){ return (S.groups||[]).filter(g=>g.nodeId===n.id); }
 function addEntry(n, rid){ return (n.adds||[]).find(a=>a.rid===rid); }
 
 /* ============================ 렌더: 레시피 목록 ============================ */
@@ -662,13 +804,64 @@ function syncReagentCells(){
   $("#reagent-warn").innerHTML = warns.length ? `<div class="banner">⚠︎ ${warns.map(esc).join("<br>")}</div>` : "";
 }
 
+/* ============================ 렌더: 실험 디자인 ============================ */
+function nodeOptions(sel){
+  const out = [`<option value=""${sel?"":" selected"}>— 단계 선택 —</option>`];
+  walk(S.roots, (n,p,ch)=>{
+    out.push(`<option value="${n.id}"${n.id===sel?" selected":""}>${"　".repeat(ch.length-1)}${esc(n.name||"단계")}${n.day?" · "+esc(n.day):""}</option>`);
+  });
+  return out.join("");
+}
+function renderGroups(){
+  $("#opt-overage").value = S.opt.overage;
+  $("#opt-round").value = String(S.opt.round);
+  $("#groups tbody").innerHTML = (S.groups||[]).map(g=>`
+    <tr data-gid="${g.id}">
+      <td><input data-gf="name" value="${esc(g.name)}" placeholder="예: SHH+ RA"></td>
+      <td><select data-gf="nodeId">${nodeOptions(g.nodeId)}</select></td>
+      <td style="width:118px"><select data-gf="plate">${
+        PLATES.map(x=>`<option value="${esc(x.name)}"${x.name===g.plate?" selected":""}>${esc(x.name)}</option>`).join("")
+      }</select></td>
+      <td style="width:70px"><input class="num" data-gf="well" value="${esc(g.well)}" inputmode="decimal"></td>
+      <td style="width:68px"><select data-gf="wellUnit">
+        <option value="mL"${g.wellUnit==="mL"?" selected":""}>mL</option>
+        <option value="µL"${g.wellUnit==="µL"?" selected":""}>µL</option></select></td>
+      <td style="width:66px"><input class="num" data-gf="n" value="${esc(g.n)}" inputmode="numeric" placeholder="n"></td>
+      <td style="width:66px"><input class="num" data-gf="days" value="${esc(g.days)}" inputmode="numeric" title="하루 1회 교환"></td>
+      <td class="out" data-gsum>${volML(groupML(g))}</td>
+      <td class="noprint" style="width:34px"><button class="mini danger ghost" data-act="del-group" title="삭제">✕</button></td>
+    </tr>`).join("") ||
+    `<tr><td colspan="9" class="muted">그룹이 없습니다. “+ 그룹 추가”로 실험 디자인을 넣으면 배지 부피가 역산됩니다.</td></tr>`;
+  syncGroupSum();
+}
+function syncGroups(){
+  $$("#groups tbody tr[data-gid]").forEach(tr=>{
+    const g = (S.groups||[]).find(x=>x.id===tr.dataset.gid); if(!g) return;
+    const c = $("[data-gsum]", tr); if(c) c.textContent = volML(groupML(g));
+  });
+  syncGroupSum();
+}
+function syncGroupSum(){
+  const gs = S.groups||[];
+  const pure = gs.reduce((t,g)=>t+groupML(g), 0);
+  const ov = num(S.opt.overage)||0;
+  const rootTot = (S.roots||[]).reduce((t,n)=> t + volOf(n), 0);
+  const unassigned = gs.filter(g=>!g.nodeId && groupML(g) > 0).length;
+  if(!gs.length){ $("#group-sum").innerHTML = ""; return; }
+  $("#group-sum").innerHTML =
+    `<div class="meta">그룹 ${gs.length}개 · 순수 사용량 <b class="out">${volML(pure)}</b>` +
+    (ov>0 ? ` · 여유 ${trim0(String(ov))}% 포함 <b class="out">${volML(pure*(1+ov/100))}</b>` : "") +
+    ` · 마스터 믹스 합계 <b class="out">${volML(rootTot)}</b></div>` +
+    (unassigned ? `<div class="banner">⚠︎ 쓸 배지(단계)가 지정되지 않은 그룹이 ${unassigned}개 있습니다. 그 그룹은 역산에 반영되지 않습니다.</div>` : "");
+}
+
 /* ============================ 렌더: 트리 ============================ */
 function chipHTML(n, r){
   const e = addEntry(n, r.id);
   const on = !!e;
   const eff = effReagent(r, on ? e.ov : null);
   const c = calcReagent(eff);
-  const v = isFinite(c.perML) ? c.perML * toML(n.volume) : NaN;
+  const v = isFinite(c.perML) ? c.perML * volOf(n) : NaN;
   const hidden = S.opt.compact && !on && !EXPAND.has(n.id);
   return `<span class="pill${on?" on":""}${hidden?" hide":""}" data-chip="${r.id}">
       <input type="checkbox" data-act="toggle-add" data-rid="${r.id}"${on?" checked":""}>
@@ -682,17 +875,15 @@ function defOvPlaceholder(r){
   return r.mode==="fold" ? (r.fold||"") : r.mode==="perml" ? (r.perML||"") : (r.finalVal||"");
 }
 function nodeHTML(n){
-  const v = num(n.volume)||0;
-  const kv = kidsVolume(n);
-  const rest = v - kv;
-  const adds = nodeAdds(n);
-  const addTot = adds.reduce((s,a)=> s + (isFinite(a.uLv)?a.uLv:0), 0);
   return `<div class="node" data-nid="${n.id}">
     <div class="nrow">
       <div class="f-name"><input data-f="name" value="${esc(n.name)}" placeholder="이름"></div>
       <div class="f-day"><input data-f="day" value="${esc(n.day)}" placeholder="Day / 단계"></div>
-      <div class="f-vol"><input class="num" data-f="volume" value="${esc(n.volume)}" inputmode="decimal"></div>
+      <div class="f-vol"><input class="num" data-f="volume" data-vol
+        value="${n.auto ? esc(sig(fromML(volOf(n)))) : esc(n.volume)}" inputmode="decimal"${n.auto?" readonly":""}></div>
       <span class="unit">${esc(S.opt.volUnit)}</span>
+      <button class="mini${n.auto?" primary":""}" data-act="auto"
+        title="실험 디자인에서 역산할지, 직접 입력할지">${n.auto?"자동":"직접"}</button>
       <span style="flex:1"></span>
       <span class="noprint">
         <button class="mini" data-act="up" title="위로">↑</button>
@@ -706,21 +897,27 @@ function nodeHTML(n){
     <div class="chips">${S.reagents.map(r=>chipHTML(n,r)).join("") || '<span class="muted">시약을 먼저 추가하세요.</span>'}
       ${S.opt.compact && S.reagents.length ? `<button class="pill addbtn" data-act="expand">${EXPAND.has(n.id)?"− 접기":"＋ 시약"}</button>` : ""}
     </div>
-    <div class="meta" data-meta>${metaText(n, v, kv, rest, addTot)}</div>
+    <div class="meta" data-meta>${metaText(n)}</div>
     ${(NOTEON.has(n.id) || n.note) ? `<div class="nnote noprint"><input data-f="note" value="${esc(n.note||"")}" placeholder="이 단계 메모"></div>` : ""}
     ${n.kids && n.kids.length ? `<div class="kids">${n.kids.map(nodeHTML).join("")}</div>` : ""}
   </div>`;
 }
-function metaText(n, v, kv, rest, addTot){
-  const cls = rest < -1e-9 ? "bad" : (rest > 1e-9 ? "warnc" : "");
+function metaText(n){
+  const vML   = volOf(n);
+  const kvML  = kidsVolumeML(n);
+  const dML   = demandML(n);
+  const gs    = groupsOf(n);
+  const rest  = vML - kvML - dML;
+  const addTot = nodeAdds(n).reduce((s,a)=> s + (isFinite(a.uLv)?a.uLv:0), 0);
+  const cls = rest < -1e-9 ? "bad" : "";
   const parts = [`시약 합계 <b class="out">${amt(addTot)}</b>`];
-  if(S.opt.subtract){
-    const baseML = toML(n.volume) - addTot/1000;
-    parts.push(`기본 배지 <b class="out">${sig(baseML / (VOLF[S.opt.volUnit]||1))} ${S.opt.volUnit}</b>`);
+  if(S.opt.subtract) parts.push(`기본 배지 <b class="out">${volML(vML - addTot/1000)}</b>`);
+  if(gs.length){
+    parts.push(`사용 <b class="out">${volML(dML)}</b> <span class="muted">(${gs.map(g=>esc(g.name||"그룹")).join(", ")}${(num(S.opt.overage)||0)>0?` · 여유 ${trim0(String(num(S.opt.overage)||0))}%`:""})</span>`);
   }
-  if(n.kids && n.kids.length){
-    parts.push(`하위 분주 ${vol(kv)}`);
-    parts.push(`<span class="${cls}">남는 양 ${vol(rest)}${rest < -1e-9 ? " ⚠︎ 부피 초과" : ""}</span>`);
+  if(n.kids && n.kids.length) parts.push(`하위 분주 ${volML(kvML)}`);
+  if(gs.length || (n.kids && n.kids.length)){
+    parts.push(`<span class="${cls}">${rest < -1e-9 ? "부족 " + volML(-rest) + " ⚠︎ 부피 초과" : "남는 양 " + volML(rest)}</span>`);
   }
   if(n.note) parts.push(`<i>${esc(n.note)}</i>`);
   return parts.join(" · ");
@@ -734,9 +931,7 @@ function renderTree(){
 function syncTree(){   // 값만 갱신 (입력 포커스 유지)
   $$("#tree .node[data-nid]").forEach(el=>{
     const hit = findNode(el.dataset.nid); if(!hit) return;
-    const n = hit.node, v = num(n.volume)||0;
-    const adds = nodeAdds(n);
-    const addTot = adds.reduce((s,a)=> s + (isFinite(a.uLv)?a.uLv:0), 0);
+    const n = hit.node;
     S.reagents.forEach(r=>{
       const chip = el.querySelector(`:scope > .chips [data-chip="${r.id}"]`);
       if(!chip) return;
@@ -747,7 +942,7 @@ function syncTree(){   // 값만 갱신 (입력 포커스 유지)
       const b  = chip.querySelector("[data-chipv]");
       if(on){
         const c = calcReagent(effReagent(r, e.ov));
-        const val = isFinite(c.perML) ? c.perML * toML(n.volume) : NaN;
+        const val = isFinite(c.perML) ? c.perML * volOf(n) : NaN;
         if(b) b.textContent = sig(val) + " µL";
         const oi = chip.querySelector(".ovr");
         if(oi){ oi.placeholder = defOvPlaceholder(r); }
@@ -755,9 +950,11 @@ function syncTree(){   // 값만 갱신 (입력 포커스 유지)
       }
     });
     const meta = el.querySelector(":scope > [data-meta]");
-    if(meta) meta.innerHTML = metaText(n, v, kidsVolume(n), v - kidsVolume(n), addTot);
+    if(meta) meta.innerHTML = metaText(n);
     const unitEl = el.querySelector(":scope > .nrow > .unit");
     if(unitEl) unitEl.textContent = S.opt.volUnit;
+    const vi = el.querySelector(':scope > .nrow input[data-vol]');
+    if(vi && n.auto && vi !== document.activeElement) vi.value = sig(fromML(volOf(n)));
   });
 }
 
@@ -766,7 +963,7 @@ function diagramHTML(n){
   const lines = nodeAdds(n).map(a=> `${esc(a.base.name||"시약")} ${sig(a.uLv)} µL`).join("<br>");
   return `<div class="hrow">
     <div class="hbox">
-      <div class="hv">${vol(num(n.volume)||0)}</div>
+      <div class="hv">${volML(volOf(n))}</div>
       <div class="hn">${esc(n.name||"")}${n.day?" · "+esc(n.day):""}</div>
       ${lines?`<div class="ha">${lines}</div>`:""}
     </div>
@@ -783,7 +980,7 @@ function renderProtocol(){
   walk(S.roots, (n, parent, chain)=>{
     const adds = nodeAdds(n);
     const addTot = adds.reduce((s,a)=> s + (isFinite(a.uLv)?a.uLv:0), 0);
-    const baseML = toML(n.volume) - (S.opt.subtract ? addTot/1000 : 0);
+    const baseML = volOf(n) - (S.opt.subtract ? addTot/1000 : 0);
     const comp = [];   // 누적 조성 (뒤에 다시 넣은 값이 우선)
     chain.forEach(c => (c.adds||[]).forEach(a=>{
       const b = reagentById(a.rid); if(!b) return;
@@ -807,19 +1004,20 @@ function renderProtocol(){
       <span class="daytag">${esc(d)}</span>
       ${groups[d].map(s=>{
         const src = s.parent
-          ? `<li><b>${esc(s.parent.name||"상위")}</b> 에서 <code>${vol(num(s.n.volume)||0)}</code> 분주</li>`
-          : `<li>기본 배지 <code>${sig(s.baseML/f)} ${esc(S.opt.volUnit)}</code> 준비${S.opt.subtract?` <span class="muted">(시약 포함 총 ${vol(num(s.n.volume)||0)})</span>`:""}</li>`;
+          ? `<li><b>${esc(s.parent.name||"상위")}</b> 에서 <code>${volML(volOf(s.n))}</code> 분주</li>`
+          : `<li>기본 배지 <code>${sig(s.baseML/f)} ${esc(S.opt.volUnit)}</code> 준비${S.opt.subtract?` <span class="muted">(시약 포함 총 ${volML(volOf(s.n))})</span>`:""}</li>`;
         const addLi = s.adds.length
           ? s.adds.map(a=>`<li>${esc(a.base.name||"시약")} <b class="out">${sig(a.uLv)} µL</b>
               <span class="muted">(${esc(concTxt(a.r))}${isFinite(a.perML)?`, ${foldTxt(1000/a.perML)} 희석`:""}${a.ov!=null&&a.ov!==""?", 이 단계 전용":""})</span>
               ${a.err?`<span class="bad">${esc(a.err)}</span>`:""}</li>`).join("")
           : `<li class="muted">추가 시약 없음</li>`;
         const kidLi = (s.n.kids&&s.n.kids.length)
-          ? `<li>→ ${s.n.kids.map(k=>`<code>${vol(num(k.volume)||0)}</code> ${esc(k.name||"")}`).join(" / ")} 로 분주</li>` : "";
+          ? `<li>→ ${s.n.kids.map(k=>`<code>${volML(volOf(k))}</code> ${esc(k.name||"")}`).join(" / ")} 로 분주</li>` : "";
+        const useLi = groupsOf(s.n).map(g=>`<li>세포에 사용: <b>${esc(g.name||"그룹")}</b> — ${esc(g.plate)} ${sig(num(g.well)||0)} ${esc(g.wellUnit)}/웰 × ${sig(num(g.n)||0)}웰 × ${sig(num(g.days)||1)}일 = <b class="out">${volML(groupML(g))}</b></li>`).join("");
         const noteLi = s.n.note ? `<li class="muted">📝 ${esc(s.n.note)}</li>` : "";
         return `<div class="step">
-          <h3>${esc(s.n.name||"이름 없음")} · ${vol(num(s.n.volume)||0)}</h3>
-          <ul>${src}${addLi}${kidLi}${noteLi}</ul>
+          <h3>${esc(s.n.name||"이름 없음")} · ${volML(volOf(s.n))}</h3>
+          <ul>${src}${addLi}${kidLi}${useLi}${noteLi}</ul>
           <div class="comp">최종 조성: ${s.comp.length ? s.comp.map(c=>`${esc(c.name||"시약")} ${esc(c.txt)}`).join(" · ") : "기본 배지"}</div>
         </div>`;
       }).join("")}
@@ -848,11 +1046,13 @@ function renderTotals(){
 
 /* ============================ 렌더 전체 ============================ */
 function renderAll(){
-  renderRecipeBar(); renderReagents(); renderTree();
+  computeVolumes();
+  renderRecipeBar(); renderReagents(); renderGroups(); renderTree();
   renderDiagram(); renderProtocol(); renderTotals(); save();
 }
 function refresh(){
-  syncReagentCells(); syncTree(); renderDiagram(); renderProtocol(); renderTotals();
+  computeVolumes();
+  syncReagentCells(); syncGroups(); syncTree(); renderDiagram(); renderProtocol(); renderTotals();
   $("#recipe-sub").textContent = `${S.name} · 시약 ${S.reagents.length}종 · 단계 ${countNodes()}개`;
   save();
 }
@@ -864,6 +1064,13 @@ document.addEventListener("input", e=>{
   if(tr && t.dataset.f){
     const r = reagentById(tr.dataset.rid);
     if(r){ r[t.dataset.f] = t.value; refresh(); }
+    return;
+  }
+  if(t.id === "opt-overage"){ S.opt.overage = t.value; refresh(); return; }
+  const gr = t.closest("#groups tbody tr[data-gid]");
+  if(gr && t.dataset.gf){
+    const g = (S.groups||[]).find(x=>x.id===gr.dataset.gid);
+    if(g){ g[t.dataset.gf] = t.value; refresh(); }
     return;
   }
   const nd = t.closest("#tree .node[data-nid]");
@@ -881,6 +1088,23 @@ document.addEventListener("change", async e=>{
   const t = e.target;
   if(t.id === "opt-subtract"){ S.opt.subtract = t.checked; refresh(); return; }
   if(t.id === "opt-compact"){ S.opt.compact = t.checked; EXPAND.clear(); renderTree(); refresh(); return; }
+  if(t.id === "opt-round"){ S.opt.round = parseFloat(t.value)||0; refresh(); return; }
+  const gr0 = t.closest("#groups tbody tr[data-gid]");
+  if(gr0 && t.dataset.gf){
+    const g = (S.groups||[]).find(x=>x.id===gr0.dataset.gid);
+    if(g){
+      g[t.dataset.gf] = t.value;
+      if(t.dataset.gf === "plate" && t.value !== "직접 입력"){
+        const pl = plateByName(t.value); g.well = pl.well; g.wellUnit = pl.unit;
+      }
+      if(t.dataset.gf === "nodeId" && t.value){
+        const h = findNode(t.value);
+        if(h){ g.days = daysFromLabel(h.node.day); if(!g.name) g.name = h.node.name || ""; }
+      }
+      renderGroups(); refresh();
+    }
+    return;
+  }
   if(t.id === "opt-volunit"){
     const from = S.opt.volUnit, to = t.value;
     if(from !== to){
@@ -927,6 +1151,11 @@ document.addEventListener("click", async e=>{
   const b = e.target.closest("button"); if(!b) return;
   const act = b.dataset.act;
 
+  if(act === "del-group"){
+    const gid = b.closest("tr").dataset.gid;
+    S.groups = (S.groups||[]).filter(g=>g.id!==gid);
+    renderAll(); return;
+  }
   if(act === "del-reagent"){
     const rid = b.closest("tr").dataset.rid;
     S.reagents = S.reagents.filter(r=>r.id!==rid);
@@ -937,6 +1166,11 @@ document.addEventListener("click", async e=>{
   if(nodeEl){
     const nid = nodeEl.dataset.nid;
     const hit = findNode(nid);
+    if(act === "auto" && hit){
+      hit.node.auto = !hit.node.auto;
+      if(!hit.node.auto) hit.node.volume = trim0(String(parseFloat(fromML(volOf(hit.node)).toPrecision(12))));
+      renderAll(); return;
+    }
     if(act === "expand"){
       if(EXPAND.has(nid)) EXPAND.delete(nid); else EXPAND.add(nid);
       renderTree(); refresh(); return;
@@ -949,8 +1183,10 @@ document.addEventListener("click", async e=>{
       return;
     }
     if(act === "add-kid" && hit){
-      const rest = Math.max(0, (num(hit.node.volume)||0) - kidsVolume(hit.node));
-      hit.node.kids.push(N_("분주", hit.node.day||"", rest || 1, []));
+      const rest = Math.max(0, fromML(volOf(hit.node) - kidsVolumeML(hit.node)));
+      const kid = N_("분주", hit.node.day||"", trim0(String(parseFloat((rest || 1).toPrecision(12)))), []);
+      kid.auto = !!hit.node.auto;
+      hit.node.kids.push(kid);
       renderAll(); return;
     }
     if(act === "dup-node" && hit){
@@ -973,7 +1209,10 @@ document.addEventListener("click", async e=>{
          !(await ask({type:"confirm", title:"단계 삭제", msg:"하위 분주까지 함께 삭제됩니다. 계속할까요?"}))) return;
       if(S.roots.length === 1 && S.roots[0].id === nid &&
          !(await ask({type:"confirm", title:"단계 삭제", msg:"마지막 단계입니다. 삭제할까요?"}))) return;
+      const gone = [];
+      if(hit) walk([hit.node], x=>gone.push(x.id));
       removeNode(nid);
+      (S.groups||[]).forEach(g=>{ if(gone.indexOf(g.nodeId) >= 0) g.nodeId = ""; });
       if(!S.roots.length) S.roots = [N_("마스터 믹스","Day 0",10,[])];
       renderAll(); return;
     }
@@ -985,6 +1224,23 @@ document.addEventListener("click", async e=>{
       setTimeout(()=>{ const l = $$("#reagents tbody tr input[data-f='name']").pop(); if(l) l.focus(); },0);
       break;
     case "btn-addroot": S.roots.push(N_("마스터 믹스","Day 0",10,[])); renderAll(); break;
+    case "btn-addgroup":{
+      const leaves = [];
+      walk(S.roots, n=>{ if(!n.kids || !n.kids.length) leaves.push(n); });
+      const pl = plateByName("6-well");
+      S.groups.push(G_({name:"그룹 " + ((S.groups||[]).length+1),
+        nodeId: leaves.length === 1 ? leaves[0].id : "",
+        plate:pl.name, well:pl.well, wellUnit:pl.unit, n:6,
+        days: leaves.length === 1 ? daysFromLabel(leaves[0].day) : 1}));
+      renderAll();
+      setTimeout(()=>{ const l = $$("#groups tbody tr input[data-gf='name']").pop(); if(l){ l.focus(); l.select(); } },0);
+      break;
+    }
+    case "btn-autoall": walk(S.roots, n=>{ n.auto = true; }); renderAll(); break;
+    case "btn-fixall":
+      computeVolumes();
+      walk(S.roots, n=>{ if(n.auto){ n.volume = trim0(String(parseFloat(fromML(volOf(n)).toPrecision(12)))); n.auto = false; } });
+      renderAll(); break;
     case "btn-new":{
       const name = await ask({type:"prompt", title:"새 레시피", msg:"이름을 입력하세요.",
         value:"레시피 " + (DB.recipes.length+1)});
@@ -997,7 +1253,10 @@ document.addEventListener("click", async e=>{
       copy.id = uid(); copy.name = S.name + " 복사";
       const map = {};
       copy.reagents.forEach(r=>{ const o = r.id; r.id = uid(); map[o] = r.id; });
-      walk(copy.roots, n=>{ n.id = uid(); n.adds = n.adds.map(a=>({rid:map[a.rid]||a.rid, ov:a.ov})); });
+      const nmap = {};
+      walk(copy.roots, n=>{ const o = n.id; n.id = uid(); nmap[o] = n.id;
+        n.adds = n.adds.map(a=>({rid:map[a.rid]||a.rid, ov:a.ov})); });
+      copy.groups = (copy.groups||[]).map(g=> Object.assign({}, g, {id:uid(), nodeId:nmap[g.nodeId]||""}));
       DB.recipes.push(copy); setActive(copy.id); break;
     }
     case "btn-rename":{
