@@ -1,0 +1,928 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>배양액 계산기 · Medium Calculator</title>
+<style>
+  :root{
+    --bg:#0b0d12; --panel:#141821; --panel2:#1b2130;
+    --line:#2b3346; --line2:#3a4459;
+    --text:#eef2f8; --muted:#95a0b8;
+    --accent:#6ea8fe; --accent2:#7ef0c0; --warn:#ffb45c; --danger:#ff6b8a;
+    --radius:12px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 12% -5%, rgba(110,168,254,.16), transparent 42%),
+      radial-gradient(circle at 92% 0%, rgba(126,240,192,.10), transparent 40%),
+      var(--bg);
+    color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+    font-size:14px; line-height:1.5; min-height:100vh; padding-bottom:60px;
+  }
+  h1{font-size:19px;margin:0;letter-spacing:-.2px;}
+  h2{font-size:15px;margin:0 0 2px;letter-spacing:-.2px;}
+  .sub{color:var(--muted);font-size:12px;}
+  header{
+    position:sticky;top:0;z-index:20;
+    display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;
+    padding:10px 16px;padding-top:max(10px,env(safe-area-inset-top));
+    background:rgba(11,13,18,.85);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:0 16px;}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin:16px 0;}
+  .shead{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;justify-content:space-between;margin-bottom:10px;}
+  button{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line2);
+    border-radius:9px;padding:6px 11px;cursor:pointer;transition:.12s;white-space:nowrap;}
+  button:hover{border-color:var(--accent);color:#fff;}
+  button.primary{background:linear-gradient(180deg,#3f6fd8,#3159b8);border-color:#5b87e6;}
+  button.ghost{background:transparent;}
+  button.danger:hover{border-color:var(--danger);color:var(--danger);}
+  button.mini{padding:2px 8px;font-size:12px;border-radius:7px;}
+  input,select{font:inherit;color:var(--text);background:#0f131b;border:1px solid var(--line);
+    border-radius:8px;padding:5px 7px;width:100%;}
+  input:focus,select:focus{outline:none;border-color:var(--accent);}
+  input[readonly]{background:#0c0f15;color:var(--muted);border-style:dashed;}
+  table{width:100%;border-collapse:collapse;}
+  th,td{padding:5px 6px;text-align:left;vertical-align:middle;}
+  th{font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.4px;
+     border-bottom:1px solid var(--line);white-space:nowrap;}
+  tbody tr{border-bottom:1px solid rgba(43,51,70,.6);}
+  .tblwrap{overflow-x:auto;}
+  .num{font-variant-numeric:tabular-nums;}
+  .out{color:var(--accent2);font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap;}
+  .bad{color:var(--danger);} .warnc{color:var(--warn);} .muted{color:var(--muted);}
+  .toolbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+  .fld{display:flex;align-items:center;gap:5px;}
+  .fld label{font-size:12px;color:var(--muted);white-space:nowrap;}
+  .fld select,.fld input{width:auto;}
+
+  /* 시약 칩 */
+  .pill{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line2);border-radius:999px;
+    padding:2px 9px;font-size:12px;background:#0f131b;color:var(--muted);white-space:nowrap;}
+  .pill.on{border-color:var(--accent);background:rgba(110,168,254,.14);color:var(--text);}
+  .pill input[type=checkbox]{width:auto;margin:0;accent-color:var(--accent);}
+  .pill .pname{cursor:pointer;user-select:none;}
+  .pill .ovr{width:52px;padding:1px 4px;font-size:11px;border-radius:6px;text-align:right;}
+  .pill b{color:var(--accent2);font-variant-numeric:tabular-nums;}
+  .pill .u{font-size:10px;opacity:.75;}
+
+  /* 트리 */
+  .node{border:1px solid var(--line);border-radius:11px;background:var(--panel2);padding:10px;margin-top:8px;}
+  .node > .kids{margin:8px 0 0 8px;padding-left:12px;border-left:2px dashed var(--line2);}
+  .nrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+  .nrow .f-name{flex:1 1 150px;min-width:110px;}
+  .nrow .f-day{flex:0 1 100px;}
+  .nrow .f-vol{flex:0 1 84px;}
+  .unit{color:var(--muted);font-size:12px;}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+  .meta{font-size:12px;color:var(--muted);margin-top:6px;}
+  .pill.hide{display:none;}
+  .addbtn{border-style:dashed;color:var(--muted);}
+  .nnote{margin-top:6px;}
+  .nnote input{font-size:12px;}
+
+  /* 흐름도 */
+  .diagram{overflow-x:auto;padding:8px 4px;}
+  .hrow{display:flex;align-items:center;}
+  .hbox{border:1px solid var(--line2);border-radius:11px;background:var(--panel2);padding:8px 11px;
+    min-width:130px;white-space:nowrap;}
+  .hbox .hv{font-size:16px;font-weight:700;}
+  .hbox .hn{font-size:11px;color:var(--muted);}
+  .hbox .ha{font-size:11px;color:var(--accent2);font-variant-numeric:tabular-nums;}
+  .hkids{display:flex;flex-direction:column;gap:10px;margin-left:24px;position:relative;}
+  .hkids::before{content:"";position:absolute;left:-24px;top:50%;width:24px;border-top:1.5px solid var(--line2);}
+  .hchild{position:relative;padding-left:24px;}
+  .hchild::before{content:"";position:absolute;left:0;top:0;bottom:0;border-left:1.5px solid var(--line2);}
+  .hchild:first-child::before{top:50%;}
+  .hchild:last-child::before{bottom:50%;}
+  .hchild::after{content:"";position:absolute;left:0;top:50%;width:24px;border-top:1.5px solid var(--line2);}
+
+  /* 프로토콜 */
+  .day{margin:14px 0 0;}
+  .daytag{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.5px;
+    background:rgba(110,168,254,.16);border:1px solid rgba(110,168,254,.4);color:#cfe0ff;
+    border-radius:999px;padding:2px 11px;}
+  .step{border-left:2px solid var(--line2);margin:8px 0 8px 10px;padding:2px 0 2px 14px;}
+  .step h3{font-size:14px;margin:0 0 3px;}
+  .step ul{margin:4px 0;padding-left:18px;}
+  .step li{margin:1px 0;}
+  .step .comp{font-size:12px;color:var(--muted);margin-top:3px;}
+  code{background:#0f131b;border:1px solid var(--line);border-radius:5px;padding:0 5px;font-size:12px;}
+  .banner{border:1px solid rgba(255,180,92,.45);background:rgba(255,180,92,.10);color:#ffd9a8;
+    border-radius:9px;padding:8px 11px;font-size:12px;margin-top:8px;}
+  textarea{width:100%;min-height:150px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;
+    background:#0f131b;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;}
+
+  @media print{
+    body{background:#fff;color:#000;}
+    header,.noprint{display:none !important;}
+    section{border:1px solid #bbb;background:#fff;break-inside:avoid;}
+    .hbox,.node{background:#fff;border-color:#999;}
+    .out,.hbox .ha,.pill b{color:#065f46;}
+    .muted,.sub,.hbox .hn{color:#555;}
+    .daytag{background:#eee;color:#000;border-color:#999;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>배양액 계산기</h1>
+    <div class="sub" id="recipe-sub">한 번에 만들어 분주하는 흐름 그대로 · 시약별 µL 자동 계산</div>
+  </div>
+  <div class="toolbar noprint">
+    <select id="recipe-sel" style="min-width:150px"></select>
+    <button id="btn-new">새 레시피</button>
+    <button id="btn-dup">복제</button>
+    <button id="btn-rename">이름 변경</button>
+    <button id="btn-delrecipe" class="danger ghost">삭제</button>
+    <button id="btn-examples">예시</button>
+    <button id="btn-io">저장/불러오기</button>
+    <button id="btn-print">인쇄·PDF</button>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- ① 시약 -->
+  <section>
+    <div class="shead">
+      <div>
+        <h2>① 시약 라이브러리</h2>
+        <div class="sub">스톡 농도와 최종 농도를 넣으면 희석배수와 <b>배지 1 mL당 µL</b>가 자동으로 나옵니다. 희석배수나 µL/mL을 직접 넣어도 됩니다.</div>
+      </div>
+      <div class="toolbar noprint">
+        <button id="btn-addreagent" class="primary">+ 시약 추가</button>
+      </div>
+    </div>
+    <div class="tblwrap">
+      <table id="reagents">
+        <thead>
+          <tr>
+            <th style="min-width:120px">이름</th>
+            <th colspan="2">스톡 농도</th>
+            <th colspan="2">최종 농도</th>
+            <th title="몰농도 ↔ 질량농도 변환이 필요할 때만 입력">MW</th>
+            <th>계산 방식</th>
+            <th>희석배수</th>
+            <th>µL / mL</th>
+            <th style="min-width:110px">메모</th>
+            <th class="noprint"></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div id="reagent-warn"></div>
+  </section>
+
+  <!-- ② 흐름 -->
+  <section class="noprint">
+    <div class="shead">
+      <div>
+        <h2>② 배지 흐름</h2>
+        <div class="sub">부피를 넣고 그 단계에서 <b>새로 넣는</b> 시약만 체크하세요. 칩 안의 숫자를 고치면 그 단계만 다른 농도로 쓸 수 있습니다.</div>
+      </div>
+      <div class="toolbar noprint">
+        <span class="fld"><label>부피 단위</label>
+          <select id="opt-volunit"><option value="mL">mL</option><option value="µL">µL</option><option value="L">L</option></select>
+        </span>
+        <label class="pill"><input type="checkbox" id="opt-compact"> 체크한 시약만 표시</label>
+        <label class="pill"><input type="checkbox" id="opt-subtract"> 시약 부피를 총 부피에 포함</label>
+        <button id="btn-addroot">+ 마스터 믹스</button>
+      </div>
+    </div>
+    <div id="tree"></div>
+  </section>
+
+  <!-- ③ 흐름도 -->
+  <section>
+    <h2>③ 흐름도</h2>
+    <div class="sub">전체 분주 구조를 한눈에 확인합니다.</div>
+    <div class="diagram" id="diagram"></div>
+  </section>
+
+  <!-- ④ 프로토콜 -->
+  <section>
+    <h2>④ 조제 프로토콜</h2>
+    <div class="sub">단계(날짜)별 순서. 이대로 실험대에서 따라 하면 됩니다.</div>
+    <div id="protocol"></div>
+  </section>
+
+  <!-- ⑤ 총량 -->
+  <section>
+    <h2>⑤ 시약 총 소모량</h2>
+    <div class="sub">스톡 튜브에서 꺼내야 하는 전체 양입니다.</div>
+    <div class="tblwrap"><table id="totals">
+      <thead><tr><th>시약</th><th>총 사용량</th><th>사용 단계</th><th>스톡 → 최종</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </section>
+
+  <!-- 저장/불러오기 -->
+  <section id="io" class="noprint" hidden>
+    <div class="shead">
+      <div><h2>저장 / 불러오기</h2>
+        <div class="sub">모든 레시피는 이 브라우저에 자동 저장됩니다. 아래 JSON을 옮기면 다른 기기에서도 이어서 쓸 수 있습니다.</div></div>
+      <div class="toolbar">
+        <span class="fld"><label>범위</label>
+          <select id="io-scope"><option value="one">현재 레시피</option><option value="all">전체</option></select></span>
+        <button id="btn-copy">복사</button>
+        <button id="btn-load" class="primary">붙여넣은 JSON 적용</button>
+        <button id="btn-download">파일로 저장</button>
+        <button id="btn-ioclose" class="ghost">닫기</button>
+      </div>
+    </div>
+    <textarea id="json"></textarea>
+  </section>
+
+</div>
+
+<script>
+"use strict";
+
+/* ============================ 단위 ============================ */
+// mol 계열 기준: mol/L,  mass 계열 기준: g/L
+const UNITS = {
+  "M":{kind:"mol",f:1}, "mM":{kind:"mol",f:1e-3}, "µM":{kind:"mol",f:1e-6},
+  "nM":{kind:"mol",f:1e-9}, "pM":{kind:"mol",f:1e-12},
+  "g/mL":{kind:"mass",f:1000}, "mg/mL":{kind:"mass",f:1}, "µg/mL":{kind:"mass",f:1e-3},
+  "ng/mL":{kind:"mass",f:1e-6}, "µg/µL":{kind:"mass",f:1}, "ng/µL":{kind:"mass",f:1e-3},
+  "mg/L":{kind:"mass",f:1e-3}, "µg/L":{kind:"mass",f:1e-6},
+  "U/mL":{kind:"act",f:1}, "U/L":{kind:"act",f:1e-3},
+  "X":{kind:"fold",f:1}, "%":{kind:"pct",f:1}, "mg/mL(w/v)":{kind:"mass",f:1}
+};
+const UNIT_KEYS = Object.keys(UNITS);
+const VOLF = {"mL":1, "µL":0.001, "L":1000};   // → mL
+
+function toBase(val, unit){
+  const u = UNITS[unit];
+  if(!u || !isFinite(val)) return null;
+  return {kind:u.kind, v:val*u.f};
+}
+function dilutionFold(r){
+  const s = toBase(num(r.stockVal), r.stockUnit);
+  const f = toBase(num(r.finalVal), r.finalUnit);
+  if(!s || !f || f.v === 0) return {fold:NaN, err:"스톡·최종 농도를 입력하세요"};
+  if(s.kind === f.kind) return {fold:s.v/f.v, err:""};
+  const mw = num(r.mw);
+  if((s.kind==="mol"&&f.kind==="mass")||(s.kind==="mass"&&f.kind==="mol")){
+    if(!(mw>0)) return {fold:NaN, err:"몰농도 ↔ 질량농도 변환에는 MW가 필요합니다"};
+    const sv = s.kind==="mol" ? s.v : s.v/mw;
+    const fv = f.kind==="mol" ? f.v : f.v/mw;
+    return {fold:sv/fv, err:""};
+  }
+  return {fold:NaN, err:"단위 종류가 서로 달라 계산할 수 없습니다"};
+}
+function calcReagent(r){
+  if(r.mode === "fold"){
+    const fold = num(r.fold);
+    return {fold, perML: fold>0 ? 1000/fold : NaN, err: fold>0?"":"희석배수를 입력하세요"};
+  }
+  if(r.mode === "perml"){
+    const p = num(r.perML);
+    return {fold: p>0 ? 1000/p : NaN, perML:p, err: p>0?"":"µL/mL 값을 입력하세요"};
+  }
+  const d = dilutionFold(r);
+  return {fold:d.fold, perML: d.fold>0 ? 1000/d.fold : NaN, err:d.err};
+}
+// 단계별 덮어쓰기(ov)를 반영한 실효 시약
+function effReagent(r, ov){
+  if(ov === null || ov === undefined || ov === "") return r;
+  const c = Object.assign({}, r);
+  if(r.mode === "fold")       c.fold   = ov;
+  else if(r.mode === "perml") c.perML  = ov;
+  else                        c.finalVal = ov;
+  return c;
+}
+function ovUnit(r){ return r.mode==="fold" ? "×" : r.mode==="perml" ? "µL/mL" : r.finalUnit; }
+
+/* ============================ 유틸 ============================ */
+const $  = (s,el)=> (el||document).querySelector(s);
+const $$ = (s,el)=> Array.from((el||document).querySelectorAll(s));
+const num = v => { const n = parseFloat(v); return isFinite(n) ? n : NaN; };
+const uid = () => Math.random().toString(36).slice(2,9);
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function trim0(s){ return s.indexOf(".")<0 ? s : s.replace(/0+$/,"").replace(/\.$/,""); }
+function sig(v){
+  if(!isFinite(v)) return "—";
+  if(v === 0) return "0";
+  const a = Math.abs(v);
+  if(a < 1e-6) return v.toExponential(2);
+  if(a < 0.01)  return trim0(parseFloat(v.toPrecision(3)).toFixed(8));
+  return trim0(a >= 100 ? v.toFixed(1) : a >= 10 ? v.toFixed(2) : v.toFixed(3));
+}
+const uL = sig;
+function amt(v){ // µL → 1000 이상이면 mL 병기
+  if(!isFinite(v)) return "—";
+  return v >= 1000 ? `${sig(v)} µL (${sig(v/1000)} mL)` : `${sig(v)} µL`;
+}
+function vol(v){ return sig(v) + " " + S.opt.volUnit; }        // 사용자가 고른 부피 단위로 표시
+function toML(v){ return (num(v)||0) * (VOLF[S.opt.volUnit]||1); }
+function foldTxt(f){
+  if(!isFinite(f)||f<=0) return "—";
+  const r = f >= 100 ? Math.round(f) : Math.round(f*100)/100;
+  return r.toLocaleString("en-US") + "×";
+}
+function concTxt(r){
+  if(r.mode === "conc" && isFinite(num(r.finalVal))) return trim0(String(num(r.finalVal))) + " " + r.finalUnit;
+  const c = calcReagent(r);
+  return isFinite(c.fold) ? foldTxt(c.fold) + " 희석" : "—";
+}
+
+/* ============================ 상태 ============================ */
+const KEY = "medium-calc.v2";
+let DB = null;    // {activeId, recipes:[…]}
+let S  = null;    // 현재 레시피 {id,name,opt,reagents,roots}
+
+function newRecipe(name){
+  return {id:uid(), name:name||"새 레시피", opt:{subtract:false, volUnit:"mL", compact:false},
+    reagents:[], roots:[{id:uid(), name:"마스터 믹스", day:"Day 0", volume:10, adds:[], note:"", kids:[]}]};
+}
+const R_ = (o)=> Object.assign({id:uid(), name:"", stockVal:"", stockUnit:"mM", finalVal:"", finalUnit:"µM",
+  mw:"", mode:"conc", fold:"", perML:"", note:""}, o);
+const N_ = (name, day, volume, adds, kids)=> ({id:uid(), name, day, volume,
+  adds:(adds||[]).map(a=> typeof a === "string" ? {rid:a, ov:null} : a), note:"", kids:kids||[]});
+
+/* --- 예시들 --- */
+const EXAMPLES = {
+  "분주 흐름 (36 mL → 18/18 → 4·2·12 → 8·4)": function(){
+    const rs = [
+      R_({name:"FGF2",          stockVal:100, stockUnit:"µg/mL", finalVal:10,  finalUnit:"ng/mL", note:"성장인자"}),
+      R_({name:"PDGF-BB",       stockVal:100, stockUnit:"µg/mL", finalVal:10,  finalUnit:"ng/mL", note:"성장인자"}),
+      R_({name:"A83-01",        stockVal:10,  stockUnit:"mM",    finalVal:0.5, finalUnit:"µM",    note:"TGF-β 억제제"}),
+      R_({name:"Purmorphamine", stockVal:10,  stockUnit:"mM",    finalVal:1,   finalUnit:"µM",    note:"DMSO 스톡 · 10,000×"}),
+      R_({name:"RA",            stockVal:10,  stockUnit:"mM",    finalVal:2,   finalUnit:"µM",    note:"스톡 농도 확인 필요"}),
+      R_({name:"LT",            stockVal:10,  stockUnit:"mM",    finalVal:2,   finalUnit:"µM",    note:"스톡 농도 확인 필요"}),
+      R_({name:"DAPT",          stockVal:10,  stockUnit:"mM",    finalVal:10,  finalUnit:"µM",    note:"Notch 억제제 · 1,000×"})
+    ];
+    const id = n => rs.find(r=>r.name===n).id;
+    const branch = (label)=> [
+      N_(label+" 4 mL",  "Day 1", 4,  []),
+      N_(label+" 2 mL",  "Day 1", 2,  [id("RA")]),
+      N_(label+" 12 mL", "Day 1", 12, [id("LT")], [
+        N_(label+" 8 mL", "Day 2-3", 8, [id("DAPT")]),
+        N_(label+" 4 mL", "Day 2-3", 4, [])
+      ])
+    ];
+    return {id:uid(), name:"분주 흐름 예시", opt:{subtract:false, volUnit:"mL", compact:false}, reagents:rs,
+      roots:[ N_("마스터 믹스","Day 0",36,[id("FGF2"),id("PDGF-BB"),id("A83-01")],[
+        N_("SHH −","Day 0",18,[], branch("SHH −")),
+        N_("SHH +","Day 0",18,[id("Purmorphamine")], branch("SHH +"))
+      ])]};
+  },
+  "단순 1단계 (배지 한 통에 시약 첨가)": function(){
+    const rs = [ R_({name:"시약 A", stockVal:10, stockUnit:"mM", finalVal:10, finalUnit:"µM"}) ];
+    return {id:uid(), name:"단순 배지", opt:{subtract:false, volUnit:"mL", compact:false}, reagents:rs,
+      roots:[ N_("배지","Day 0",50,[rs[0].id]) ]};
+  },
+  "빈 레시피": function(){ return newRecipe("새 레시피"); }
+};
+
+function normalize(rec){
+  rec.opt = Object.assign({subtract:false, volUnit:"mL", compact:false}, rec.opt||{});
+  rec.reagents = (rec.reagents||[]).map(r=> Object.assign(R_({}), r));
+  const fixNode = n => {
+    n.id = n.id || uid();
+    n.adds = (n.adds||[]).map(a=> typeof a === "string" ? {rid:a, ov:null} : Object.assign({rid:"", ov:null}, a));
+    n.kids = (n.kids||[]).map(fixNode);
+    return n;
+  };
+  rec.roots = (rec.roots && rec.roots.length ? rec.roots : [newRecipe().roots[0]]).map(fixNode);
+  rec.id = rec.id || uid();
+  rec.name = rec.name || "레시피";
+  return rec;
+}
+function loadDB(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(raw){
+      const d = JSON.parse(raw);
+      if(d && Array.isArray(d.recipes) && d.recipes.length){
+        d.recipes = d.recipes.map(normalize);
+        if(!d.recipes.some(r=>r.id===d.activeId)) d.activeId = d.recipes[0].id;
+        return d;
+      }
+    }
+    // v1 마이그레이션
+    const old = localStorage.getItem("medium-calc.v1");
+    if(old){
+      const o = JSON.parse(old);
+      if(o && o.reagents && o.roots){
+        const rec = normalize({id:uid(), name:"이전 작업", opt:o.opt, reagents:o.reagents, roots:o.roots});
+        return {activeId:rec.id, recipes:[rec]};
+      }
+    }
+  }catch(e){}
+  const first = normalize(EXAMPLES["분주 흐름 (36 mL → 18/18 → 4·2·12 → 8·4)"]());
+  return {activeId:first.id, recipes:[first]};
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(DB)); }catch(e){} }
+function setActive(id){ DB.activeId = id; S = DB.recipes.find(r=>r.id===id); renderAll(); }
+
+const EXPAND = new Set();   // compact 모드에서 시약 목록을 펼친 노드
+const NOTEON = new Set();   // 메모 입력을 연 노드
+
+/* ============================ 트리 헬퍼 ============================ */
+function walk(nodes, fn, parent, chain){
+  (nodes||[]).forEach(n=>{
+    const ch = (chain||[]).concat([n]);
+    fn(n, parent||null, ch);
+    walk(n.kids, fn, n, ch);
+  });
+}
+function findNode(id){
+  let hit = null;
+  walk(S.roots, (n,p,ch)=>{ if(n.id===id) hit={node:n, parent:p, chain:ch}; });
+  return hit;
+}
+function siblingsOf(id){
+  let arr = null;
+  const rec = (list)=>{ if(list.some(n=>n.id===id)){ arr = list; return; } list.forEach(n=>rec(n.kids)); };
+  rec(S.roots);
+  return arr;
+}
+function removeNode(id){
+  const rec = (arr)=>{
+    const i = arr.findIndex(n=>n.id===id);
+    if(i>=0){ arr.splice(i,1); return true; }
+    return arr.some(n=>rec(n.kids));
+  };
+  rec(S.roots);
+}
+function reagentById(id){ return S.reagents.find(r=>r.id===id); }
+
+// 이 단계에서 새로 넣는 시약 → µL
+function nodeAdds(n){
+  const vML = toML(n.volume);
+  return (n.adds||[]).map(a=>{
+    const base = reagentById(a.rid);
+    if(!base) return null;
+    const r = effReagent(base, a.ov);
+    const c = calcReagent(r);
+    return {base, r, ov:a.ov, perML:c.perML, err:c.err, uLv: isFinite(c.perML) ? c.perML*vML : NaN};
+  }).filter(Boolean);
+}
+function kidsVolume(n){ return (n.kids||[]).reduce((s,k)=> s + (num(k.volume)||0), 0); }
+function addEntry(n, rid){ return (n.adds||[]).find(a=>a.rid===rid); }
+
+/* ============================ 렌더: 레시피 목록 ============================ */
+function renderRecipeBar(){
+  $("#recipe-sel").innerHTML = DB.recipes.map(r=>
+    `<option value="${r.id}"${r.id===DB.activeId?" selected":""}>${esc(r.name)}</option>`).join("");
+  $("#recipe-sub").textContent = `${S.name} · 시약 ${S.reagents.length}종 · 단계 ${countNodes()}개`;
+}
+function countNodes(){ let c=0; walk(S.roots, ()=>c++); return c; }
+
+/* ============================ 렌더: 시약 ============================ */
+function unitOptions(sel){
+  return UNIT_KEYS.map(u=>`<option value="${u}"${u===sel?" selected":""}>${u}</option>`).join("");
+}
+function renderReagents(){
+  $("#reagents tbody").innerHTML = S.reagents.map(r=>`
+    <tr data-rid="${r.id}">
+      <td><input data-f="name" value="${esc(r.name)}" placeholder="시약명"></td>
+      <td style="width:76px"><input class="num" data-f="stockVal" value="${esc(r.stockVal)}" inputmode="decimal"></td>
+      <td style="width:96px"><select data-f="stockUnit">${unitOptions(r.stockUnit)}</select></td>
+      <td style="width:76px"><input class="num" data-f="finalVal" value="${esc(r.finalVal)}" inputmode="decimal"></td>
+      <td style="width:96px"><select data-f="finalUnit">${unitOptions(r.finalUnit)}</select></td>
+      <td style="width:68px"><input class="num" data-f="mw" value="${esc(r.mw)}" placeholder="—" inputmode="decimal"></td>
+      <td style="width:112px"><select data-f="mode">
+        <option value="conc"${r.mode==="conc"?" selected":""}>농도로 계산</option>
+        <option value="fold"${r.mode==="fold"?" selected":""}>희석배수 입력</option>
+        <option value="perml"${r.mode==="perml"?" selected":""}>µL/mL 입력</option>
+      </select></td>
+      <td style="width:92px"><input class="num" data-f="fold" data-derived="fold" value=""></td>
+      <td style="width:88px"><input class="num" data-f="perML" data-derived="perML" value=""></td>
+      <td><input data-f="note" value="${esc(r.note)}" placeholder="메모"></td>
+      <td class="noprint" style="width:34px"><button class="mini danger ghost" data-act="del-reagent" title="삭제">✕</button></td>
+    </tr>`).join("") || `<tr><td colspan="11" class="muted">시약이 없습니다. “+ 시약 추가”를 누르세요.</td></tr>`;
+  syncReagentCells();
+}
+function syncReagentCells(){
+  const warns = [];
+  $$("#reagents tbody tr[data-rid]").forEach(tr=>{
+    const r = reagentById(tr.dataset.rid); if(!r) return;
+    const c = calcReagent(r);
+    const fi = $('input[data-derived="fold"]', tr);
+    const pi = $('input[data-derived="perML"]', tr);
+    const setD = (el, editable, val)=>{
+      if(el === document.activeElement && editable) return;
+      el.readOnly = !editable;
+      el.value = val;
+    };
+    setD(fi, r.mode==="fold",  r.mode==="fold"  ? r.fold  : (isFinite(c.fold)  ? trim0(String(c.fold>=100?Math.round(c.fold):Math.round(c.fold*100)/100)) : ""));
+    setD(pi, r.mode==="perml", r.mode==="perml" ? r.perML : (isFinite(c.perML) ? sig(c.perML) : ""));
+    fi.classList.toggle("bad", !!c.err && r.mode!=="fold");
+    pi.classList.toggle("bad", !!c.err && r.mode!=="perml");
+    if(c.err) warns.push((r.name||"이름 없는 시약") + ": " + c.err);
+  });
+  $("#reagent-warn").innerHTML = warns.length ? `<div class="banner">⚠︎ ${warns.map(esc).join("<br>")}</div>` : "";
+}
+
+/* ============================ 렌더: 트리 ============================ */
+function chipHTML(n, r){
+  const e = addEntry(n, r.id);
+  const on = !!e;
+  const eff = effReagent(r, on ? e.ov : null);
+  const c = calcReagent(eff);
+  const v = isFinite(c.perML) ? c.perML * toML(n.volume) : NaN;
+  const hidden = S.opt.compact && !on && !EXPAND.has(n.id);
+  return `<span class="pill${on?" on":""}${hidden?" hide":""}" data-chip="${r.id}">
+      <input type="checkbox" data-act="toggle-add" data-rid="${r.id}"${on?" checked":""}>
+      <span class="pname" data-act="toggle-chip" data-rid="${r.id}">${esc(r.name||"시약")}</span>
+      ${on?`<input class="ovr num" data-act="ovr" data-rid="${r.id}" value="${esc(e.ov==null?"":e.ov)}" placeholder="${esc(defOvPlaceholder(r))}" inputmode="decimal" title="이 단계만 다른 값으로 (비우면 기본값)">
+            <span class="u">${esc(ovUnit(r))}</span>
+            <b data-chipv="${r.id}">${sig(v)} µL</b>`:""}
+    </span>`;
+}
+function defOvPlaceholder(r){
+  return r.mode==="fold" ? (r.fold||"") : r.mode==="perml" ? (r.perML||"") : (r.finalVal||"");
+}
+function nodeHTML(n){
+  const v = num(n.volume)||0;
+  const kv = kidsVolume(n);
+  const rest = v - kv;
+  const adds = nodeAdds(n);
+  const addTot = adds.reduce((s,a)=> s + (isFinite(a.uLv)?a.uLv:0), 0);
+  return `<div class="node" data-nid="${n.id}">
+    <div class="nrow">
+      <div class="f-name"><input data-f="name" value="${esc(n.name)}" placeholder="이름"></div>
+      <div class="f-day"><input data-f="day" value="${esc(n.day)}" placeholder="Day / 단계"></div>
+      <div class="f-vol"><input class="num" data-f="volume" value="${esc(n.volume)}" inputmode="decimal"></div>
+      <span class="unit">${esc(S.opt.volUnit)}</span>
+      <span style="flex:1"></span>
+      <span class="noprint">
+        <button class="mini" data-act="up" title="위로">↑</button>
+        <button class="mini" data-act="down" title="아래로">↓</button>
+        <button class="mini" data-act="note" title="메모">📝</button>
+        <button class="mini" data-act="add-kid">+ 분주</button>
+        <button class="mini" data-act="dup-node" title="복제">⧉</button>
+        <button class="mini danger ghost" data-act="del-node">삭제</button>
+      </span>
+    </div>
+    <div class="chips">${S.reagents.map(r=>chipHTML(n,r)).join("") || '<span class="muted">시약을 먼저 추가하세요.</span>'}
+      ${S.opt.compact && S.reagents.length ? `<button class="pill addbtn" data-act="expand">${EXPAND.has(n.id)?"− 접기":"＋ 시약"}</button>` : ""}
+    </div>
+    <div class="meta" data-meta>${metaText(n, v, kv, rest, addTot)}</div>
+    ${(NOTEON.has(n.id) || n.note) ? `<div class="nnote noprint"><input data-f="note" value="${esc(n.note||"")}" placeholder="이 단계 메모"></div>` : ""}
+    ${n.kids && n.kids.length ? `<div class="kids">${n.kids.map(nodeHTML).join("")}</div>` : ""}
+  </div>`;
+}
+function metaText(n, v, kv, rest, addTot){
+  const cls = rest < -1e-9 ? "bad" : (rest > 1e-9 ? "warnc" : "");
+  const parts = [`시약 합계 <b class="out">${amt(addTot)}</b>`];
+  if(S.opt.subtract){
+    const baseML = toML(n.volume) - addTot/1000;
+    parts.push(`기본 배지 <b class="out">${sig(baseML / (VOLF[S.opt.volUnit]||1))} ${S.opt.volUnit}</b>`);
+  }
+  if(n.kids && n.kids.length){
+    parts.push(`하위 분주 ${vol(kv)}`);
+    parts.push(`<span class="${cls}">남는 양 ${vol(rest)}${rest < -1e-9 ? " ⚠︎ 부피 초과" : ""}</span>`);
+  }
+  if(n.note) parts.push(`<i>${esc(n.note)}</i>`);
+  return parts.join(" · ");
+}
+function renderTree(){
+  $("#tree").innerHTML = S.roots.map(nodeHTML).join("");
+  $("#opt-subtract").checked = !!S.opt.subtract;
+  $("#opt-compact").checked = !!S.opt.compact;
+  $("#opt-volunit").value = S.opt.volUnit;
+}
+function syncTree(){   // 값만 갱신 (입력 포커스 유지)
+  $$("#tree .node[data-nid]").forEach(el=>{
+    const hit = findNode(el.dataset.nid); if(!hit) return;
+    const n = hit.node, v = num(n.volume)||0;
+    const adds = nodeAdds(n);
+    const addTot = adds.reduce((s,a)=> s + (isFinite(a.uLv)?a.uLv:0), 0);
+    S.reagents.forEach(r=>{
+      const chip = el.querySelector(`:scope > .chips [data-chip="${r.id}"]`);
+      if(!chip) return;
+      const e = addEntry(n, r.id), on = !!e;
+      chip.classList.toggle("on", on);
+      chip.classList.toggle("hide", S.opt.compact && !on && !EXPAND.has(n.id));
+      const nm = chip.querySelector(".pname"); if(nm) nm.textContent = r.name || "시약";
+      const b  = chip.querySelector("[data-chipv]");
+      if(on){
+        const c = calcReagent(effReagent(r, e.ov));
+        const val = isFinite(c.perML) ? c.perML * toML(n.volume) : NaN;
+        if(b) b.textContent = sig(val) + " µL";
+        const oi = chip.querySelector(".ovr");
+        if(oi){ oi.placeholder = defOvPlaceholder(r); }
+        const u = chip.querySelector(".u"); if(u) u.textContent = ovUnit(r);
+      }
+    });
+    const meta = el.querySelector(":scope > [data-meta]");
+    if(meta) meta.innerHTML = metaText(n, v, kidsVolume(n), v - kidsVolume(n), addTot);
+    const unitEl = el.querySelector(":scope > .nrow > .unit");
+    if(unitEl) unitEl.textContent = S.opt.volUnit;
+  });
+}
+
+/* ============================ 렌더: 흐름도 ============================ */
+function diagramHTML(n){
+  const lines = nodeAdds(n).map(a=> `${esc(a.base.name||"시약")} ${sig(a.uLv)} µL`).join("<br>");
+  return `<div class="hrow">
+    <div class="hbox">
+      <div class="hv">${vol(num(n.volume)||0)}</div>
+      <div class="hn">${esc(n.name||"")}${n.day?" · "+esc(n.day):""}</div>
+      ${lines?`<div class="ha">${lines}</div>`:""}
+    </div>
+    ${n.kids && n.kids.length ? `<div class="hkids">${n.kids.map(k=>`<div class="hchild">${diagramHTML(k)}</div>`).join("")}</div>` : ""}
+  </div>`;
+}
+function renderDiagram(){
+  $("#diagram").innerHTML = S.roots.map(diagramHTML).join('<div style="height:14px"></div>');
+}
+
+/* ============================ 렌더: 프로토콜 ============================ */
+function renderProtocol(){
+  const steps = [];
+  walk(S.roots, (n, parent, chain)=>{
+    const adds = nodeAdds(n);
+    const addTot = adds.reduce((s,a)=> s + (isFinite(a.uLv)?a.uLv:0), 0);
+    const baseML = toML(n.volume) - (S.opt.subtract ? addTot/1000 : 0);
+    const comp = [];   // 누적 조성 (뒤에 다시 넣은 값이 우선)
+    chain.forEach(c => (c.adds||[]).forEach(a=>{
+      const b = reagentById(a.rid); if(!b) return;
+      const i = comp.findIndex(x=>x.id===b.id);
+      const item = {id:b.id, name:b.name, txt:concTxt(effReagent(b, a.ov))};
+      if(i>=0) comp[i] = item; else comp.push(item);
+    }));
+    steps.push({n, parent, adds, addTot, baseML, comp});
+  });
+
+  const order = [], groups = {};
+  steps.forEach(s=>{
+    const d = (s.n.day||"").trim() || "단계 미지정";
+    if(!groups[d]){ groups[d] = []; order.push(d); }
+    groups[d].push(s);
+  });
+  const f = VOLF[S.opt.volUnit] || 1;
+
+  $("#protocol").innerHTML = order.map(d=>`
+    <div class="day">
+      <span class="daytag">${esc(d)}</span>
+      ${groups[d].map(s=>{
+        const src = s.parent
+          ? `<li><b>${esc(s.parent.name||"상위")}</b> 에서 <code>${vol(num(s.n.volume)||0)}</code> 분주</li>`
+          : `<li>기본 배지 <code>${sig(s.baseML/f)} ${esc(S.opt.volUnit)}</code> 준비${S.opt.subtract?` <span class="muted">(시약 포함 총 ${vol(num(s.n.volume)||0)})</span>`:""}</li>`;
+        const addLi = s.adds.length
+          ? s.adds.map(a=>`<li>${esc(a.base.name||"시약")} <b class="out">${sig(a.uLv)} µL</b>
+              <span class="muted">(${esc(concTxt(a.r))}${isFinite(a.perML)?`, ${foldTxt(1000/a.perML)} 희석`:""}${a.ov!=null&&a.ov!==""?", 이 단계 전용":""})</span>
+              ${a.err?`<span class="bad">${esc(a.err)}</span>`:""}</li>`).join("")
+          : `<li class="muted">추가 시약 없음</li>`;
+        const kidLi = (s.n.kids&&s.n.kids.length)
+          ? `<li>→ ${s.n.kids.map(k=>`<code>${vol(num(k.volume)||0)}</code> ${esc(k.name||"")}`).join(" / ")} 로 분주</li>` : "";
+        const noteLi = s.n.note ? `<li class="muted">📝 ${esc(s.n.note)}</li>` : "";
+        return `<div class="step">
+          <h3>${esc(s.n.name||"이름 없음")} · ${vol(num(s.n.volume)||0)}</h3>
+          <ul>${src}${addLi}${kidLi}${noteLi}</ul>
+          <div class="comp">최종 조성: ${s.comp.length ? s.comp.map(c=>`${esc(c.name||"시약")} ${esc(c.txt)}`).join(" · ") : "기본 배지"}</div>
+        </div>`;
+      }).join("")}
+    </div>`).join("") || '<div class="muted">배지 단계를 추가하세요.</div>';
+}
+
+/* ============================ 렌더: 총량 ============================ */
+function renderTotals(){
+  const tot = {};
+  walk(S.roots, n=>{
+    nodeAdds(n).forEach(a=>{
+      const t = tot[a.base.id] || (tot[a.base.id] = {r:a.base, sum:0, where:[]});
+      if(isFinite(a.uLv)) t.sum += a.uLv;
+      t.where.push(`${n.name||"단계"} ${sig(a.uLv)}`);
+    });
+  });
+  const rows = Object.values(tot);
+  $("#totals tbody").innerHTML = rows.map(t=>`
+    <tr>
+      <td>${esc(t.r.name||"시약")}</td>
+      <td class="out">${amt(t.sum)}</td>
+      <td class="muted">${t.where.map(esc).join(" · ")}</td>
+      <td class="muted">${esc(String(t.r.stockVal||"?"))} ${esc(t.r.stockUnit)} → ${esc(concTxt(t.r))}</td>
+    </tr>`).join("") || '<tr><td colspan="4" class="muted">사용 중인 시약이 없습니다.</td></tr>';
+}
+
+/* ============================ 렌더 전체 ============================ */
+function renderAll(){
+  renderRecipeBar(); renderReagents(); renderTree();
+  renderDiagram(); renderProtocol(); renderTotals(); save();
+}
+function refresh(){
+  syncReagentCells(); syncTree(); renderDiagram(); renderProtocol(); renderTotals();
+  $("#recipe-sub").textContent = `${S.name} · 시약 ${S.reagents.length}종 · 단계 ${countNodes()}개`;
+  save();
+}
+
+/* ============================ 이벤트 ============================ */
+document.addEventListener("input", e=>{
+  const t = e.target;
+  const tr = t.closest("#reagents tbody tr[data-rid]");
+  if(tr && t.dataset.f){
+    const r = reagentById(tr.dataset.rid);
+    if(r){ r[t.dataset.f] = t.value; refresh(); }
+    return;
+  }
+  const nd = t.closest("#tree .node[data-nid]");
+  if(!nd) return;
+  const hit = findNode(nd.dataset.nid); if(!hit) return;
+  if(t.dataset.act === "ovr"){
+    const en = addEntry(hit.node, t.dataset.rid);
+    if(en){ en.ov = t.value.trim() === "" ? null : t.value.trim(); refresh(); }
+    return;
+  }
+  if(t.dataset.f){ hit.node[t.dataset.f] = t.value; refresh(); }
+});
+
+document.addEventListener("change", e=>{
+  const t = e.target;
+  if(t.id === "opt-subtract"){ S.opt.subtract = t.checked; refresh(); return; }
+  if(t.id === "opt-compact"){ S.opt.compact = t.checked; EXPAND.clear(); renderTree(); refresh(); return; }
+  if(t.id === "opt-volunit"){
+    const from = S.opt.volUnit, to = t.value;
+    if(from !== to){
+      const k = (VOLF[from]||1) / (VOLF[to]||1);
+      const ex = 36 * k;
+      if(confirm(`부피 숫자도 함께 환산할까요?\n예) 36 ${from} → ${trim0(String(ex))} ${to}\n\n[취소] 를 누르면 숫자는 그대로 두고 단위만 바뀝니다.`)){
+        walk(S.roots, n=>{ const v = num(n.volume); if(isFinite(v)) n.volume = trim0(String(parseFloat((v*k).toPrecision(12)))); });
+      }
+    }
+    S.opt.volUnit = to; renderAll(); return;
+  }
+  if(t.id === "recipe-sel"){ setActive(t.value); return; }
+  if(t.dataset.act === "toggle-add"){
+    const nd = t.closest(".node[data-nid]"); const hit = findNode(nd.dataset.nid);
+    if(hit){ toggleAdd(hit.node, t.dataset.rid, t.checked); renderTree(); refresh(); }
+    return;
+  }
+  const tr = t.closest("#reagents tbody tr[data-rid]");
+  if(tr && t.dataset.f && t.tagName === "SELECT"){
+    const r = reagentById(tr.dataset.rid);
+    if(r){ r[t.dataset.f] = t.value; renderReagents(); refresh(); }
+  }
+});
+function toggleAdd(n, rid, on){
+  const i = (n.adds||[]).findIndex(a=>a.rid===rid);
+  if(on && i<0) n.adds.push({rid, ov:null});
+  if(!on && i>=0) n.adds.splice(i,1);
+}
+
+document.addEventListener("click", e=>{
+  // 칩 이름 클릭 = 토글
+  const pn = e.target.closest('[data-act="toggle-chip"]');
+  if(pn){
+    const nd = pn.closest(".node[data-nid]"); const hit = findNode(nd.dataset.nid);
+    if(hit){
+      const on = !addEntry(hit.node, pn.dataset.rid);
+      toggleAdd(hit.node, pn.dataset.rid, on);
+      renderTree(); refresh();
+    }
+    return;
+  }
+  const b = e.target.closest("button"); if(!b) return;
+  const act = b.dataset.act;
+
+  if(act === "del-reagent"){
+    const rid = b.closest("tr").dataset.rid;
+    S.reagents = S.reagents.filter(r=>r.id!==rid);
+    walk(S.roots, n=>{ n.adds = (n.adds||[]).filter(a=>a.rid!==rid); });
+    renderAll(); return;
+  }
+  const nodeEl = b.closest(".node[data-nid]");
+  if(nodeEl){
+    const nid = nodeEl.dataset.nid;
+    const hit = findNode(nid);
+    if(act === "expand"){
+      if(EXPAND.has(nid)) EXPAND.delete(nid); else EXPAND.add(nid);
+      renderTree(); refresh(); return;
+    }
+    if(act === "note"){
+      if(NOTEON.has(nid)) NOTEON.delete(nid); else NOTEON.add(nid);
+      renderTree(); refresh();
+      const inp = document.querySelector(`.node[data-nid="${nid}"] > .nnote input`);
+      if(inp) inp.focus();
+      return;
+    }
+    if(act === "add-kid" && hit){
+      const rest = Math.max(0, (num(hit.node.volume)||0) - kidsVolume(hit.node));
+      hit.node.kids.push(N_("분주", hit.node.day||"", rest || 1, []));
+      renderAll(); return;
+    }
+    if(act === "dup-node" && hit){
+      const sibs = siblingsOf(nid);
+      const clone = JSON.parse(JSON.stringify(hit.node));
+      (function reid(n){ n.id = uid(); (n.kids||[]).forEach(reid); })(clone);
+      clone.name = (clone.name||"") + " 복사";
+      sibs.splice(sibs.findIndex(n=>n.id===nid)+1, 0, clone);
+      renderAll(); return;
+    }
+    if((act === "up" || act === "down")){
+      const sibs = siblingsOf(nid);
+      const i = sibs.findIndex(n=>n.id===nid);
+      const j = act === "up" ? i-1 : i+1;
+      if(j>=0 && j<sibs.length){ const tmp = sibs[i]; sibs[i] = sibs[j]; sibs[j] = tmp; renderAll(); }
+      return;
+    }
+    if(act === "del-node"){
+      if(hit && hit.node.kids.length && !confirm("하위 분주까지 함께 삭제됩니다. 계속할까요?")) return;
+      if(S.roots.length === 1 && S.roots[0].id === nid && !confirm("마지막 단계입니다. 삭제할까요?")) return;
+      removeNode(nid);
+      if(!S.roots.length) S.roots = [N_("마스터 믹스","Day 0",10,[])];
+      renderAll(); return;
+    }
+  }
+
+  switch(b.id){
+    case "btn-addreagent":
+      S.reagents.push(R_({})); renderAll();
+      setTimeout(()=>{ const l = $$("#reagents tbody tr input[data-f='name']").pop(); if(l) l.focus(); },0);
+      break;
+    case "btn-addroot": S.roots.push(N_("마스터 믹스","Day 0",10,[])); renderAll(); break;
+    case "btn-new":{
+      const name = prompt("새 레시피 이름", "레시피 " + (DB.recipes.length+1));
+      if(name === null) break;
+      const rec = newRecipe(name || "새 레시피");
+      DB.recipes.push(rec); setActive(rec.id); break;
+    }
+    case "btn-dup":{
+      const copy = normalize(JSON.parse(JSON.stringify(S)));
+      copy.id = uid(); copy.name = S.name + " 복사";
+      const map = {};
+      copy.reagents.forEach(r=>{ const o = r.id; r.id = uid(); map[o] = r.id; });
+      walk(copy.roots, n=>{ n.id = uid(); n.adds = n.adds.map(a=>({rid:map[a.rid]||a.rid, ov:a.ov})); });
+      DB.recipes.push(copy); setActive(copy.id); break;
+    }
+    case "btn-rename":{
+      const name = prompt("레시피 이름", S.name);
+      if(name){ S.name = name; renderAll(); }
+      break;
+    }
+    case "btn-delrecipe":{
+      if(DB.recipes.length === 1){ alert("마지막 레시피는 삭제할 수 없습니다."); break; }
+      if(!confirm(`“${S.name}” 레시피를 삭제할까요?`)) break;
+      DB.recipes = DB.recipes.filter(r=>r.id!==S.id);
+      setActive(DB.recipes[0].id); break;
+    }
+    case "btn-examples":{
+      const keys = Object.keys(EXAMPLES);
+      const pick = prompt("예시를 새 레시피로 추가합니다. 번호를 입력하세요.\n\n" +
+        keys.map((k,i)=>`${i+1}. ${k}`).join("\n"), "1");
+      if(pick === null) break;
+      const i = parseInt(pick,10)-1;
+      if(!(i>=0 && i<keys.length)){ alert("번호가 올바르지 않습니다."); break; }
+      const rec = normalize(EXAMPLES[keys[i]]());
+      rec.id = uid();
+      DB.recipes.push(rec); setActive(rec.id); break;
+    }
+    case "btn-print": window.print(); break;
+    case "btn-io":
+      $("#io").hidden = false; dumpJSON(); $("#io").scrollIntoView({behavior:"smooth"}); break;
+    case "btn-ioclose": $("#io").hidden = true; break;
+    case "btn-copy":
+      $("#json").select(); document.execCommand("copy");
+      b.textContent = "복사됨 ✓"; setTimeout(()=>b.textContent="복사",1200); break;
+    case "btn-load":
+      try{
+        const d = JSON.parse($("#json").value);
+        if(Array.isArray(d.recipes)){
+          DB = {activeId:d.activeId, recipes:d.recipes.map(normalize)};
+          if(!DB.recipes.some(r=>r.id===DB.activeId)) DB.activeId = DB.recipes[0].id;
+          S = DB.recipes.find(r=>r.id===DB.activeId);
+        }else if(d.reagents && d.roots){
+          const rec = normalize(d); rec.id = uid();
+          DB.recipes.push(rec); DB.activeId = rec.id; S = rec;
+        }else throw new Error("형식이 올바르지 않습니다");
+        renderAll(); $("#io").hidden = true;
+      }catch(err){ alert("불러오기 실패: " + err.message); }
+      break;
+    case "btn-download":{
+      const one = $("#io-scope").value === "one";
+      const blob = new Blob([JSON.stringify(one ? S : DB, null, 2)], {type:"application/json"});
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = (one ? S.name.replace(/\s+/g,"_") : "medium-recipes") + ".json";
+      a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+      break;
+    }
+  }
+});
+document.addEventListener("change", e=>{
+  if(e.target.id === "io-scope" && !$("#io").hidden) dumpJSON();
+});
+function dumpJSON(){
+  $("#json").value = JSON.stringify($("#io-scope").value === "one" ? S : DB, null, 2);
+}
+
+/* ============================ 시작 ============================ */
+DB = loadDB();
+S  = DB.recipes.find(r=>r.id===DB.activeId) || DB.recipes[0];
+renderAll();
+</script>
+</body>
+</html>
