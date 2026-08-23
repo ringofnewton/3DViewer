@@ -268,7 +268,9 @@
         <div class="sub">그룹마다 <b>플레이트 규격 × n수 × 사용 일수</b>를 넣으면 필요한 배지량이 나옵니다 (하루 1회 교환 기준). 그 값이 흐름을 타고 위로 합산됩니다.</div>
       </div>
       <div class="toolbar noprint">
-        <span class="fld"><label>여유율</label><input id="opt-overage" class="num" style="width:52px" inputmode="decimal"><label>%</label></span>
+        <span class="fld"><label>여유율</label><input id="opt-overage" class="num" style="width:52px" inputmode="decimal"><label>%</label>
+          <button class="mini" data-ov="10">10</button><button class="mini" data-ov="20">20</button><button class="mini" data-ov="30">30</button>
+        </span>
         <span class="fld"><label>올림</label>
           <select id="opt-round">
             <option value="0">없음</option><option value="0.1">0.1 mL</option>
@@ -568,7 +570,7 @@ let DB = null;    // {activeId, recipes:[…]}
 let S  = null;    // 현재 레시피 {id,name,opt,reagents,roots}
 
 function newRecipe(name){
-  return {id:uid(), name:name||"새 레시피", opt:{subtract:false, volUnit:"mL", compact:false, overage:10, round:0},
+  return {id:uid(), name:name||"새 레시피", opt:{subtract:false, volUnit:"mL", compact:false, overage:20, round:0.5},
     reagents:[], groups:[], roots:[{id:uid(), name:"마스터 믹스", day:"Day 0", volume:10, adds:[], note:"", auto:false, kids:[]}]};
 }
 const R_ = (o)=> Object.assign({id:uid(), name:"", stockVal:"", stockUnit:"mM", finalVal:"", finalUnit:"µM",
@@ -631,7 +633,7 @@ const EXAMPLES = {
         N_(tag+" LT+DAPT",  "Day 2-3", 0, [id("DAPT")])
       ])
     ]);
-    const rec = {id:uid(), name:"실험 디자인 역산", opt:{subtract:false, volUnit:"mL", compact:false, overage:10, round:0.5},
+    const rec = {id:uid(), name:"실험 디자인 역산", opt:{subtract:false, volUnit:"mL", compact:false, overage:20, round:0.5},
       reagents:rs, groups:[],
       roots:[ N_("마스터 믹스","Day 0",0,[id("FGF2"),id("PDGF-BB"),id("A83-01")],[
         arm("SHH−", []), arm("SHH+", [id("Purmorphamine")])
@@ -654,7 +656,7 @@ const EXAMPLES = {
 };
 
 function normalize(rec){
-  rec.opt = Object.assign({subtract:false, volUnit:"mL", compact:false, overage:10, round:0}, rec.opt||{});
+  rec.opt = Object.assign({subtract:false, volUnit:"mL", compact:false, overage:20, round:0.5}, rec.opt||{});
   rec.reagents = (rec.reagents||[]).map(r=> Object.assign(R_({}), r));
   const fixNode = n => {
     n.id = n.id || uid();
@@ -1149,6 +1151,7 @@ document.addEventListener("click", async e=>{
     return;
   }
   const b = e.target.closest("button"); if(!b) return;
+  if(b.dataset.ov){ S.opt.overage = b.dataset.ov; $("#opt-overage").value = b.dataset.ov; refresh(); return; }
   const act = b.dataset.act;
 
   if(act === "del-group"){
