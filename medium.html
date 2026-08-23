@@ -3,21 +3,82 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>배양액 계산기 · Medium Calculator</title>
+<title>배양액 분주 설계기</title>
 <style>
+  /* ---------- 토큰: 라이트가 기본, 다크는 재정의만 ---------- */
   :root{
-    --bg:#0b0d12; --panel:#141821; --panel2:#1b2130;
-    --line:#2b3346; --line2:#3a4459;
-    --text:#eef2f8; --muted:#95a0b8;
-    --accent:#6ea8fe; --accent2:#7ef0c0; --warn:#ffb45c; --danger:#ff6b8a;
+    --bg:#f2f4f8;
+    --panel:#ffffff;
+    --panel2:#f7f9fc;
+    --line:#d8dee9;
+    --line2:#c3ccdb;
+    --row-line:#e7ecf3;
+    --text:#141a24;
+    --muted:#5d6a80;
+    --field:#ffffff;
+    --field-ro:#eef1f6;
+    --accent:#2f6fd0;
+    --accent-soft:rgba(47,111,208,.10);
+    --accent-line:rgba(47,111,208,.38);
+    --accent-ink:#1d4e9b;
+    --ok:#0d7a55;
+    --warn:#a5610a;
+    --warn-bg:rgba(214,138,26,.12);
+    --warn-line:rgba(214,138,26,.42);
+    --warn-ink:#7c4708;
+    --danger:#c0304d;
+    --btn-a:#3f76d8; --btn-b:#2f5fbe; --btn-line:#5b87e6;
+    --header-bg:rgba(242,244,248,.88);
+    --scrim:rgba(20,26,36,.42);
+    --glow1:rgba(47,111,208,.07);
+    --glow2:rgba(13,122,85,.06);
+    --shadow:0 1px 2px rgba(20,26,36,.06), 0 8px 24px rgba(20,26,36,.05);
     --radius:12px;
+    color-scheme:light;
   }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme:dark;
+      --bg:#0b0d12; --panel:#141821; --panel2:#1b2130;
+      --line:#2b3346; --line2:#3a4459; --row-line:rgba(43,51,70,.6);
+      --text:#eef2f8; --muted:#95a0b8;
+      --field:#0f131b; --field-ro:#0c0f15;
+      --accent:#6ea8fe; --accent-soft:rgba(110,168,254,.14); --accent-line:rgba(110,168,254,.40);
+      --accent-ink:#cfe0ff;
+      --ok:#7ef0c0;
+      --warn:#ffb45c; --warn-bg:rgba(255,180,92,.10); --warn-line:rgba(255,180,92,.45); --warn-ink:#ffd9a8;
+      --danger:#ff6b8a;
+      --btn-a:#3f6fd8; --btn-b:#3159b8; --btn-line:#5b87e6;
+      --header-bg:rgba(11,13,18,.85);
+      --scrim:rgba(4,6,10,.66);
+      --glow1:rgba(110,168,254,.16); --glow2:rgba(126,240,192,.10);
+      --shadow:0 20px 60px rgba(0,0,0,.45);
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme:dark;
+    --bg:#0b0d12; --panel:#141821; --panel2:#1b2130;
+    --line:#2b3346; --line2:#3a4459; --row-line:rgba(43,51,70,.6);
+    --text:#eef2f8; --muted:#95a0b8;
+    --field:#0f131b; --field-ro:#0c0f15;
+    --accent:#6ea8fe; --accent-soft:rgba(110,168,254,.14); --accent-line:rgba(110,168,254,.40);
+    --accent-ink:#cfe0ff;
+    --ok:#7ef0c0;
+    --warn:#ffb45c; --warn-bg:rgba(255,180,92,.10); --warn-line:rgba(255,180,92,.45); --warn-ink:#ffd9a8;
+    --danger:#ff6b8a;
+    --btn-a:#3f6fd8; --btn-b:#3159b8; --btn-line:#5b87e6;
+    --header-bg:rgba(11,13,18,.85);
+    --scrim:rgba(4,6,10,.66);
+    --glow1:rgba(110,168,254,.16); --glow2:rgba(126,240,192,.10);
+    --shadow:0 20px 60px rgba(0,0,0,.45);
+  }
+
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{
     background:
-      radial-gradient(circle at 12% -5%, rgba(110,168,254,.16), transparent 42%),
-      radial-gradient(circle at 92% 0%, rgba(126,240,192,.10), transparent 40%),
+      radial-gradient(circle at 12% -5%, var(--glow1), transparent 42%),
+      radial-gradient(circle at 92% 0%, var(--glow2), transparent 40%),
       var(--bg);
     color:var(--text);
     font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;
@@ -30,30 +91,32 @@
     position:sticky;top:0;z-index:20;
     display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;
     padding:10px 16px;padding-top:max(10px,env(safe-area-inset-top));
-    background:rgba(11,13,18,.85);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);
+    background:var(--header-bg);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);
   }
   .wrap{max-width:1180px;margin:0 auto;padding:0 16px;}
-  section{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin:16px 0;}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px;margin:16px 0;}
   .shead{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;justify-content:space-between;margin-bottom:10px;}
   button{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line2);
-    border-radius:9px;padding:6px 11px;cursor:pointer;transition:.12s;white-space:nowrap;}
-  button:hover{border-color:var(--accent);color:#fff;}
-  button.primary{background:linear-gradient(180deg,#3f6fd8,#3159b8);border-color:#5b87e6;}
+    border-radius:9px;padding:6px 11px;cursor:pointer;transition:border-color .12s, color .12s;white-space:nowrap;}
+  button:hover{border-color:var(--accent);}
+  button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+  button.primary{background:linear-gradient(180deg,var(--btn-a),var(--btn-b));border-color:var(--btn-line);color:#fff;}
   button.ghost{background:transparent;}
   button.danger:hover{border-color:var(--danger);color:var(--danger);}
   button.mini{padding:2px 8px;font-size:12px;border-radius:7px;}
-  input,select{font:inherit;color:var(--text);background:#0f131b;border:1px solid var(--line);
+  input,select{font:inherit;color:var(--text);background:var(--field);border:1px solid var(--line);
     border-radius:8px;padding:5px 7px;width:100%;}
   input:focus,select:focus{outline:none;border-color:var(--accent);}
-  input[readonly]{background:#0c0f15;color:var(--muted);border-style:dashed;}
+  input[readonly]{background:var(--field-ro);color:var(--muted);border-style:dashed;}
   table{width:100%;border-collapse:collapse;}
   th,td{padding:5px 6px;text-align:left;vertical-align:middle;}
   th{font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.4px;
      border-bottom:1px solid var(--line);white-space:nowrap;}
-  tbody tr{border-bottom:1px solid rgba(43,51,70,.6);}
+  tbody tr{border-bottom:1px solid var(--row-line);}
   .tblwrap{overflow-x:auto;}
   .num{font-variant-numeric:tabular-nums;}
-  .out{color:var(--accent2);font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap;}
+  .out{color:var(--ok);font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap;}
   .bad{color:var(--danger);} .warnc{color:var(--warn);} .muted{color:var(--muted);}
   .toolbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
   .fld{display:flex;align-items:center;gap:5px;}
@@ -62,13 +125,15 @@
 
   /* 시약 칩 */
   .pill{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line2);border-radius:999px;
-    padding:2px 9px;font-size:12px;background:#0f131b;color:var(--muted);white-space:nowrap;}
-  .pill.on{border-color:var(--accent);background:rgba(110,168,254,.14);color:var(--text);}
+    padding:2px 9px;font-size:12px;background:var(--field);color:var(--muted);white-space:nowrap;}
+  .pill.on{border-color:var(--accent-line);background:var(--accent-soft);color:var(--text);}
   .pill input[type=checkbox]{width:auto;margin:0;accent-color:var(--accent);}
   .pill .pname{cursor:pointer;user-select:none;}
   .pill .ovr{width:52px;padding:1px 4px;font-size:11px;border-radius:6px;text-align:right;}
-  .pill b{color:var(--accent2);font-variant-numeric:tabular-nums;}
+  .pill b{color:var(--ok);font-variant-numeric:tabular-nums;}
   .pill .u{font-size:10px;opacity:.75;}
+  .pill.hide{display:none;}
+  .addbtn{border-style:dashed;color:var(--muted);}
 
   /* 트리 */
   .node{border:1px solid var(--line);border-radius:11px;background:var(--panel2);padding:10px;margin-top:8px;}
@@ -80,8 +145,6 @@
   .unit{color:var(--muted);font-size:12px;}
   .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
   .meta{font-size:12px;color:var(--muted);margin-top:6px;}
-  .pill.hide{display:none;}
-  .addbtn{border-style:dashed;color:var(--muted);}
   .nnote{margin-top:6px;}
   .nnote input{font-size:12px;}
 
@@ -90,9 +153,9 @@
   .hrow{display:flex;align-items:center;}
   .hbox{border:1px solid var(--line2);border-radius:11px;background:var(--panel2);padding:8px 11px;
     min-width:130px;white-space:nowrap;}
-  .hbox .hv{font-size:16px;font-weight:700;}
+  .hbox .hv{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;}
   .hbox .hn{font-size:11px;color:var(--muted);}
-  .hbox .ha{font-size:11px;color:var(--accent2);font-variant-numeric:tabular-nums;}
+  .hbox .ha{font-size:11px;color:var(--ok);font-variant-numeric:tabular-nums;}
   .hkids{display:flex;flex-direction:column;gap:10px;margin-left:24px;position:relative;}
   .hkids::before{content:"";position:absolute;left:-24px;top:50%;width:24px;border-top:1.5px solid var(--line2);}
   .hchild{position:relative;padding-left:24px;}
@@ -104,18 +167,33 @@
   /* 프로토콜 */
   .day{margin:14px 0 0;}
   .daytag{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.5px;
-    background:rgba(110,168,254,.16);border:1px solid rgba(110,168,254,.4);color:#cfe0ff;
+    background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent-ink);
     border-radius:999px;padding:2px 11px;}
   .step{border-left:2px solid var(--line2);margin:8px 0 8px 10px;padding:2px 0 2px 14px;}
   .step h3{font-size:14px;margin:0 0 3px;}
   .step ul{margin:4px 0;padding-left:18px;}
   .step li{margin:1px 0;}
   .step .comp{font-size:12px;color:var(--muted);margin-top:3px;}
-  code{background:#0f131b;border:1px solid var(--line);border-radius:5px;padding:0 5px;font-size:12px;}
-  .banner{border:1px solid rgba(255,180,92,.45);background:rgba(255,180,92,.10);color:#ffd9a8;
+  code{background:var(--field);border:1px solid var(--line);border-radius:5px;padding:0 5px;font-size:12px;
+    font-variant-numeric:tabular-nums;}
+  .banner{border:1px solid var(--warn-line);background:var(--warn-bg);color:var(--warn-ink);
     border-radius:9px;padding:8px 11px;font-size:12px;margin-top:8px;}
   textarea{width:100%;min-height:150px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;
-    background:#0f131b;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;}
+    background:var(--field);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;}
+
+  /* 자체 모달 (네이티브 alert/confirm/prompt 미사용) */
+  .modal{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;
+    background:var(--scrim);backdrop-filter:blur(3px);padding:18px;}
+  .modal[hidden]{display:none;}
+  .mbox{background:var(--panel);border:1px solid var(--line2);border-radius:14px;padding:16px;
+    width:min(420px,100%);box-shadow:var(--shadow);}
+  .mtitle{font-weight:700;font-size:15px;margin-bottom:6px;}
+  .mmsg{color:var(--muted);font-size:13px;white-space:pre-line;margin-bottom:10px;}
+  .mopts{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
+  .mopts button{text-align:left;}
+  .mbtns{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;}
+
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;animation:none !important;} }
 
   @media print{
     body{background:#fff;color:#000;}
@@ -125,6 +203,7 @@
     .out,.hbox .ha,.pill b{color:#065f46;}
     .muted,.sub,.hbox .hn{color:#555;}
     .daytag{background:#eee;color:#000;border-color:#999;}
+    code{background:#f4f4f4;border-color:#ccc;}
   }
 </style>
 </head>
@@ -132,7 +211,7 @@
 
 <header>
   <div>
-    <h1>배양액 계산기</h1>
+    <h1>배양액 분주 설계기</h1>
     <div class="sub" id="recipe-sub">한 번에 만들어 분주하는 흐름 그대로 · 시약별 µL 자동 계산</div>
   </div>
   <div class="toolbar noprint">
@@ -243,6 +322,19 @@
 
 </div>
 
+<div class="modal" id="modal" hidden>
+  <div class="mbox">
+    <div class="mtitle" id="m-title"></div>
+    <div class="mmsg" id="m-msg"></div>
+    <div class="mopts" id="m-opts"></div>
+    <input id="m-input" hidden>
+    <div class="mbtns">
+      <button data-m="cancel" class="ghost">취소</button>
+      <button data-m="ok" class="primary">확인</button>
+    </div>
+  </div>
+</div>
+
 <script>
 "use strict";
 
@@ -334,6 +426,51 @@ function concTxt(r){
   const c = calcReagent(r);
   return isFinite(c.fold) ? foldTxt(c.fold) + " 희석" : "—";
 }
+
+/* ============================ 모달 ============================ */
+let mResolve = null;
+function ask(o){
+  // o = {type:"alert"|"confirm"|"prompt"|"select", title, msg, value, options:[…]}
+  return new Promise(res=>{
+    mResolve = res;
+    const m = $("#modal");
+    $("#m-title").textContent = o.title || "";
+    $("#m-msg").textContent = o.msg || "";
+    $("#m-msg").hidden = !o.msg;
+    const inp = $("#m-input");
+    inp.hidden = o.type !== "prompt";
+    inp.value = o.value == null ? "" : o.value;
+    const opts = $("#m-opts");
+    opts.innerHTML = (o.type === "select" ? (o.options||[]) : [])
+      .map((t,i)=>`<button data-m="opt" data-i="${i}">${esc(t)}</button>`).join("");
+    $('#modal [data-m="ok"]').hidden   = o.type === "select";
+    $('#modal [data-m="cancel"]').textContent = o.type === "alert" ? "닫기" : "취소";
+    $('#modal [data-m="cancel"]').hidden = o.type === "alert" ? false : false;
+    if(o.type === "alert"){ $('#modal [data-m="ok"]').hidden = true; }
+    m.hidden = false;
+    setTimeout(()=>{ if(o.type === "prompt"){ inp.focus(); inp.select(); }
+                     else { const b = $('#modal [data-m="ok"]:not([hidden])') || $('#modal [data-m="cancel"]'); if(b) b.focus(); } }, 0);
+  });
+}
+function closeModal(val){
+  $("#modal").hidden = true;
+  const r = mResolve; mResolve = null;
+  if(r) r(val);
+}
+document.addEventListener("click", e=>{
+  const b = e.target.closest("#modal [data-m]");
+  if(!b) return;
+  const k = b.dataset.m;
+  if(k === "ok")     closeModal($("#m-input").hidden ? true : $("#m-input").value);
+  else if(k === "opt") closeModal(parseInt(b.dataset.i,10));
+  else closeModal(null);
+}, true);
+document.addEventListener("keydown", e=>{
+  if($("#modal").hidden) return;
+  if(e.key === "Enter" && !$("#m-input").hidden){ e.preventDefault(); closeModal($("#m-input").value); }
+  else if(e.key === "Enter" && $("#m-opts").children.length === 0){ e.preventDefault(); closeModal(true); }
+  else if(e.key === "Escape"){ e.preventDefault(); closeModal(null); }
+});
 
 /* ============================ 상태 ============================ */
 const KEY = "medium-calc.v2";
@@ -740,7 +877,7 @@ document.addEventListener("input", e=>{
   if(t.dataset.f){ hit.node[t.dataset.f] = t.value; refresh(); }
 });
 
-document.addEventListener("change", e=>{
+document.addEventListener("change", async e=>{
   const t = e.target;
   if(t.id === "opt-subtract"){ S.opt.subtract = t.checked; refresh(); return; }
   if(t.id === "opt-compact"){ S.opt.compact = t.checked; EXPAND.clear(); renderTree(); refresh(); return; }
@@ -749,7 +886,9 @@ document.addEventListener("change", e=>{
     if(from !== to){
       const k = (VOLF[from]||1) / (VOLF[to]||1);
       const ex = 36 * k;
-      if(confirm(`부피 숫자도 함께 환산할까요?\n예) 36 ${from} → ${trim0(String(ex))} ${to}\n\n[취소] 를 누르면 숫자는 그대로 두고 단위만 바뀝니다.`)){
+      const yes = await ask({type:"confirm", title:"부피 단위 변경",
+        msg:`부피 숫자도 함께 환산할까요?\n예) 36 ${from} → ${trim0(String(ex))} ${to}\n\n[취소] 를 누르면 숫자는 그대로 두고 단위만 바뀝니다.`});
+      if(yes){
         walk(S.roots, n=>{ const v = num(n.volume); if(isFinite(v)) n.volume = trim0(String(parseFloat((v*k).toPrecision(12)))); });
       }
     }
@@ -773,7 +912,7 @@ function toggleAdd(n, rid, on){
   if(!on && i>=0) n.adds.splice(i,1);
 }
 
-document.addEventListener("click", e=>{
+document.addEventListener("click", async e=>{
   // 칩 이름 클릭 = 토글
   const pn = e.target.closest('[data-act="toggle-chip"]');
   if(pn){
@@ -830,8 +969,10 @@ document.addEventListener("click", e=>{
       return;
     }
     if(act === "del-node"){
-      if(hit && hit.node.kids.length && !confirm("하위 분주까지 함께 삭제됩니다. 계속할까요?")) return;
-      if(S.roots.length === 1 && S.roots[0].id === nid && !confirm("마지막 단계입니다. 삭제할까요?")) return;
+      if(hit && hit.node.kids.length &&
+         !(await ask({type:"confirm", title:"단계 삭제", msg:"하위 분주까지 함께 삭제됩니다. 계속할까요?"}))) return;
+      if(S.roots.length === 1 && S.roots[0].id === nid &&
+         !(await ask({type:"confirm", title:"단계 삭제", msg:"마지막 단계입니다. 삭제할까요?"}))) return;
       removeNode(nid);
       if(!S.roots.length) S.roots = [N_("마스터 믹스","Day 0",10,[])];
       renderAll(); return;
@@ -845,7 +986,8 @@ document.addEventListener("click", e=>{
       break;
     case "btn-addroot": S.roots.push(N_("마스터 믹스","Day 0",10,[])); renderAll(); break;
     case "btn-new":{
-      const name = prompt("새 레시피 이름", "레시피 " + (DB.recipes.length+1));
+      const name = await ask({type:"prompt", title:"새 레시피", msg:"이름을 입력하세요.",
+        value:"레시피 " + (DB.recipes.length+1)});
       if(name === null) break;
       const rec = newRecipe(name || "새 레시피");
       DB.recipes.push(rec); setActive(rec.id); break;
@@ -859,23 +1001,23 @@ document.addEventListener("click", e=>{
       DB.recipes.push(copy); setActive(copy.id); break;
     }
     case "btn-rename":{
-      const name = prompt("레시피 이름", S.name);
+      const name = await ask({type:"prompt", title:"레시피 이름 변경", value:S.name});
       if(name){ S.name = name; renderAll(); }
       break;
     }
     case "btn-delrecipe":{
-      if(DB.recipes.length === 1){ alert("마지막 레시피는 삭제할 수 없습니다."); break; }
-      if(!confirm(`“${S.name}” 레시피를 삭제할까요?`)) break;
+      if(DB.recipes.length === 1){
+        await ask({type:"alert", title:"삭제할 수 없음", msg:"마지막 레시피는 삭제할 수 없습니다."}); break;
+      }
+      if(!(await ask({type:"confirm", title:"레시피 삭제", msg:`“${S.name}” 레시피를 삭제할까요?`}))) break;
       DB.recipes = DB.recipes.filter(r=>r.id!==S.id);
       setActive(DB.recipes[0].id); break;
     }
     case "btn-examples":{
       const keys = Object.keys(EXAMPLES);
-      const pick = prompt("예시를 새 레시피로 추가합니다. 번호를 입력하세요.\n\n" +
-        keys.map((k,i)=>`${i+1}. ${k}`).join("\n"), "1");
-      if(pick === null) break;
-      const i = parseInt(pick,10)-1;
-      if(!(i>=0 && i<keys.length)){ alert("번호가 올바르지 않습니다."); break; }
+      const i = await ask({type:"select", title:"예시 불러오기",
+        msg:"새 레시피로 추가합니다. 현재 작업은 그대로 남습니다.", options:keys});
+      if(i === null || !(i>=0 && i<keys.length)) break;
       const rec = normalize(EXAMPLES[keys[i]]());
       rec.id = uid();
       DB.recipes.push(rec); setActive(rec.id); break;
@@ -899,15 +1041,30 @@ document.addEventListener("click", e=>{
           DB.recipes.push(rec); DB.activeId = rec.id; S = rec;
         }else throw new Error("형식이 올바르지 않습니다");
         renderAll(); $("#io").hidden = true;
-      }catch(err){ alert("불러오기 실패: " + err.message); }
+      }catch(err){ await ask({type:"alert", title:"불러오기 실패", msg:err.message}); }
       break;
     case "btn-download":{
       const one = $("#io-scope").value === "one";
-      const blob = new Blob([JSON.stringify(one ? S : DB, null, 2)], {type:"application/json"});
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = (one ? S.name.replace(/\s+/g,"_") : "medium-recipes") + ".json";
-      a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+      const data = JSON.stringify(one ? S : DB, null, 2);
+      const filename = (one ? (S.name||"recipe").replace(/[\\/:*?"<>|\s]+/g,"_") : "medium-recipes") + ".json";
+      // 호스팅된 페이지(아티팩트)에서는 downloads 기능으로, 로컬 파일에서는 blob 링크로 저장
+      let dl = null;
+      try{ dl = (typeof claude !== "undefined" && claude && claude.use) ? await claude.use("downloads") : null; }catch(err){ dl = null; }
+      if(dl){
+        try{ await dl.save({filename, data}); }
+        catch(err){
+          if(!err || err.code !== "declined"){
+            await ask({type:"alert", title:"파일 저장 실패",
+              msg:(err && err.message ? err.message + "\n\n" : "") + "위 JSON을 [복사] 해서 사용하세요."});
+          }
+        }
+      }else{
+        const blob = new Blob([data], {type:"application/json"});
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob); a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+      }
       break;
     }
   }
