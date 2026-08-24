@@ -115,6 +115,45 @@
      border-bottom:1px solid var(--line);white-space:nowrap;}
   tbody tr{border-bottom:1px solid var(--row-line);}
   .tblwrap{overflow-x:auto;}
+  /* 값 + 단위 한 칸 */
+  .pair{display:flex;gap:4px;align-items:center;}
+  .pair input{flex:1 1 auto;min-width:0;}
+  .pair select{flex:0 0 auto;width:auto;}
+  /* 표 모드에서는 눌리지 않게 최소 너비 확보 (넘치면 가로 스크롤) */
+  #reagents{min-width:900px;}
+  #groups{min-width:840px;}
+
+  /* 좁은 화면: 표 대신 카드 */
+  @media (max-width: 900px){
+    #reagents, #groups{min-width:0;}
+    #reagents thead, #groups thead{display:none;}
+    #reagents, #reagents tbody, #groups, #groups tbody{display:block;}
+    #reagents tbody tr, #groups tbody tr{
+      display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px;
+      border:1px solid var(--line);border-radius:11px;background:var(--panel2);
+      padding:10px 12px;margin-bottom:10px;position:relative;
+    }
+    #reagents td, #groups td{display:block;padding:0;width:auto !important;}
+    #reagents td::before, #groups td::before{
+      content:attr(data-label);display:block;font-size:11px;color:var(--muted);
+      letter-spacing:.3px;margin-bottom:2px;
+    }
+    /* 이름·메모·쓸 배지는 한 줄 전체 */
+    #reagents td:nth-child(1), #reagents td:nth-child(8),
+    #groups  td:nth-child(1), #groups  td:nth-child(2){grid-column:1 / -1;}
+    #reagents td.del, #groups td.del{
+      position:absolute;top:8px;right:10px;width:auto !important;
+    }
+    #reagents td.del::before, #groups td.del::before{display:none;}
+    #reagents td[colspan], #groups td[colspan]{grid-column:1 / -1;}
+    #reagents td[colspan]::before, #groups td[colspan]::before{display:none;}
+    #groups td[data-gsum]{align-self:end;font-size:15px;}
+  }
+  /* 아주 좁을 때: 값+단위가 붙는 칸만 한 줄 전체로, 짧은 칸은 2열 유지 */
+  @media (max-width: 540px){
+    #reagents td:nth-child(2), #reagents td:nth-child(3),
+    #groups  td:nth-child(4){grid-column:1 / -1;}
+  }
   .num{font-variant-numeric:tabular-nums;}
   .out{color:var(--ok);font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap;}
   .bad{color:var(--danger);} .warnc{color:var(--warn);} .muted{color:var(--muted);}
@@ -196,6 +235,13 @@
   @media (prefers-reduced-motion: reduce){ *{transition:none !important;animation:none !important;} }
 
   @media print{
+    #reagents, #groups{min-width:0;}
+    #reagents thead, #groups thead{display:table-header-group;}
+    #reagents, #groups{display:table;} #reagents tbody, #groups tbody{display:table-row-group;}
+    #reagents tbody tr, #groups tbody tr{display:table-row;border:0;padding:0;background:none;}
+    #reagents td, #groups td{display:table-cell;padding:5px 6px;}
+    #reagents td::before, #groups td::before{display:none;}
+    #reagents td.del, #groups td.del{position:static;}
     body{background:#fff;color:#000;}
     header,.noprint{display:none !important;}
     section{border:1px solid #bbb;background:#fff;break-inside:avoid;}
@@ -244,8 +290,8 @@
         <thead>
           <tr>
             <th style="min-width:120px">이름</th>
-            <th colspan="2">스톡 농도</th>
-            <th colspan="2">최종 농도</th>
+            <th style="min-width:150px">스톡 농도</th>
+            <th style="min-width:150px">최종 농도</th>
             <th title="몰농도 ↔ 질량농도 변환이 필요할 때만 입력">MW</th>
             <th>계산 방식</th>
             <th>희석배수</th>
@@ -286,7 +332,7 @@
           <th style="min-width:130px">그룹</th>
           <th style="min-width:150px">쓸 배지 (단계)</th>
           <th>플레이트</th>
-          <th colspan="2">웰당 배지</th>
+          <th style="min-width:130px">웰당 배지</th>
           <th>웰 수 (n)</th>
           <th title="하루 1회 교환 기준. Day 라벨에서 자동으로 채워집니다.">사용 일수</th>
           <th>필요량</th>
@@ -767,22 +813,24 @@ function unitOptions(sel){
 function renderReagents(){
   $("#reagents tbody").innerHTML = S.reagents.map(r=>`
     <tr data-rid="${r.id}">
-      <td><input data-f="name" value="${esc(r.name)}" placeholder="시약명"></td>
-      <td style="width:76px"><input class="num" data-f="stockVal" value="${esc(r.stockVal)}" inputmode="decimal"></td>
-      <td style="width:96px"><select data-f="stockUnit">${unitOptions(r.stockUnit)}</select></td>
-      <td style="width:76px"><input class="num" data-f="finalVal" value="${esc(r.finalVal)}" inputmode="decimal"></td>
-      <td style="width:96px"><select data-f="finalUnit">${unitOptions(r.finalUnit)}</select></td>
-      <td style="width:68px"><input class="num" data-f="mw" value="${esc(r.mw)}" placeholder="—" inputmode="decimal"></td>
-      <td style="width:112px"><select data-f="mode">
+      <td data-label="이름"><input data-f="name" value="${esc(r.name)}" placeholder="시약명"></td>
+      <td data-label="스톡 농도"><span class="pair">
+        <input class="num" data-f="stockVal" value="${esc(r.stockVal)}" inputmode="decimal">
+        <select data-f="stockUnit">${unitOptions(r.stockUnit)}</select></span></td>
+      <td data-label="최종 농도"><span class="pair">
+        <input class="num" data-f="finalVal" value="${esc(r.finalVal)}" inputmode="decimal">
+        <select data-f="finalUnit">${unitOptions(r.finalUnit)}</select></span></td>
+      <td data-label="MW" style="width:70px"><input class="num" data-f="mw" value="${esc(r.mw)}" placeholder="—" inputmode="decimal"></td>
+      <td data-label="계산 방식" style="width:124px"><select data-f="mode">
         <option value="conc"${r.mode==="conc"?" selected":""}>농도로 계산</option>
         <option value="fold"${r.mode==="fold"?" selected":""}>희석배수 입력</option>
         <option value="perml"${r.mode==="perml"?" selected":""}>µL/mL 입력</option>
       </select></td>
-      <td style="width:92px"><input class="num" data-f="fold" data-derived="fold" value=""></td>
-      <td style="width:88px"><input class="num" data-f="perML" data-derived="perML" value=""></td>
-      <td><input data-f="note" value="${esc(r.note)}" placeholder="메모"></td>
-      <td class="noprint" style="width:34px"><button class="mini danger ghost" data-act="del-reagent" title="삭제">✕</button></td>
-    </tr>`).join("") || `<tr><td colspan="11" class="muted">시약이 없습니다. “+ 시약 추가”를 누르세요.</td></tr>`;
+      <td data-label="희석배수" style="width:94px"><input class="num" data-f="fold" data-derived="fold" value=""></td>
+      <td data-label="µL / mL" style="width:90px"><input class="num" data-f="perML" data-derived="perML" value=""></td>
+      <td data-label="메모"><input data-f="note" value="${esc(r.note)}" placeholder="메모"></td>
+      <td class="noprint del" style="width:34px"><button class="mini danger ghost" data-act="del-reagent" title="삭제">✕</button></td>
+    </tr>`).join("") || `<tr><td colspan="9" class="muted">시약이 없습니다. “+ 시약 추가”를 누르세요.</td></tr>`;
   syncReagentCells();
 }
 function syncReagentCells(){
@@ -819,21 +867,22 @@ function renderGroups(){
   $("#opt-round").value = String(S.opt.round);
   $("#groups tbody").innerHTML = (S.groups||[]).map(g=>`
     <tr data-gid="${g.id}">
-      <td><input data-gf="name" value="${esc(g.name)}" placeholder="예: SHH+ RA"></td>
-      <td><select data-gf="nodeId">${nodeOptions(g.nodeId)}</select></td>
-      <td style="width:118px"><select data-gf="plate">${
+      <td data-label="그룹"><input data-gf="name" value="${esc(g.name)}" placeholder="예: SHH+ RA"></td>
+      <td data-label="쓸 배지"><select data-gf="nodeId">${nodeOptions(g.nodeId)}</select></td>
+      <td data-label="플레이트" style="width:122px"><select data-gf="plate">${
         PLATES.map(x=>`<option value="${esc(x.name)}"${x.name===g.plate?" selected":""}>${esc(x.name)}</option>`).join("")
       }</select></td>
-      <td style="width:70px"><input class="num" data-gf="well" value="${esc(g.well)}" inputmode="decimal"></td>
-      <td style="width:68px"><select data-gf="wellUnit">
-        <option value="mL"${g.wellUnit==="mL"?" selected":""}>mL</option>
-        <option value="µL"${g.wellUnit==="µL"?" selected":""}>µL</option></select></td>
-      <td style="width:66px"><input class="num" data-gf="n" value="${esc(g.n)}" inputmode="numeric" placeholder="n"></td>
-      <td style="width:66px"><input class="num" data-gf="days" value="${esc(g.days)}" inputmode="numeric" title="하루 1회 교환"></td>
-      <td class="out" data-gsum>${volML(groupML(g))}</td>
-      <td class="noprint" style="width:34px"><button class="mini danger ghost" data-act="del-group" title="삭제">✕</button></td>
+      <td data-label="웰당 배지"><span class="pair">
+        <input class="num" data-gf="well" value="${esc(g.well)}" inputmode="decimal">
+        <select data-gf="wellUnit">
+          <option value="mL"${g.wellUnit==="mL"?" selected":""}>mL</option>
+          <option value="µL"${g.wellUnit==="µL"?" selected":""}>µL</option></select></span></td>
+      <td data-label="웰 수 (n)" style="width:70px"><input class="num" data-gf="n" value="${esc(g.n)}" inputmode="numeric" placeholder="n"></td>
+      <td data-label="사용 일수" style="width:70px"><input class="num" data-gf="days" value="${esc(g.days)}" inputmode="numeric" title="하루 1회 교환"></td>
+      <td data-label="필요량" class="out" data-gsum>${volML(groupML(g))}</td>
+      <td class="noprint del" style="width:34px"><button class="mini danger ghost" data-act="del-group" title="삭제">✕</button></td>
     </tr>`).join("") ||
-    `<tr><td colspan="9" class="muted">그룹이 없습니다. “+ 그룹 추가”로 실험 디자인을 넣으면 배지 부피가 역산됩니다.</td></tr>`;
+    `<tr><td colspan="8" class="muted">그룹이 없습니다. “+ 그룹 추가”로 실험 디자인을 넣으면 배지 부피가 역산됩니다.</td></tr>`;
   syncGroupSum();
 }
 function syncGroups(){
