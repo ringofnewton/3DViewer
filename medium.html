@@ -4,6 +4,16 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>배양액 분주 설계기</title>
+
+<!-- 홈 화면에 추가해서 앱처럼 쓰기 위한 설정 -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="배지 계산기" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#f2f4f8" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#0b0d12" media="(prefers-color-scheme: dark)" />
+<link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAIAAACyr5FlAAADeElEQVR42u3dwW0UQRRF0dojNhYLtiRCAA7GIRAPYRASESAIAI97eqar/vt1pLv3uOro9Sws9/j0+UX6b8MRCA7BITgEh+AQHIJDcAgOwSHBITgEh+AQHIJDcAiOTr39/OMQNsXx7+4fDw4aWOmIYwKITaAMJihpi6OUiWZKxlYsvnz99nj7EBm9WTxFw7OswFGCxQQTp5XAsYbFEhPnlMAxiUUREyeUwHGhjLIsjhOBY1MW6URGnIw4FgeJwLEvi0Qigww+AnBswuIIETh2HIysCRkGw4QUxUFGZR+DDD7K4cDiLiIb4SAjwscgg48qOMgI8jHI4KMoDtd/wkdDHGTE+Rhk8LESh68aoV8+htkwHstwkJHrY5DBBxxwVMJBRrqPQQYfcMBRAwcZPXzMwOEi5/gIwGE22ozHMBvGYxIOs9FpPIbZMB4zcJiNZuMxzIbxuByH2eg3HsNsGA844FiEwzOl5ZNlmA3jAQccK3B4pnR9sgyzYTzggAMOOOrgIKOxDzjggAMOOASHyuMgo7cPOOCAAw44BIfgEByCQ3AIDjjggAMOfzrqj0kth+WAAw44BIfgUF8cP37/UoXgEBzqgePl9bsqBIfgUCgOPhrLgAMOOOCAQ3AoBAcfXWXAAQcccNT5P6QuqYKMEjiMR8vZgAOOFW9NcFXpz5QL37fittJnAw44Fr3jzYVFP1OufTukO4uejcvfK+vacmfj8jdSu7nc2ZjxLnuXFzobz8dhPNrMxgwcfITOxiU4jEeP2ZiEg4/E2bgKBx8NZMABxwocfKTLuBYHH9Ey4IBjHQ4+cmXMwMFHqIxlOPh4XEYTHMYjcTbm4eAjTsZUHHxkyViPg4+CXzXW4OAjSMYCHHykyFiDg48IGctw8FFfxkoc7/nYmch7B7Lqglbi4KOyjPU4+CgrowSOGz52IHLjd19+LyVwbDshZVmUw7HVhFQejKI4NvERIaMijt5EUliUxnHbRyKR279OzSuoi6MNkUQWGTg+9FGZyIefvPjJB+A4SKSOkiMfNeLMY3AcJ7JKycHPFnTaYTjuIjJHyfEPE3fOkTjuJfJcKyd+bugJB+M4TWRm0Wcbj6Omkh5H2gdHBSXNTrIhjslQGp9ecxxXWNnnuPbCcUSPQ4BDcAgOwSE4BIfgEByCQ3BIcAgOwSE4BIfgEByCQ236CyVvtnl2kRoQAAAAAElFTkSuQmCC" />
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAIAAACyr5FlAAADeElEQVR42u3dwW0UQRRF0dojNhYLtiRCAA7GIRAPYRASESAIAI97eqar/vt1pLv3uOro9Sws9/j0+UX6b8MRCA7BITgEh+AQHIJDcAgOwSHBITgEh+AQHIJDcAiOTr39/OMQNsXx7+4fDw4aWOmIYwKITaAMJihpi6OUiWZKxlYsvnz99nj7EBm9WTxFw7OswFGCxQQTp5XAsYbFEhPnlMAxiUUREyeUwHGhjLIsjhOBY1MW6URGnIw4FgeJwLEvi0Qigww+AnBswuIIETh2HIysCRkGw4QUxUFGZR+DDD7K4cDiLiIb4SAjwscgg48qOMgI8jHI4KMoDtd/wkdDHGTE+Rhk8LESh68aoV8+htkwHstwkJHrY5DBBxxwVMJBRrqPQQYfcMBRAwcZPXzMwOEi5/gIwGE22ozHMBvGYxIOs9FpPIbZMB4zcJiNZuMxzIbxuByH2eg3HsNsGA844FiEwzOl5ZNlmA3jAQccK3B4pnR9sgyzYTzggAMOOOrgIKOxDzjggAMOOASHyuMgo7cPOOCAAw44BIfgEByCQ3AIDjjggAMOfzrqj0kth+WAAw44BIfgUF8cP37/UoXgEBzqgePl9bsqBIfgUCgOPhrLgAMOOOCAQ3AoBAcfXWXAAQcccNT5P6QuqYKMEjiMR8vZgAOOFW9NcFXpz5QL37fittJnAw44Fr3jzYVFP1OufTukO4uejcvfK+vacmfj8jdSu7nc2ZjxLnuXFzobz8dhPNrMxgwcfITOxiU4jEeP2ZiEg4/E2bgKBx8NZMABxwocfKTLuBYHH9Ey4IBjHQ4+cmXMwMFHqIxlOPh4XEYTHMYjcTbm4eAjTsZUHHxkyViPg4+CXzXW4OAjSMYCHHykyFiDg48IGctw8FFfxkoc7/nYmch7B7Lqglbi4KOyjPU4+CgrowSOGz52IHLjd19+LyVwbDshZVmUw7HVhFQejKI4NvERIaMijt5EUliUxnHbRyKR279OzSuoi6MNkUQWGTg+9FGZyIefvPjJB+A4SKSOkiMfNeLMY3AcJ7JKycHPFnTaYTjuIjJHyfEPE3fOkTjuJfJcKyd+bugJB+M4TWRm0Wcbj6Omkh5H2gdHBSXNTrIhjslQGp9ecxxXWNnnuPbCcUSPQ4BDcAgOwSE4BIfgEByCQ3BIcAgOwSE4BIfgEByCQ236CyVvtnl2kRoQAAAAAElFTkSuQmCC" />
 <style>
   /* ---------- 토큰: 라이트가 기본, 다크는 재정의만 ---------- */
   :root{
