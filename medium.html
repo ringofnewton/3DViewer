@@ -168,6 +168,11 @@
   .out{color:var(--ok);font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap;}
   .bad{color:var(--danger);} .warnc{color:var(--warn);} .muted{color:var(--muted);}
   .toolbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+  #btn-cloud{font-variant-numeric:tabular-nums;}
+  #btn-cloud[data-s="saved"]{border-color:var(--accent-line);color:var(--ok);}
+  #btn-cloud[data-s="dirty"]{border-color:var(--warn-line);color:var(--warn);}
+  #btn-cloud[data-s="saving"]{border-color:var(--accent-line);color:var(--accent);}
+  #btn-cloud[data-s="conflict"],#btn-cloud[data-s="error"]{border-color:var(--danger);color:var(--danger);}
   .fld{display:flex;align-items:center;gap:5px;}
   .fld label{font-size:12px;color:var(--muted);white-space:nowrap;}
   .fld select,.fld input{width:auto;}
@@ -279,6 +284,7 @@
     <button id="btn-examples">예시</button>
     <button id="btn-io">저장/불러오기</button>
     <button id="btn-print">인쇄·PDF</button>
+    <button id="btn-cloud" hidden></button>
   </div>
 </header>
 
@@ -758,7 +764,11 @@ function loadDB(){
   const first = normalize(EXAMPLES["분주 흐름 (36 mL → 18/18 → 4·2·12 → 8·4)"]());
   return {activeId:first.id, recipes:[first]};
 }
-function save(){ try{ localStorage.setItem(KEY, JSON.stringify(DB)); }catch(e){} }
+function save(){
+  if(bootDone) DB.savedAt = Date.now();
+  try{ localStorage.setItem(KEY, JSON.stringify(DB)); }catch(e){}
+  markDirty();
+}
 function setActive(id){ DB.activeId = id; S = DB.recipes.find(r=>r.id===id); renderAll(); }
 
 const EXPAND = new Set();   // compact 모드에서 시약 목록을 펼친 노드
@@ -1344,6 +1354,7 @@ document.addEventListener("click", async e=>{
       DB.recipes.push(rec); setActive(rec.id); break;
     }
     case "btn-print": window.print(); break;
+    case "btn-cloud": await publishCloud(); break;
     case "btn-io":
       $("#io").hidden = false; dumpJSON(); $("#io").scrollIntoView({behavior:"smooth"}); break;
     case "btn-ioclose": $("#io").hidden = true; break;
@@ -1397,10 +1408,110 @@ function dumpJSON(){
   $("#json").value = JSON.stringify($("#io-scope").value === "one" ? S : DB, null, 2);
 }
 
+/* ============================ 클라우드 동기화 ============================ */
+/* 아티팩트로 열었을 때만 동작합니다. 페이지는 그대로 두고 데이터 파일만 새 버전으로 저장하므로,
+   한 기기에서 저장하면 다른 기기는 다음에 열 때(또는 열려 있으면 자동 새로고침 후) 같은 내용을 봅니다. */
+const CLOUD_PATH = "data/recipes.json";
+let ART = null;            // artifact capability
+let bootDone = false;
+let syncTimer = null, lastPublish = 0, minGap = 15000;
+const CLOUD_LABEL = {
+  idle:     "☁ 동기화",
+  saved:    "☁ 저장됨",
+  dirty:    "☁ 변경됨 · 저장",
+  saving:   "☁ 저장 중…",
+  conflict: "☁ 다른 기기가 먼저 저장함",
+  error:    "☁ 저장 실패"
+};
+function setCloud(state, msg){
+  const el = $("#btn-cloud");
+  if(!el) return;
+  if(!ART || state === "off"){ el.hidden = true; return; }
+  el.hidden = false;
+  el.dataset.s = state;
+  el.textContent = CLOUD_LABEL[state] || CLOUD_LABEL.idle;
+  el.title = msg || (state === "saved" ? "이 기기의 내용이 클라우드에 저장되어 있습니다."
+    : state === "dirty" ? "저장되지 않은 변경사항이 있습니다. 눌러서 지금 저장합니다."
+    : state === "conflict" ? "다른 기기에서 먼저 저장했습니다. 새로고침한 뒤 다시 저장하세요."
+    : "눌러서 지금 저장합니다.");
+}
+function markDirty(){
+  if(!ART || !bootDone) return;
+  setCloud("dirty");
+  scheduleSync(5000);
+}
+function scheduleSync(ms){
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(publishCloud, ms);
+}
+async function publishCloud(){
+  if(!ART) return;
+  clearTimeout(syncTimer);
+  const now = Date.now();
+  if(now - lastPublish < minGap){ scheduleSync(minGap - (now - lastPublish)); return; }
+  setCloud("saving");
+  try{
+    await ART.publish({[CLOUD_PATH]: JSON.stringify({v:1, savedAt: DB.savedAt || now, db: DB})});
+    lastPublish = Date.now();
+    DB.syncedAt = DB.savedAt || now;
+    save();
+    setCloud("saved");
+  }catch(err){
+    const c = err && err.code;
+    if(c === "conflict"){ setCloud("conflict"); }
+    else if(c === "rate_limited"){ minGap = Math.min(minGap*2, 120000); setCloud("dirty"); scheduleSync(minGap); }
+    else if(c === "not_writer" || c === "not_granted" || c === "not_declared" ||
+            c === "capability_disabled" || c === "capability_removed"){ ART = null; setCloud("off"); }
+    else { setCloud("error", (err && err.message) || ""); }
+  }
+}
+function adoptCloud(cloud){
+  DB = {activeId: cloud.db.activeId, recipes: cloud.db.recipes.map(normalize)};
+  if(!DB.recipes.length) DB.recipes = [normalize(newRecipe())];
+  if(!DB.recipes.some(r=>r.id===DB.activeId)) DB.activeId = DB.recipes[0].id;
+  DB.savedAt = DB.syncedAt = cloud.savedAt || Date.now();
+  S = DB.recipes.find(r=>r.id===DB.activeId) || DB.recipes[0];
+  renderAll();
+}
+async function initCloud(){
+  try{ ART = (typeof claude !== "undefined" && claude && claude.use) ? await claude.use("artifact") : null; }
+  catch(e){ ART = null; }
+  if(!ART){ setCloud("off"); return; }
+
+  let cloud = null;
+  try{
+    const r = await fetch(CLOUD_PATH, {cache:"no-store"});
+    if(r.ok) cloud = await r.json();
+  }catch(e){}
+
+  const valid = cloud && cloud.db && Array.isArray(cloud.db.recipes) && cloud.db.recipes.length;
+  const localEdited = (DB.savedAt||0) > (DB.syncedAt||0);
+  const cloudNewer  = valid && (cloud.savedAt||0) > (DB.syncedAt||0);
+
+  if(cloudNewer && !localEdited){ adoptCloud(cloud); setCloud("saved"); return; }
+  if(cloudNewer && localEdited){
+    const i = await ask({type:"select", title:"기기마다 내용이 다릅니다",
+      msg:"이 기기에서 수정한 내용과 클라우드에 저장된 내용이 서로 다릅니다. 어느 쪽을 쓸까요?",
+      options:[
+        "이 기기 내용 사용 (클라우드에 덮어쓰기)",
+        "클라우드 내용 사용 (이 기기 변경 버림)"
+      ]});
+    if(i === 1){ adoptCloud(cloud); setCloud("saved"); return; }
+    setCloud("dirty"); scheduleSync(500); return;
+  }
+  setCloud(localEdited || !valid ? "dirty" : "saved");
+}
+
 /* ============================ 시작 ============================ */
 DB = loadDB();
 S  = DB.recipes.find(r=>r.id===DB.activeId) || DB.recipes[0];
 renderAll();
+bootDone = true;
+initCloud();
+// 탭을 닫기 전 마지막 저장 시도
+window.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState === "hidden" && ART && (DB.savedAt||0) > (DB.syncedAt||0)) publishCloud();
+});
 </script>
 </body>
 </html>
